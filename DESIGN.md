@@ -2,13 +2,9 @@
 
 ## Working agreement (read first)
 
-**Order of work: the owner sets it. Current phase:**
-1. **Draft the Playwright specs.**
-2. **Set up GitHub (`gh`) and CI.**
-3. **Make CI fail:** there's no app yet, so the gate must go red for the right reason.
-4. **Add the fixtures and supporting pieces, and make the easiest smoke test pass:** the 4 screens load, even though nothing plays yet.
-
-**We reconvene after these four steps.** Nothing beyond them gets started before then.
+**Order of work: the owner sets it.**
+- **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing), the pinned Playwright Docker image, and the GitHub Pages deploy.
+- **Current phase:** M0, the Shaka offline spike (see Milestones).
 
 **Rules while working:**
 - Ask for design clarifications along the way whenever they're needed.
@@ -27,6 +23,8 @@ Specs: (spend more time on the ones on top - 60% top two bullets and 40% divided
 ---
 
 # Plan
+
+**Typical media:** 5–20 minute episodes, not films. Sizes are in the low hundreds of MB.
 
 Effort split mirrors the specs: sections 1–2 (platform + stack) are the bulk of the thinking; sections 3–6 are deliberately short.
 
@@ -100,8 +98,8 @@ Deleting the home-screen icon (or clearing that app's data) deletes its library.
 | Offline + installability | Service worker + `manifest.webmanifest` |
 
 **Mac-side tools (preparing videos only; nothing extra on the iPad):**
-- **Shaka Packager:** a single static binary (from GitHub releases, or the `shaka-streamer-binaries` package). It repackages H.264/AAC `.mp4` into DASH **without re-encoding**, so it's fast.
-- **ffmpeg** (Homebrew):
+- **Shaka Packager:** a single static binary, **pinned to v3.9.3**, downloaded from its GitHub releases (`packager-osx-arm64` on the Mac, `packager-linux-x64` in CI) and checked against a SHA-256. It repackages H.264/AAC `.mp4` into DASH **without re-encoding**, so it's fast. **No Python or venv anywhere.**
+- **ffmpeg 9.0.2**: Homebrew on the Mac (already installed). In CI, the static build from `mwader/static-ffmpeg:9.0.2-1-amd64`, pinned by image digest and copied out of the image. No `apt`, which hung CI once:
   - re-encodes inputs that aren't already H.264/AAC;
   - grabs a poster frame for the thumbnail.
 
@@ -212,7 +210,7 @@ Any new feature gets proposed first and added only after it's approved.
 - **Codec canary test (runs first):** it asserts that `MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')` and the AAC equivalent are `true`. Open-source Chromium builds lack H.264/AAC, so if a bump ever switches to one, this fails loudly instead of every playback test failing in confusing ways.
 
 ### Fixtures (generated, deterministic, nothing big committed)
-- Generated in CI with pinned **ffmpeg** + **Shaka Packager** from synthetic sources (`testsrc` video, which has a built-in frame counter, plus a `sine` tone). Both tools come from the pinned `shaka-streamer-binaries` package. There's no copyrighted or real content.
+- Generated in CI with the **pinned static ffmpeg 9.0.2** + the **pinned Shaka Packager binary** from synthetic sources (`testsrc` video, which has a built-in frame counter, plus a `sine` tone). There's no copyrighted or real content.
 - Cached by a hash of the fixture script plus the tool versions.
 
 | Fixture | Purpose |
@@ -331,7 +329,9 @@ The specs depend only on what's listed here. Changing it means changing the spec
    - an empty app shell with its `data-state` contract;
    - the smoke test (4 screens load) plus the codec canary passing in CI;
    - all other specs drafted as `test.fixme`.
-1. **M0 – Shaka offline spike (riskiest feature work, right after T0):** a bare PWA with Shaka installed on both the iPad and the Mac. Package one **2 GB+** video on the Mac, put it in Google Drive, then on the actual iPad confirm:
+1. **M0 – Shaka offline spike (riskiest feature work, right after T0):**
+   - Built as a **diagnostic page**, `app/spike/` (with its own service worker and manifest), installable as its own PWA. It shows each check as pass/fail and reuses real modules the app keeps (e.g. `local-scheme.js`). It has one active CI test that stores a fixture via the `local:` scheme. The main app is untouched.
+   - Package one **typical episode (5–20 min)** on the Mac and put it in Google Drive. Then on the actual iPad confirm:
    - the 4 files can be picked from Google Drive in the Files picker;
    - `storage.store()` through the `local:` scheme completes;
    - the video plays smoothly offline (airplane mode);
@@ -340,7 +340,12 @@ The specs depend only on what's listed here. Changing it means changing the spec
    - the Media Session `play` handler is honoured.
 
    If Shaka fails on iPad, switch to the OPFS + range-response fallback (section 1).
-2. **M1 – Mac prepare script:** `tools/prepare.sh`, which checks the codec, re-encodes only if needed, packages, grabs the poster, and writes to the Drive folder.
+2. **M1 – Mac prepare script:** *pulled into M0*, because M0 needs a real episode packaged. It covers:
+   - `tools/get-packager.sh` (pinned binary + SHA-256);
+   - `tools/prepare.sh` (codec check, re-encode only if needed, package, poster);
+   - CI building the fixtures through `prepare.sh`, including the VP9 re-encode path.
+
+   What's left for M1 is whatever the iPad run shows is missing.
 3. **M2 – Library + import:** Add video (pick files → `store` with progress), thumbnail grid, remove video.
 4. **M3 – Player + PIN gate:** custom controls, pause free / play behind the PIN, no autoplay, background pause, remote play blocked.
 5. **M4 – PIN setup & lockout,** service worker for offline, app icon.
@@ -365,5 +370,4 @@ The specs depend only on what's listed here. Changing it means changing the spec
 - Shaka Packager releases: https://github.com/shaka-project/shaka-packager/releases
 - Playwright: Chrome for Testing vs Chromium codecs: https://qaskills.sh/blog/chrome-for-testing-vs-chromium-playwright
 - Chromium lacks H.264 for MSE by default: https://groups.google.com/a/chromium.org/g/chromium-dev/c/Qh49e3wcyKM
-- shaka-streamer-binaries (Packager + ffmpeg static builds incl. macOS arm64): https://pypi.org/project/shaka-streamer-binaries/
 - Chrome on iOS adds Home Screen web apps (iPadOS 16.4+): https://www.ghacks.net/?p=198976

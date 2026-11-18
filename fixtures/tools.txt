@@ -1,2 +1,0 @@
-# Pinned media tools for fixtures (ffmpeg, ffprobe, Shaka Packager static builds).
-shaka-streamer-binaries==2.1.0
