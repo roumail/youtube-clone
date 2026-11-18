@@ -152,5 +152,8 @@ tools/release.sh 1.0.0 --dry-run   # first release: explicit version; preview
 tools/release.sh 1.0.0
 tools/release.sh minor             # later: major | minor | patch
 ```
-It only releases the commit that is live and verified, and creates the tag and
-GitHub Release with your own `gh` login.
+It tags `main`'s current commit (it must have passed CI) and publishes the
+GitHub Release with your own `gh` login. **Publishing the release deploys it**:
+the site always runs the latest release. Watch the deploy with
+`gh run list --workflow deploy.yml --limit 1`; if its live check fails, the
+previous release is restored automatically.

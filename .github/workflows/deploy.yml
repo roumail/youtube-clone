@@ -1,19 +1,18 @@
 name: Deploy
-# The run name carries the deployed commit; the rollback reads it back.
-run-name: Deploy ${{ inputs.ref || github.event.workflow_run.head_sha || github.sha }}
+# The run name carries the deployed release; the rollback reads it back.
+run-name: Deploy ${{ github.event.release.tag_name || inputs.tag }}
 
-# Publishes the app to GitHub Pages after CI passes on main, then checks the
-# live site; if that fails, the previous good version is restored.
+# The site runs exactly the latest release: publishing a GitHub Release (via
+# tools/release.sh) deploys its tag, then the live site is checked; if that
+# fails, the previous release is restored. Merges to main don't deploy.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
-      ref:
-        description: 'Commit to deploy (default: the current main)'
-        required: false
+      tag:
+        description: 'Release tag to (re)deploy, e.g. v1.0.0'
+        required: true
       rollback:
         description: 'Set by the automatic rollback; disables a further rollback'
         required: false
@@ -31,9 +30,6 @@ env:
 
 jobs:
   deploy:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -46,40 +42,41 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     outputs:
       sha: ${{ steps.target.outputs.sha }}
+      tag: ${{ steps.target.outputs.tag }}
     steps:
-      - id: target
-        env:
-          INPUT_REF: ${{ inputs.ref }}
-          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: echo "sha=${INPUT_REF:-${RUN_SHA:-$GITHUB_SHA}}" >> "$GITHUB_OUTPUT"
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Deploy exactly the commit CI tested.
-          ref: ${{ steps.target.outputs.sha }}
           fetch-depth: 0
 
-      # Only commits on main that passed e2e are published.
-      - name: Guard — commit is on main and passed CI
+      # Only a release tag whose commit is on main and passed e2e is published.
+      - id: target
+        name: Guard — release tag on main, passed CI
         env:
           GH_TOKEN: ${{ github.token }}
-          SHA: ${{ steps.target.outputs.sha }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::ref must be a full commit SHA"; exit 1; }
-          git fetch -q origin main
-          git merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$SHA is not on main"; exit 1; }
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a release tag: $TAG"; exit 1; }
+          git fetch -q --tags origin main
+          SHA=$(git rev-parse -q --verify "refs/tags/$TAG^{commit}") || { echo "::error::tag $TAG not found"; exit 1; }
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' | grep -qx false \
+            || { echo "::error::$TAG is not a published release"; exit 1; }
+          git merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$TAG ($SHA) is not on main"; exit 1; }
           ok=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=e2e&filter=all" \
             --jq '[.check_runs[] | select(.conclusion == "success")] | length')
-          [ "${ok:-0}" -gt 0 ] || { echo "::error::$SHA has no successful e2e check"; exit 1; }
-          echo "OK: $SHA is on main and passed e2e"
+          [ "${ok:-0}" -gt 0 ] || { echo "::error::$TAG ($SHA) has no successful e2e check"; exit 1; }
+          echo "OK: $TAG = $SHA, on main, passed e2e"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          git checkout -q "$SHA"
 
       - name: Assemble the public site
         env:
           SHA: ${{ steps.target.outputs.sha }}
+          TAG: ${{ steps.target.outputs.tag }}
         run: |
           mkdir _site
           rsync -a app/ _site/
-          printf '{"commit":"%s"}\n' "$SHA" > _site/version.json
+          printf '{"version":"%s","commit":"%s"}\n' "$TAG" "$SHA" > _site/version.json
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
@@ -149,6 +146,7 @@ jobs:
       - name: Smoke-test the live site
         env:
           EXPECTED_SHA: ${{ needs.deploy.outputs.sha }}
+          EXPECTED_VERSION: ${{ needs.deploy.outputs.tag }}
         run: npx playwright test
 
       - name: Upload report and traces
@@ -170,18 +168,17 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: write
-      deployments: read
     steps:
-      - name: Redeploy the previous good version
+      - name: Redeploy the previous release
         env:
           GH_TOKEN: ${{ github.token }}
-          BAD_SHA: ${{ needs.deploy.outputs.sha }}
+          BAD_TAG: ${{ needs.deploy.outputs.tag }}
         run: |
-          # A successful Deploy run = deployed AND verified live. Its name is "Deploy <sha>".
+          # A successful Deploy run = deployed AND verified. Its name is "Deploy <tag>".
           good=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?status=success&per_page=30" \
-            --jq '[.workflow_runs[].display_title | capture("^Deploy (?<sha>[0-9a-f]{40})$").sha] | map(select(. != env.BAD_SHA)) | .[0] // empty')
-          if [ -z "$good" ]; then echo "no previous good deploy found; leaving the site as is" >&2; exit 1; fi
+            --jq '[.workflow_runs[].display_title | capture("^Deploy (?<tag>v[0-9]+[.][0-9]+[.][0-9]+)$").tag] | map(select(. != env.BAD_TAG)) | .[0] // empty')
+          if [ -z "$good" ]; then echo "::error::Live check failed for $BAD_TAG and there is no earlier verified release to restore"; exit 1; fi
           echo "rolling back to $good"
-          gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main -f ref="$good" -f rollback=true
-          echo "::error::Live check failed for $BAD_SHA; rolled back to $good"
+          gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main -f tag="$good" -f rollback=true
+          echo "::error::Live check failed for $BAD_TAG; rolled back to $good"
           exit 1
