@@ -9,6 +9,8 @@
 #   audio.mp4      audio track (AAC)
 #   poster.jpg     thumbnail
 #
+# Audio: if there are several audio tracks, the first English one is used
+# (language tag en/eng/english); otherwise the first audio track.
 # Re-encodes only when the input isn't already H.264 + AAC in MP4/MOV;
 # otherwise it just repackages (fast). Skips videos already prepared.
 # Needs: ffmpeg + ffprobe on PATH, and tools/get-packager.sh run once.
@@ -32,7 +34,16 @@ DEST="$ROOT/$TITLE"
 if [[ -f "$DEST/$TITLE.mpd" ]]; then echo "already prepared: $DEST"; exit 0; fi
 
 probe() { "$FFPROBE" -v error -select_streams "$1" -show_entries stream=codec_name -of csv=p=0 "$INPUT" | head -1; }
-VCODEC="$(probe v:0)"; ACODEC="$(probe a:0)"
+
+# Which audio stream (absolute index): first English, else first audio.
+AUDIO_LIST="$("$FFPROBE" -v error -select_streams a -show_entries stream=index:stream_tags=language -of csv=p=0 "$INPUT")"
+AIDX="$(awk -F, 'tolower($2) ~ /^(en|eng|english)$/ { print $1; exit }' <<<"$AUDIO_LIST")"
+[[ -n "$AIDX" ]] || AIDX="$(head -1 <<<"$AUDIO_LIST" | cut -d, -f1)"
+[[ -n "$AIDX" ]] || { echo "no audio track in $INPUT" >&2; exit 1; }
+ALANG="$(awk -F, -v i="$AIDX" '$1 == i { print ($2 == "" ? "unknown" : $2) }' <<<"$AUDIO_LIST")"
+echo "audio: stream $AIDX ($ALANG) of $(wc -l <<<"$AUDIO_LIST" | tr -d ' ') audio track(s)"
+
+VCODEC="$(probe v:0)"; ACODEC="$(probe "$AIDX")"
 EXT="$(tr '[:upper:]' '[:lower:]' <<<"${NAME##*.}")"
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
@@ -43,17 +54,19 @@ if [[ "$VCODEC" != h264 || "$ACODEC" != aac || ! "$EXT" =~ ^(mp4|m4v|mov)$ ]]; t
   AARGS=(-c:a aac -b:a 128k -ac 2)
   [[ "$VCODEC" == h264 ]] && VARGS=(-c:v copy)
   [[ "$ACODEC" == aac ]] && AARGS=(-c:a copy)
-  "$FFMPEG" -hide_banner -loglevel error -y -i "$INPUT" -map 0:v:0 -map 0:a:0 \
+  "$FFMPEG" -hide_banner -loglevel error -y -i "$INPUT" -map 0:v:0 -map "0:$AIDX" \
     "${VARGS[@]}" "${AARGS[@]}" -movflags +faststart "$WORK/src.mp4"
   SRC="$WORK/src.mp4"
+  ASEL=audio   # the re-encoded file has exactly one audio track
 else
   echo "already H.264/AAC: repackaging only"
+  ASEL="$AIDX" # packager accepts a zero-based stream index
 fi
 
 mkdir -p "$WORK/out"
 "$PACKAGER" --quiet \
   "in=$SRC,stream=video,output=$WORK/out/video.mp4" \
-  "in=$SRC,stream=audio,output=$WORK/out/audio.mp4" \
+  "in=$SRC,stream=$ASEL,output=$WORK/out/audio.mp4" \
   --mpd_output "$WORK/out/$TITLE.mpd"
 
 # Poster from 10% into the video.

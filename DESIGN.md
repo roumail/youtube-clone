@@ -144,6 +144,7 @@ tools/prepare.sh           // Mac: video → packaged folder in Google Drive
     poster.jpg        // thumbnail
   ```
 - The script:
+  - uses the **first English audio track** when there are several (language tag `en`/`eng`/`english`), otherwise the first audio track;
   - runs ffmpeg first only if the input isn't already H.264/AAC (and always to grab the poster);
   - then runs Shaka Packager in **on-demand profile**, which writes one file per track plus the manifest, so there are no thousands of tiny files.
 - Already-packaged folders in Drive are reused as they are. Nothing is processed twice.
@@ -226,6 +227,7 @@ Any new feature gets proposed first and added only after it's approved.
 | `medium` (60 s, packaged) | Pause/resume mid-video, background-pause tests. |
 | `raw-h264.mp4`, `raw-vp9.webm` (unpackaged) | Raw inputs. From M1 on, `prepare.sh` packages them in CI, which covers its no-re-encode and transcode paths. |
 | `broken-missing-audio/` | Import error handling (a file is missing from the folder). |
+| `episode-like` (10 s, 1080p H.264 High, BT.709, audio: Chinese first + English second) | Mirrors a real web-download episode: the P3/SDR track-picker case, and `prepare.sh` choosing English. |
 
 ### Avoiding races in user-action tests
 The principle: **tests wait on observable state, never on time.**
