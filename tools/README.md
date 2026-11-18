@@ -30,7 +30,7 @@ The pinned Shaka Packager is downloaded automatically on first use
 ## `tools/run_prepare.sh` — the everyday command
 
 ```bash
-tools/run_prepare.sh [--dest DIR] [--title "Clean Title"] INPUT...
+tools/run_prepare.sh [--dest DIR] [--title "Clean Title"] [--series "Name"] INPUT...
 ls *.mp4 | tools/run_prepare.sh        # paths on stdin, one per line
 ```
 
@@ -50,7 +50,8 @@ echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 |---|---|
 | `INPUT...` | Video files and/or folders. Folders are searched recursively for `.mp4 .m4v .mov .mkv .webm .avi`. With no `INPUT`, paths are read from stdin, one per line (`ls *.mp4 \| run_prepare`). |
 | `--dest DIR` | Where prepared folders go. Default: `KIDS_LIBRARY` from the environment or `.env`. |
-| `--title "…"` | Clean title for a **single** file (instead of its file name). |
+| `--title "…"` | Clean title for a **single** file (instead of its file name). With `--series`, the episode title. |
+| `--series "Name"` | The inputs are episodes of a series (see below). |
 
 ### Examples
 
@@ -85,6 +86,33 @@ Several files and folders at once, into a different destination:
 ```bash
 tools/run_prepare.sh --dest ~/Desktop/test-library ep1.mp4 ep2.mkv ~/Videos/Specials/
 ```
+
+### Series
+Pass `--series` and the episodes get titles the app understands
+(`Name - S01E03 - Episode title`) and go into a folder per series:
+
+```bash
+run_prepare --series "Bluey" ~/Downloads/Bluey/          # whole season folder
+ls Bluey*.mkv | run_prepare --series "Bluey"              # piped
+run_prepare --series "Bluey" --title "Keepy Uppy" ep3.mkv # name one episode yourself
+```
+
+```
+Kids Library/
+  Bluey/
+    Bluey - S01E01 - Magic Xylophone/   (Bluey - S01E01 - Magic Xylophone.mpd + 3 files)
+    Bluey - S01E03 - Keepy Uppy/
+  The Snowy Day/                        (standalone videos stay at the top level)
+```
+
+- Each file name must contain its season and episode: `S01E03`, `s1e3` or
+  `1x03`. Files without one are reported as failed (rename them, or prepare
+  them without `--series`).
+- The episode title is the text after that tag, with dots/underscores turned
+  into spaces and release tags (`1080p`, `WEB-DL`, `x264`, …) cut off:
+  `Bluey.S01E03.Keepy.Uppy.1080p.WEB-DL.mkv` → `Bluey - S01E03 - Keepy Uppy`.
+- In the app, episodes of a series are listed together, in episode order.
+  On the iPad, pick the 4 files from inside the episode's folder, as usual.
 
 ### What it does
 - For each video, runs `tools/prepare.sh`, which:

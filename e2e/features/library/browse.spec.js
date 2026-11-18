@@ -42,4 +42,19 @@ test.describe('Feature: Browse the library', () => {
       await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toBeVisible();
     });
   });
+
+  test('Scenario: episodes of a series are listed together, in episode order', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given three episodes of "Show" (stored out of order) and "tiny" are stored', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('Show - S01E10 - Tenth', 'tiny', 'Show - S01E02 - Second', 'Show - S01E01 - First');
+    });
+    await test.step('Then the episodes appear together, E01, E02, E10, and the other video by name', async () => {
+      await expect(page.getByTestId('library-item')).toHaveText([
+        /Show - S01E01 - First/,
+        /Show - S01E02 - Second/,
+        /Show - S01E10 - Tenth/,
+        /tiny/,
+      ]);
+    });
+  });
 });
