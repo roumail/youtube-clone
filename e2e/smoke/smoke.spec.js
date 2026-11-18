@@ -32,6 +32,9 @@ test.describe('the 4 screens load', () => {
     await test.step('Given a PIN is set and the library is empty', async () => {
       await goto(page, '#/library');
     });
+    await test.step('And without a release (local/CI) the version label says "dev"', async () => {
+      await expect(page.getByTestId('app-version')).toHaveText('dev');
+    });
     await test.step('Then the library screen shows its empty state', async () => {
       await expect(page.getByTestId('screen-library')).toBeVisible();
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');

@@ -25,4 +25,9 @@ test.describe('Live site after deploy', () => {
     await goto(page, '#/library');
     await expect(page.getByTestId('screen-library')).toBeVisible();
   });
+
+  test('Scenario: the library shows the released version', async ({ page, pinSet }) => {
+    await goto(page, '#/library');
+    await expect(page.getByTestId('app-version')).toHaveText(process.env.EXPECTED_VERSION);
+  });
 });
