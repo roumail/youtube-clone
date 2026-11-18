@@ -19,6 +19,7 @@
 #          "NAME - S01E03 - Episode title", filed under DEST/NAME/.
 # --tmux:  run the job detached in a tmux session (survives closing the
 #          terminal); prints how to watch it. Needs tmux (brew install tmux).
+#          RUN_PREPARE_TMUX=1 in .env makes it the default; --no-tmux overrides.
 #
 # Already-prepared videos are skipped; a failure doesn't stop the batch.
 set -uo pipefail
@@ -33,15 +34,16 @@ done
 HERE="$(cd "$(dirname "$SELF")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
-usage() { sed -n '2,23p' "$SELF" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
+usage() { sed -n '2,24p' "$SELF" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
 
-DEST=""; TITLE=""; SERIES=""; USE_TMUX=0; INPUTS=()
+DEST=""; TITLE=""; SERIES=""; USE_TMUX=""; INPUTS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dest) DEST="${2:-}"; shift 2 ;;
     --title) TITLE="${2:-}"; shift 2 ;;
     --series) SERIES="${2:-}"; shift 2 ;;
     --tmux) USE_TMUX=1; shift ;;
+    --no-tmux) USE_TMUX=0; shift ;;
     -h|--help) usage 0 ;;
     --) shift; INPUTS+=("$@"); break ;;
     -*) echo "unknown option: $1" >&2; usage ;;
@@ -54,12 +56,18 @@ if [[ ${#INPUTS[@]} -eq 0 && ! -t 0 ]]; then
 fi
 [[ ${#INPUTS[@]} -gt 0 ]] || usage
 
-if [[ -z "$DEST" ]]; then
-  if [[ -z "${KIDS_LIBRARY:-}" && -f "$ROOT/.env" ]]; then
-    set -a; . "$ROOT/.env"; set +a
-  fi
-  DEST="${KIDS_LIBRARY:-}"
+# Defaults from the repo's .env (gitignored). Variables already set in the
+# environment win over .env; command-line options win over both.
+if [[ -f "$ROOT/.env" ]]; then
+  kl_set="${KIDS_LIBRARY+x}"; kl="${KIDS_LIBRARY-}"
+  tm_set="${RUN_PREPARE_TMUX+x}"; tm="${RUN_PREPARE_TMUX-}"
+  set -a; . "$ROOT/.env"; set +a
+  [[ -n "$kl_set" ]] && KIDS_LIBRARY="$kl"
+  [[ -n "$tm_set" ]] && RUN_PREPARE_TMUX="$tm"
 fi
+[[ -n "$DEST" ]] || DEST="${KIDS_LIBRARY:-}"
+[[ -n "$USE_TMUX" ]] || USE_TMUX="${RUN_PREPARE_TMUX:-0}"
+[[ "$USE_TMUX" == 0 || "$USE_TMUX" == 1 ]] || { echo "RUN_PREPARE_TMUX must be 0 or 1 (got: $USE_TMUX)" >&2; exit 2; }
 if [[ -z "$DEST" ]]; then
   echo "No destination. Use --dest DIR, or set KIDS_LIBRARY in $ROOT/.env (see .env.example)." >&2
   exit 2
@@ -110,8 +118,8 @@ if [[ "$USE_TMUX" == 1 && -z "${TMUX:-}" ]]; then
   echo "  log:        $log"
   exit 0
 fi
-if [[ -z "${TMUX:-}" && -t 2 ]] && command -v tmux >/dev/null; then
-  echo "tip: long jobs (re-encodes) can run detached with --tmux" >&2
+if [[ "$USE_TMUX" == 0 && -z "${TMUX:-}" && -t 2 ]] && command -v tmux >/dev/null; then
+  echo "tip: long jobs (re-encodes) can run detached with --tmux (or RUN_PREPARE_TMUX=1 in .env)" >&2
 fi
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
