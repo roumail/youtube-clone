@@ -14,32 +14,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Media fixtures need no browser: generated on the plain runner with pinned
-  # static tools, cached, and handed to e2e as an artifact.
+  # Media fixtures need no browser: generated on the plain runner with ffmpeg +
+  # the pinned Shaka Packager binary, cached, and handed to e2e as an artifact.
   fixtures:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
-      - name: Restore fixtures (keyed on generator + tool versions)
+      - name: Restore fixtures (keyed on generator, prepare script, packager pin)
         id: fx-cache
         uses: actions/cache@v6
         with:
           path: fixtures/out
-          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'fixtures/tools.txt') }}
+          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'tools/prepare.sh', 'tools/get-packager.sh') }}
 
-      - name: Install pinned media tools
+      - name: Install ffmpeg + pinned Shaka Packager
         if: steps.fx-cache.outputs.cache-hit != 'true'
         run: |
-          python3 -m venv /tmp/mediatools
-          /tmp/mediatools/bin/pip install --quiet -r fixtures/tools.txt
-          # Use the fully static ffmpeg, not the distro-specific hw-encoder build.
-          FFPROBE=$(/tmp/mediatools/bin/python -c 'import streamer_binaries as b; print(b.ffprobe)')
-          echo "FFMPEG=${FFPROBE/ffprobe-/ffmpeg-}" >> "$GITHUB_ENV"
-          echo "PACKAGER=$(/tmp/mediatools/bin/python -c 'import streamer_binaries as b; print(b.packager)')" >> "$GITHUB_ENV"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg
+          tools/get-packager.sh
 
-      - name: Generate fixtures
+      - name: Generate fixtures (via tools/prepare.sh)
         if: steps.fx-cache.outputs.cache-hit != 'true'
         run: fixtures/generate.sh
 

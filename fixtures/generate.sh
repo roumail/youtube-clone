@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # Generate deterministic, synthetic test fixtures (DESIGN.md §7). Nothing real,
 # nothing committed: output goes to fixtures/out/ (gitignored, cached in CI).
-#
-# Tools come from the pinned shaka-streamer-binaries package (ffmpeg, ffprobe,
-# Shaka Packager static builds). Override with FFMPEG=/PACKAGER= if needed.
+# Packaged fixtures are produced by tools/prepare.sh itself, so every e2e run
+# exercises the real preparation path.
+# Needs: ffmpeg + ffprobe on PATH, and tools/get-packager.sh run once.
 set -euo pipefail
 
-cd "$(dirname "$0")"
-FFMPEG="${FFMPEG:-ffmpeg}"
-PACKAGER="${PACKAGER:-packager}"
-OUT=out
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PREPARE="$HERE/../tools/prepare.sh"
+OUT="$HERE/out"
 RAW="$OUT/raw"
+FFMPEG="${FFMPEG:-ffmpeg}"
 
+"$FFMPEG" -hide_banner -version | head -1
 rm -rf "$OUT"
 mkdir -p "$RAW"
 
@@ -26,32 +27,23 @@ make_raw() { # name seconds
     "$RAW/$1.mp4"
 }
 
-# Package exactly as tools/prepare.sh will: DASH on-demand profile, one file
-# per track, manifest named after the video (the title), plus a poster.
-package() { # name
-  local dir="$OUT/$1"
-  mkdir -p "$dir"
-  "$PACKAGER" --quiet \
-    "in=$RAW/$1.mp4,stream=video,output=$dir/video.mp4" \
-    "in=$RAW/$1.mp4,stream=audio,output=$dir/audio.mp4" \
-    --mpd_output "$dir/$1.mpd"
-  "$FFMPEG" -hide_banner -loglevel error -y -ss 1 -i "$RAW/$1.mp4" \
-    -frames:v 1 -q:v 4 "$dir/poster.jpg"
-}
-
 make_raw tiny 3
 make_raw medium 60
 make_raw broken-missing-audio 3
 
-package tiny
-package medium
-package broken-missing-audio
+for name in tiny medium broken-missing-audio; do
+  "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
+done
 rm "$OUT/broken-missing-audio/audio.mp4"   # the "broken" part
 
-# Raw inputs for tools/prepare.sh (from M1): already-H.264 and needs-transcode.
+# Raw inputs: already-H.264 (repackage path) and VP9/Opus (re-encode path).
 cp "$RAW/tiny.mp4" "$OUT/raw-h264.mp4"
 "$FFMPEG" -hide_banner -loglevel error -y -i "$RAW/tiny.mp4" \
   -c:v libvpx-vp9 -b:v 0 -crf 40 -deadline realtime -c:a libopus "$OUT/raw-vp9.webm"
+
+# Exercise the re-encode path of prepare.sh too.
+"$PREPARE" "$OUT/raw-vp9.webm" "$OUT/prepared-from-vp9" >/dev/null
+test -f "$OUT/prepared-from-vp9/raw-vp9/raw-vp9.mpd"
 
 rm -rf "$RAW"
 echo "fixtures:"; find "$OUT" -type f | sort
