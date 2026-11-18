@@ -12,7 +12,7 @@ test.describe('Feature: No way around the PIN', () => {
     await openVideo(page, 'medium');
   });
 
-  test.fixme('Scenario: leaving the app pauses, and coming back needs the PIN', async ({ page }) => {
+  test('Scenario: leaving the app pauses, and coming back needs the PIN', async ({ page }) => {
     await test.step('Given "medium" is playing', async () => {
       await startPlaying(page);
     });
@@ -32,7 +32,7 @@ test.describe('Feature: No way around the PIN', () => {
     });
   });
 
-  test.fixme('Scenario: headphone / lock-screen "play" does not resume', async ({ page }) => {
+  test('Scenario: headphone / lock-screen "play" does not resume', async ({ page }) => {
     await test.step('Given "medium" was playing and I paused it', async () => {
       await startPlaying(page);
       await page.getByTestId('pause-button').click();
@@ -47,7 +47,7 @@ test.describe('Feature: No way around the PIN', () => {
     });
   });
 
-  test.fixme('Scenario: play started outside the PIN flow is stopped at once', async ({ page }) => {
+  test('Scenario: play started outside the PIN flow is stopped at once', async ({ page }) => {
     await test.step('When something calls video.play() directly', async () => {
       await page.getByTestId('player-video').evaluate((v) => v.play().catch(() => {}));
     });

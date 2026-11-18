@@ -1,9 +1,12 @@
 // App: routing + one state object + render(state) (DESIGN.md §2, §7 contract).
-// Built so far: M2 (library, import, remove, PIN verify). Player behaviour (M3)
-// and first-run PIN setup / lockout / offline (M4) come later.
+// Built so far: M2 (library, import, remove, PIN verify) and M3 (player + PIN
+// gate). First-run PIN setup / lockout / offline (M4) come later.
 import { installLocalScheme } from './local-scheme.js';
 import { hasPin, verifyPin } from './pin.js';
 import { listVideos, importVideo, removeVideo } from './library.js';
+import {
+  playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
+} from './player.js';
 
 const $ = (testid, root = document) => root.querySelector(`[data-testid="${testid}"]`);
 
@@ -12,7 +15,7 @@ const state = {
   pinSet: false,
   library: [], // usable Shaka StoredContent
   settingsUnlocked: false,
-  // PIN prompt opened for an action: { purpose: 'import' | 'settings', status: 'entry' | 'wrong' }
+  // PIN prompt opened for an action: { purpose: 'import' | 'settings' | 'play', status: 'entry' | 'wrong' }
   prompt: null,
   importStatus: { phase: 'idle', progress: 0, message: '' },
 };
@@ -79,11 +82,13 @@ function render(s) {
   bar.hidden = s.importStatus.phase !== 'storing';
   bar.value = s.importStatus.progress;
 
-  // Player (behaviour is M3; the screen and route exist)
+  // Player
   show('screen-player', s.route.name === 'player');
   if (s.route.name === 'player') {
-    const found = s.library.some((c) => c.offlineUri === s.route.videoId);
-    $('screen-player').dataset.state = found ? 'loading' : 'error';
+    const status = playerState.status;
+    $('screen-player').dataset.state = status;
+    show('play-button', ['paused', 'ended', 'pin-required'].includes(status));
+    show('pause-button', status === 'playing');
   }
 
   // Settings
@@ -138,7 +143,22 @@ async function onPinSubmit(event) {
     $('import-input').click();
   } else if (purpose === 'settings') {
     state.settingsUnlocked = true;
+  } else if (purpose === 'play') {
+    update();
+    await allowPlay(); // still within the tap, so autoplay rules allow it
   }
+  update();
+}
+
+// Play (button or OS command): the PIN comes first, every time.
+function onPlayRequested() {
+  if (state.route.name !== 'player' || state.prompt) return;
+  if (requestPlay()) askPin('play');
+}
+
+function onPause() {
+  pause();
+  if (state.prompt?.purpose === 'play') state.prompt = null;
   update();
 }
 
@@ -146,6 +166,7 @@ function onPinCancel() {
   const purpose = state.prompt?.purpose;
   state.prompt = null;
   if (purpose === 'settings') go('#/library');
+  if (purpose === 'play') cancelPlay();
   update();
 }
 
@@ -175,9 +196,19 @@ async function onRemove(offlineUri) {
 }
 
 function onRouteChange() {
-  const previous = state.route.name;
+  const previous = state.route;
   state.route = parseRoute(location.hash);
-  if (previous === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
+  const leftPlayer = previous.name === 'player'
+    && (state.route.name !== 'player' || state.route.videoId !== previous.videoId);
+  if (leftPlayer) {
+    if (state.prompt?.purpose === 'play') state.prompt = null;
+    closeVideo().then(update);
+  }
+  if (state.route.name === 'player' && (leftPlayer || previous.name !== 'player' || playerState.offlineUri == null)) {
+    const exists = state.library.some((c) => c.offlineUri === state.route.videoId);
+    openVideo(state.route.videoId, exists).then(update);
+  }
+  if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
   if (state.route.name === 'settings' && !state.settingsUnlocked && state.pinSet) {
     state.prompt = { purpose: 'settings', status: 'entry' };
   } else if (state.prompt?.purpose === 'settings') {
@@ -200,10 +231,26 @@ async function boot() {
   $('pin-prompt').querySelector('form').addEventListener('submit', onPinSubmit);
   $('pin-cancel').addEventListener('click', onPinCancel);
   $('import-input').addEventListener('change', onFilesPicked);
+  $('play-button').addEventListener('click', onPlayRequested);
+  $('pause-button').addEventListener('click', onPause);
   window.addEventListener('hashchange', onRouteChange);
+
+  initPlayer($('player-video'), update);
+  // Leaving the app (switching apps, locking the screen) pauses; coming back
+  // needs the PIN again.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') onPause();
+  });
+  // OS media controls (lock screen, Control Center, headphones, media keys):
+  // "play" goes through the PIN like the on-screen button; "pause" is free.
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('play', onPlayRequested);
+    navigator.mediaSession.setActionHandler('pause', onPause);
+  }
 
   state.pinSet = hasPin();
   await refreshLibrary();
+  state.route = { name: '' };
   onRouteChange();
   $('app').dataset.ready = 'true';
 }

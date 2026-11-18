@@ -10,7 +10,7 @@ test.describe('Feature: Playing needs the PIN', () => {
     await openVideo(page, 'medium');
   });
 
-  test.fixme('Scenario: play asks for the PIN, and the correct PIN starts playback', async ({ page }) => {
+  test('Scenario: play asks for the PIN, and the correct PIN starts playback', async ({ page }) => {
     await test.step('When I tap play', async () => {
       await page.getByTestId('play-button').click();
     });
@@ -27,7 +27,7 @@ test.describe('Feature: Playing needs the PIN', () => {
     });
   });
 
-  test.fixme('Scenario: a wrong PIN does not start playback', async ({ page }) => {
+  test('Scenario: a wrong PIN does not start playback', async ({ page }) => {
     await test.step('When I tap play and enter a wrong PIN', async () => {
       await page.getByTestId('play-button').click();
       await enterPin(page, WRONG_PIN);
@@ -38,7 +38,7 @@ test.describe('Feature: Playing needs the PIN', () => {
     });
   });
 
-  test.fixme('Scenario: cancelling the PIN prompt leaves the video paused', async ({ page }) => {
+  test('Scenario: cancelling the PIN prompt leaves the video paused', async ({ page }) => {
     await test.step('When I tap play and then cancel the PIN prompt', async () => {
       await page.getByTestId('play-button').click();
       await page.getByTestId('pin-cancel').click();

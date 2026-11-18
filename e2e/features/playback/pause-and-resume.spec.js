@@ -11,7 +11,7 @@ test.describe('Feature: Pause and resume', () => {
     await startPlaying(page);
   });
 
-  test.fixme('Scenario: pausing never shows a PIN window', async ({ page }) => {
+  test('Scenario: pausing never shows a PIN window', async ({ page }) => {
     await test.step('When I tap pause while "medium" is playing', async () => {
       await page.getByTestId('pause-button').click();
     });
@@ -22,7 +22,7 @@ test.describe('Feature: Pause and resume', () => {
     });
   });
 
-  test.fixme('Scenario: resuming after a pause asks for the PIN again', async ({ page }) => {
+  test('Scenario: resuming after a pause asks for the PIN again', async ({ page }) => {
     await test.step('Given I paused "medium"', async () => {
       await page.getByTestId('pause-button').click();
       await expectNotPlaying(page);
@@ -36,7 +36,7 @@ test.describe('Feature: Pause and resume', () => {
     });
   });
 
-  test.fixme('Scenario: resuming continues from where it was paused', async ({ page }) => {
+  test('Scenario: resuming continues from where it was paused', async ({ page }) => {
     let pausedAt;
     await test.step('Given I paused "medium" partway through', async () => {
       await page.getByTestId('pause-button').click();
