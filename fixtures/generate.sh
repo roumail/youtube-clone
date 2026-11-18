@@ -58,6 +58,14 @@ rm "$OUT/broken-missing-audio/audio.mp4"   # the "broken" part
 # carry the same signal so CI covers it.
 grep -q 'TransferCharacteristics" value="1"' "$OUT/tiny/tiny.mpd" \
   || { echo "fixture manifest lacks BT.709 TransferCharacteristics" >&2; exit 1; }
+# A video this device can't play: "tiny" with a codec no browser supports.
+# Shaka's capability filter drops it, so a store would keep 0 tracks.
+cp -R "$OUT/tiny" "$OUT/unplayable"
+mv "$OUT/unplayable/tiny.mpd" "$OUT/unplayable/unplayable.mpd"
+sed -i.bak 's/codecs="avc1\.[0-9A-Fa-f]*"/codecs="xyz1.000000"/' "$OUT/unplayable/unplayable.mpd" && rm "$OUT/unplayable/unplayable.mpd.bak"
+grep -q 'codecs="xyz1.000000"' "$OUT/unplayable/unplayable.mpd" \
+  || { echo "unplayable fixture: codec not replaced" >&2; exit 1; }
+
 grep -q 'lang="en"' "$OUT/episode-like/episode-like.mpd" \
   || { echo "prepare.sh did not pick the English audio track" >&2; exit 1; }
 
