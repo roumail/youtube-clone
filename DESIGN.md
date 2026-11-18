@@ -122,7 +122,8 @@ app/                                  published to GitHub Pages
   local-scheme.js                   ✅ Shaka "local:" scheme for picked files (from M0, kept)
   vendor/shaka-player-5.3.5.compiled.js   ✅ pinned
   manifest.webmanifest, sw.js, icons      ◻ installable + offline (sw: network-first, see M0 lesson 3)
-  library.js, player.js, pin.js           ◻ (split out of app.js as features land)
+  library.js, pin.js                ✅ M2: Shaka storage (own track picker, 0-track cleanup); PIN hash + verify
+  player.js                         ◻ M3
   spike/                            ✅ M0 diagnostic page (remove when the owner decides)
 tools/
   get-packager.sh, prepare.sh       ✅ Mac: video → packaged folder for Google Drive
@@ -160,7 +161,8 @@ e2e/                                ✅ specs (section 7)
 - Already-packaged folders in Drive are reused as they are. Nothing is processed twice.
 
 **Step 2, on any device:**
-- **"Add video"** button, behind the PIN.
+- **"Add video"** button, behind the PIN. After the correct PIN, the file picker opens straight away, within the same tap on "OK".
+  - **iPad risk to check (Appendix A, item 2):** Safari may refuse to open the picker after the asynchronous PIN check. If it does, the fallback is a second "Choose files" tap. That would change the add-video scenario, so it goes back to the owner first.
 - Pick the 4 files of one video folder. On iPad: Files → Google Drive → folder → Select all. On the Mac: Finder.
 - The app:
   - registers the picked files under the `local:` scheme;

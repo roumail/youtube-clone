@@ -2,7 +2,7 @@
 import { test, expect, goto, enterPin, PIN } from '../../support.js';
 
 test.describe('Feature: Remove a video', () => {
-  test.fixme('Scenario: removing one of two videos leaves the other', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: removing one of two videos leaves the other', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" and "medium" are stored and settings is unlocked', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium');

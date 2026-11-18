@@ -2,7 +2,7 @@
 import { test, expect, goto } from '../../support.js';
 
 test.describe('Feature: Browse the library', () => {
-  test.fixme('Scenario: an empty library says so', async ({ page, pinSet }) => {
+  test('Scenario: an empty library says so', async ({ page, pinSet }) => {
     await test.step('Given no videos are stored', async () => {
       await goto(page, '#/library');
     });
@@ -12,7 +12,7 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test.fixme('Scenario: several stored videos each appear with title and poster', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: several stored videos each appear with title and poster', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny", "medium" and "episode-like" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium', 'episode-like');
@@ -30,7 +30,7 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test.fixme('Scenario: the library survives a reload', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the library survives a reload', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');

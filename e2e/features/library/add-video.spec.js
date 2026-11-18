@@ -3,7 +3,7 @@
 import { test, expect, goto, enterPin, fixtureFiles, PIN, WRONG_PIN } from '../../support.js';
 
 test.describe('Feature: Add a video', () => {
-  test.fixme('Scenario: PIN, pick the 4 files, it appears in the library', async ({ page, pinSet }) => {
+  test('Scenario: PIN, pick the 4 files, it appears in the library', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
@@ -25,7 +25,7 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  test.fixme('Scenario: adding a second video keeps the first', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: adding a second video keeps the first', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -42,7 +42,7 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  test.fixme('Scenario: a wrong PIN opens no file picker', async ({ page, pinSet }) => {
+  test('Scenario: a wrong PIN opens no file picker', async ({ page, pinSet }) => {
     let pickerOpened = false;
     page.on('filechooser', () => { pickerOpened = true; });
     await test.step('Given the library is shown', async () => {
@@ -58,7 +58,7 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  test.fixme('Scenario: a folder with a missing file is rejected', async ({ page, pinSet }) => {
+  test('Scenario: a folder with a missing file is rejected', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
     });
@@ -74,7 +74,7 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  test.fixme('Scenario: a video this device cannot play is rejected and leaves nothing behind', async ({ page, pinSet }) => {
+  test('Scenario: a video this device cannot play is rejected and leaves nothing behind', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
     });
