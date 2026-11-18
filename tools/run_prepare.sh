@@ -12,6 +12,10 @@
 #          Default: $KIDS_LIBRARY, from the environment or from .env in the
 #          repo root (gitignored; copy .env.example).
 # --title: clean title for a single input file (otherwise its file name is used).
+#          With --series it's the episode title.
+# --series: these are episodes of NAME. Each file name must contain its season
+#          and episode (S01E03 / s1e3 / 1x03). Titles become
+#          "NAME - S01E03 - Episode title", filed under DEST/NAME/.
 #
 # Already-prepared videos are skipped; a failure doesn't stop the batch.
 set -uo pipefail
@@ -26,13 +30,14 @@ done
 HERE="$(cd "$(dirname "$SELF")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
-usage() { sed -n '2,18p' "$SELF" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
+usage() { sed -n '2,22p' "$SELF" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
 
-DEST=""; TITLE=""; INPUTS=()
+DEST=""; TITLE=""; SERIES=""; INPUTS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dest) DEST="${2:-}"; shift 2 ;;
     --title) TITLE="${2:-}"; shift 2 ;;
+    --series) SERIES="${2:-}"; shift 2 ;;
     -h|--help) usage 0 ;;
     --) shift; INPUTS+=("$@"); break ;;
     -*) echo "unknown option: $1" >&2; usage ;;
@@ -78,28 +83,58 @@ for input in "${INPUTS[@]}"; do
 done
 [[ ${#FILES[@]} -gt 0 ]] || { echo "no video files found" >&2; exit 1; }
 if [[ -n "$TITLE" && ${#FILES[@]} -ne 1 ]]; then
+  # (with --series, --title names the single episode)
   echo "--title only works with exactly one video (got ${#FILES[@]})" >&2; exit 2
 fi
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 done_n=0; skip_n=0; fail_n=0; FAILED=()
 
+# Episode title from a release-style name: the text after SxxEyy, with dots and
+# underscores as spaces, cut at the first quality/source tag.
+episode_title_from() { # basename-without-extension, matched-episode-tag
+  printf '%s' "${1#*"$2"}" | perl -pe '
+    s/[._]+/ /g;
+    s/\b(2160p|1080p|720p|576p|480p|4k|uhd|hdr|web[- ]?dl|webrip|web|bluray|bdrip|brrip|hdtv|dvdrip|amzn|nf|dsnp|hmax|atvp|x26[45]|h ?26[45]|hevc|avc|aac|ddp?\d?|dts|proper|repack|multi)\b.*$//i;
+    s/^[\s\-]+|[\s\-]+$//g;'
+}
+
 for f in "${FILES[@]}"; do
-  src="$f"
-  if [[ -n "$TITLE" ]]; then
-    # prepare.sh takes the title from the file name: link under the clean name.
-    ext="${f##*.}"
-    mkdir -p "$TMP/titled"
-    src="$TMP/titled/$TITLE.$ext"
-    ln -sf "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")" "$src"
+  base="$(basename "$f")"; stem="${base%.*}"; ext="${base##*.}"
+  title="$stem"; dest="$DEST"
+  if [[ -n "$SERIES" ]]; then
+    season=""; episode=""; tag=""
+    if [[ "$stem" =~ [Ss]([0-9]{1,3})[Ee]([0-9]{1,3}) ]]; then
+      tag="${BASH_REMATCH[0]}"; season="${BASH_REMATCH[1]}"; episode="${BASH_REMATCH[2]}"
+    elif [[ "$stem" =~ (^|[^0-9])(([0-9]{1,2})x([0-9]{1,3}))([^0-9]|$) ]]; then
+      tag="${BASH_REMATCH[2]}"; season="${BASH_REMATCH[3]}"; episode="${BASH_REMATCH[4]}"
+    fi
+    if [[ -z "$episode" ]]; then
+      echo "== $stem"; echo "   FAILED: no season/episode (e.g. S01E03) in the file name"
+      fail_n=$((fail_n + 1)); FAILED+=("$f"); continue
+    fi
+    ep_title="${TITLE:-$(episode_title_from "$stem" "$tag")}"
+    title="$(printf '%s - S%02dE%02d' "$SERIES" "$((10#$season))" "$((10#$episode))")"
+    [[ -n "$ep_title" ]] && title="$title - $ep_title"
+    dest="$DEST/$SERIES"
+  elif [[ -n "$TITLE" ]]; then
+    title="$TITLE"
   fi
-  name="$(basename "$src")"; title="${name%.*}"
+
+  src="$f"
+  if [[ "$title" != "$stem" ]]; then
+    # prepare.sh takes the title from the file name: link under the new name.
+    mkdir -p "$TMP/titled"
+    src="$TMP/titled/$title.$ext"
+    ln -sf "$(cd "$(dirname "$f")" && pwd)/$base" "$src"
+  fi
   echo "== $title"
-  if [[ -f "$DEST/$title/$title.mpd" ]]; then
+  if [[ -f "$dest/$title/$title.mpd" ]]; then
     echo "   already prepared, skipping"; skip_n=$((skip_n + 1)); continue
   fi
-  if "$HERE/prepare.sh" "$src" "$DEST" 2>&1 | sed 's/^/   /'; then
-    if [[ -f "$DEST/$title/$title.mpd" ]]; then done_n=$((done_n + 1)); else fail_n=$((fail_n + 1)); FAILED+=("$f"); fi
+  mkdir -p "$dest"
+  if "$HERE/prepare.sh" "$src" "$dest" 2>&1 | sed 's/^/   /'; then
+    if [[ -f "$dest/$title/$title.mpd" ]]; then done_n=$((done_n + 1)); else fail_n=$((fail_n + 1)); FAILED+=("$f"); fi
   else
     fail_n=$((fail_n + 1)); FAILED+=("$f")
   fi
