@@ -78,7 +78,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Lint specs (no sleeps allowed)
         run: npm run lint

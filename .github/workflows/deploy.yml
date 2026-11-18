@@ -39,6 +39,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      contents: read
+      checks: read
       pages: write
       id-token: write
     environment:
@@ -57,6 +59,23 @@ jobs:
         with:
           # Deploy exactly the commit CI tested.
           ref: ${{ steps.target.outputs.sha }}
+          fetch-depth: 0
+
+      # Guard: whoever triggered this (merge, owner, or the automatic rollback),
+      # only a commit that is ON main and PASSED the required e2e check can be
+      # published. Blocks deploying unreviewed code via a crafted `ref` input.
+      - name: Guard — commit is on main and passed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::ref must be a full commit SHA"; exit 1; }
+          git fetch -q origin main
+          git merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$SHA is not on main"; exit 1; }
+          ok=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=e2e&filter=all" \
+            --jq '[.check_runs[] | select(.conclusion == "success")] | length')
+          [ "${ok:-0}" -gt 0 ] || { echo "::error::$SHA has no successful e2e check"; exit 1; }
+          echo "OK: $SHA is on main and passed e2e"
 
       - name: Assemble the public site (the M0 spike is not published)
         env:
@@ -91,7 +110,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Cache Playwright browser
         id: pw-cache
@@ -113,6 +132,20 @@ jobs:
             echo "waiting for $SHA (live: ${got:-none})"; sleep 10
           done
           echo "the live site never served $SHA" >&2; exit 1
+
+      - name: Live files match the commit byte for byte
+        env:
+          SHA: ${{ needs.deploy.outputs.sha }}
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            rel="${f#app/}"
+            want=$(shasum -a 256 "$f" | cut -d' ' -f1)
+            got=$(curl -fsS -H 'Cache-Control: no-cache' "${LIVE_URL}${rel// /%20}?v=$SHA" | shasum -a 256 | cut -d' ' -f1)
+            if [ "$want" != "$got" ]; then echo "::error::MISMATCH $rel"; fail=1; fi
+          done < <(find app -type f ! -path 'app/spike/*' -print0)
+          [ $fail -eq 0 ] && echo "all published files match $SHA"
+          exit $fail
 
       - name: Smoke-test the live site (headed, like on the Mac)
         env:

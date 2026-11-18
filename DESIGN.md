@@ -417,6 +417,28 @@ e2e/
 - **The public site excludes the M0 spike** (`app/spike/`). It stays in the repo and in CI.
 - **No HTML injection sinks:** the app never uses `innerHTML`, `eval` or the like. Titles from file names are inserted as text.
 
+### Threat analysis: "CI or its tokens are compromised" (owner's scenario, 2026-11-18)
+Assumptions: the owner's GitHub account is safe, and changes reach `main` only through PRs the owner merges. The question is what a compromised workflow, action, dependency or workflow token could do.
+
+| Attack | Blocked by |
+|---|---|
+| Push or force-push to `main` | Branch protection (applies to admins too); every workflow token is **read-only for code**. No workflow is ever given `contents: write` or `pull-requests: write`, so a stolen token can't push or merge. |
+| Merge an unreviewed PR | Same: no workflow token can merge, and merging needs the owner's account. |
+| **Deploy an unmerged or unreviewed commit** (e.g. a fork PR's commit, through `workflow_dispatch` with a crafted `ref`). **This was a real gap, closed here.** | The deploy **guard**: the commit must be a full SHA, **on `main`**, with a **successful `e2e` check**, or nothing is published. This applies to merges, manual runs and the automatic rollback alike. |
+| Change the deploy workflow itself | `workflow_run` and `workflow_dispatch` always run the workflow file from `main`, so a PR can't alter it before merge. |
+| Swap the published files (artifact or CDN substitution) | The Pages artifact lives only inside its own run (immutable artifacts). After every deploy, `verify-live` **compares every published file byte for byte** with the commit; any mismatch fails and rolls back. |
+| Malicious code in an action | Only GitHub-owned actions are allowed, each pinned to a full commit SHA (enforced by repo settings), with weekly Dependabot bumps going through the same gates. |
+| Malicious npm package in the test tooling | `npm ci --ignore-scripts` (no install scripts run); the lockfile pins exact versions with integrity hashes; dependency review runs on PRs. Test tooling is never published. |
+| Tampered Shaka | `tools/verify-vendor.sh` compares it byte for byte with the npm release on every PR. |
+| Poisoned Actions cache | Caches only speed up CI (browser, fixtures). Nothing published comes from a cache: the site is built from the checked-out commit. |
+| Forged commit authorship | Commits on `main` must be **signed** (branch protection). Squash merges are signed by GitHub. |
+
+**Residual risks (can't be engineered away here):**
+- a compromise of GitHub itself, or of the owner's account or the `gh` token on the owner's Mac (which the LLM session also uses);
+- the few minutes a bad-but-merged version is live before `verify-live` rolls it back.
+
+**On the owner's machine:** the app runs inside the browser sandbox. It can't read or write files except the ones the owner picks, and it can't run programs. The Mac-side tools (`tools/*.sh`) are reviewed code in this repo. `get-packager.sh` checks the packager's SHA-256.
+
 ## Milestones
 0. **T0 – Test foundation (before any feature code):**
    - public repo `roumail/youtube-clone` with protected `main` (squash only, required checks);
