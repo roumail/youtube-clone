@@ -31,6 +31,7 @@ test('spike: picked fixture files are stored via the local: scheme and play back
     await expect(result(page, 'codec-probe')).toHaveAttribute('data-result', 'info');
     await expect(result(page, 'codec-probe')).toContainText('avc1.');
     await expect(result(page, 'codec-probe')).toContainText('mp4a.40.2');
+    await expect(result(page, 'codec-probe')).toContainText('SHAKA: media-source video+audio: supported=true');
   });
 });
 
