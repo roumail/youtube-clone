@@ -11,9 +11,9 @@ export const WRONG_PIN = '9999';
 
 export const sha256Hex = (s) => createHash('sha256').update(s).digest('hex');
 
-// Generated in CI (not committed). Served by the test server under /fixtures/.
+// Generated in CI (not committed). Served by the test server (repo root) under /fixtures/out/.
 export const FIXTURES_DIR = path.resolve(import.meta.dirname, '..', 'fixtures', 'out');
-export const fixtureUrl = (name) => `/fixtures/${name}/${name}.mpd`;
+export const fixtureUrl = (name) => `/fixtures/out/${name}/${name}.mpd`;
 export const fixtureFiles = (name) =>
   [`${name}.mpd`, 'video.mp4', 'audio.mp4', 'poster.jpg'].map((f) => path.join(FIXTURES_DIR, name, f));
 
@@ -81,7 +81,7 @@ export const test = base.extend({
             await storage.destroy();
           }
           if (!stored.size) throw new Error(`seedLibrary: "${title}" stored 0 bytes`);
-        }, { url: fixtureUrl(name), title: name, posterUrl: `/fixtures/${name}/poster.jpg` });
+        }, { url: fixtureUrl(name), title: name, posterUrl: `/fixtures/out/${name}/poster.jpg` });
       }
       await page.reload();
       await appReady(page);
