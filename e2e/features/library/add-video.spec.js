@@ -73,4 +73,24 @@ test.describe('Feature: Add a video', () => {
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
     });
   });
+
+  test.fixme('Scenario: a video this device cannot play is rejected and leaves nothing behind', async ({ page, pinSet }) => {
+    await test.step('Given the library is empty', async () => {
+      await goto(page, '#/library');
+    });
+    const chooser = page.waitForEvent('filechooser');
+    await test.step('When I add "unplayable" (a codec no browser supports)', async () => {
+      await page.getByTestId('add-video-button').click();
+      await enterPin(page, PIN);
+      await (await chooser).setFiles(fixtureFiles('unplayable'));
+    });
+    await test.step('Then the import reports an error, not success', async () => {
+      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'error');
+    });
+    await test.step('And no empty "0 MB" entry is left in the library, even after a reload', async () => {
+      await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
+      await page.reload();
+      await expect(page.getByTestId('library-item')).toHaveCount(0);
+    });
+  });
 });

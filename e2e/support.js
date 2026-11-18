@@ -65,8 +65,14 @@ export const test = base.extend({
             r.readAsDataURL(blob);
           });
           const storage = new shaka.offline.Storage();
-          await storage.store(url, { title, poster }).promise;
+          // Same rule as the app (DESIGN.md §1): never Shaka's default picker,
+          // which drops SDR video on P3 screens (emulated for every test).
+          storage.configure({ offline: {
+            trackSelectionCallback: async (tracks) => tracks.filter((t) => t.type === 'variant').slice(0, 1),
+          } });
+          const stored = await storage.store(url, { title, poster }).promise;
           await storage.destroy();
+          if (!stored.size) throw new Error(`seedLibrary: "${title}" stored 0 bytes`);
         }, { url: fixtureUrl(name), title: name, posterUrl: `/fixtures/${name}/poster.jpg` });
       }
       await page.reload();
