@@ -3,7 +3,7 @@
 ## Working agreement (read first)
 
 **Order of work: the owner sets it.**
-- **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing) and the GitHub Pages deploy.
+- **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing), the GitHub Pages deploy, and CI on macOS mirroring the owner's Mac (the pinned Playwright Docker image was used briefly, then replaced).
 - **M0 (Shaka offline spike): core question answered yes.** See "M0 results" under Milestones for exactly what is and isn't verified.
 - **Next:** the product features, built scenario by scenario from `e2e/features/` (section 7). The owner picks the order.
 
@@ -201,7 +201,12 @@ Any new feature gets proposed first and added only after it's approved.
 ### Ground rules (from the owner)
 - **Fixtures and a test harness come before any feature code.** The app is built against fixtures, never against real videos.
 - **CI is the source of truth.** The LLM never runs tests locally. It pushes a branch, CI runs, and the LLM reads the results (`gh run view --log-failed` plus the downloaded artifacts) and iterates.
-- **Behaviour is pinned to Chrome.** Automated tests run in one exact Chrome build. The iPad (WebKit) is covered by a short manual checklist, because CI can't run real iPad Safari.
+- **Behaviour is pinned to Chrome, and CI mirrors the owner's Mac.** Automated tests run in one exact Chrome build (pinned by the Playwright version):
+  - on a **macOS Apple Silicon runner**;
+  - **headed** (in a visible window);
+  - with a **P3 screen emulated for every test**.
+
+  The iPad (WebKit) is covered by a short manual checklist, because CI can't run real iPad Safari. `tools/real-episode-check.mjs` repeats the CI flow by hand with a real episode in the Mac's installed Chrome.
 
 ### Layers
 | Layer | Tool | What it covers |
@@ -215,7 +220,8 @@ Any new feature gets proposed first and added only after it's approved.
 
 ### Pinning Chrome
 - Pin Playwright to an exact version in `package-lock.json`. That pins the exact browser build Playwright downloads (Chrome for Testing in recent versions), so every CI run uses the same Chrome.
-- In CI the browser comes preinstalled in the pinned Playwright image (see CI/CD below). Browser upgrades only happen through a deliberate Playwright bump PR.
+- In CI the pinned browser is downloaded once and cached, keyed on the lockfile. Browser upgrades only happen through a deliberate Playwright bump PR.
+- **Trade-off, chosen by the owner:** a macOS runner's OS image can't be pinned by digest the way a Docker image can. Matching the owner's Mac matters more. The Docker-image approach was dropped, since GitHub's macOS runners can't run containers.
 - **Codec canary test (runs first):** it asserts that `MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')` and the AAC equivalent are `true`. Open-source Chromium builds lack H.264/AAC, so if a bump ever switches to one, this fails loudly instead of every playback test failing in confusing ways.
 
 ### Fixtures (generated, deterministic, nothing big committed)
@@ -284,7 +290,9 @@ The specs depend only on what's listed here. Changing it means changing the spec
 
 **Drafted-but-not-built specs** are marked `test.fixme`. They show as skipped in the report and are switched on in the milestone that implements them, so CI stays green on what exists.
 
-**Browser profile:** the pinned Chromium build at an iPad-sized viewport (1180×820) with touch enabled.
+**Browser profile:**
+- the pinned Chromium build at an iPad-sized viewport (1180×820), with touch enabled;
+- **`(color-gamut: p3)` reported as true** (as on the family's devices), via an init script in `e2e/support.js`.
 
 ### Test style: features as a hierarchy (Gherkin-equivalent, plain Playwright)
 No Gherkin or Cucumber layer, and no extra dependency. The structure mirrors `.feature` files:
@@ -342,10 +350,9 @@ e2e/
 - **Jobs, run on every PR to `main`:**
   - `fixtures`: generates the media fixtures on a plain runner with the pinned static tools. It's cached by a hash of the generator script plus the tool versions, and handed to `e2e` as an artifact.
   - `e2e` (**the required check**):
-    - runs **inside the official Playwright Docker image, pinned by digest** (`mcr.microsoft.com/playwright:v1.65.1-noble`), so the OS, system libraries and browser build can't drift;
+    - runs on **`macos-15` (Apple Silicon)** with the pinned Playwright Chromium, headed (`PW_HEADED=1`);
     - runs lint, the codec canary, then the specs.
-- **No custom Docker build:** the official image is used as-is.
-- **Bumping Playwright** means changing `package.json` **and** the image digest in the same PR. The tags must match.
+- **Bumping Playwright** means changing `package.json` in a PR. The browser cache key follows the lockfile.
 - **Artifacts on failure:** the Playwright trace, screenshots, video and the HTML report. These are what the LLM reads (via `gh`) to debug without running anything locally.
 - **On merge to `main`:** `deploy.yml` runs after CI succeeds on the push to `main`.
   - It publishes **only `app/`**, at the exact commit CI tested.

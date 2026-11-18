@@ -20,7 +20,15 @@ export const fixtureFiles = (name) =>
 export const test = base.extend({
   // Capture Media Session handlers the app registers, so tests can fire
   // "play" as if from headphones / lock screen. No hooks needed in the app.
+  // Every test sees a wide-gamut (P3) screen, like the family's MacBook and
+  // iPad. Shaka changes its track choices on such screens (DESIGN.md §1).
   page: async ({ page }, use) => {
+    await page.addInitScript(() => {
+      const original = window.matchMedia.bind(window);
+      window.matchMedia = (q) => (/color-gamut:\s*p3|dynamic-range:\s*high/.test(q)
+        ? { matches: true, media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent() { return false; } }
+        : original(q));
+    });
     await page.addInitScript(() => {
       window.__mediaSessionHandlers = {};
       const ms = navigator.mediaSession;
