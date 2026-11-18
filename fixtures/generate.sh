@@ -23,6 +23,7 @@ make_raw() { # name seconds
     -f lavfi -i "testsrc=size=640x360:rate=30:duration=$2" \
     -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=$2" \
     -c:v libx264 -profile:v main -pix_fmt yuv420p -g 60 -keyint_min 60 -sc_threshold 0 \
+    -color_primaries bt709 -color_trc bt709 -colorspace bt709 \
     -c:a aac -b:a 96k -ac 2 -shortest \
     "$RAW/$1.mp4"
 }
@@ -35,6 +36,12 @@ for name in tiny medium broken-missing-audio; do
   "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 rm "$OUT/broken-missing-audio/audio.mp4"   # the "broken" part
+
+# Real episodes declare SDR colour (BT.709). Shaka marks such video hdr=SDR,
+# which its default offline track picker drops on P3 screens. Fixtures must
+# carry the same signal so CI covers it.
+grep -q 'TransferCharacteristics" value="1"' "$OUT/tiny/tiny.mpd" \
+  || { echo "fixture manifest lacks BT.709 TransferCharacteristics" >&2; exit 1; }
 
 # Raw inputs: already-H.264 (repackage path) and VP9/Opus (re-encode path).
 cp "$RAW/tiny.mp4" "$OUT/raw-h264.mp4"

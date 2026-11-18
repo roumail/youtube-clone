@@ -53,6 +53,13 @@ Research summary, sources at the bottom of this doc:
 | Can the iPad play one big stored file? | **Avoid** | Turning a large stored file into a playable link (`URL.createObjectURL`) has a history of problems on iOS:<br>• memory blow-up (iOS 15);<br>• broken playback (iOS 17.4.1);<br>• crashes with 100–500 MB files in a Workbox issue that was never resolved. |
 | How do we store and play big videos offline? | **Solved: use Shaka Player offline** | Google's open-source player (Apache-2.0) with built-in offline storage:<br>• stores each video as **many small segments** (a few seconds each) in IndexedDB;<br>• plays them back through Media Source Extensions (`ManagedMediaSource` on iPadOS 17+);<br>• no single huge file is ever handed to the video element, so the big-file bugs above don't apply. |
 
+**Shaka gotcha found in M0 (must keep):** Shaka's default offline track picker uses `hdrLevel: 'AUTO'`.
+- On P3 screens (MacBooks, iPads) that means "prefer PQ", so it **drops every SDR variant**.
+- Real episodes declare BT.709, which Shaka reads as SDR. The default picker therefore stored **0 tracks without any error** ("0 MB in 0.0 s"), and playback failed with 4036.
+- **Rule:** the app always passes its own `offline.trackSelectionCallback` that stores the single variant `prepare.sh` produces.
+- **Rule:** a store that keeps 0 tracks is treated as a failure.
+- Fixtures carry BT.709 colour info, and a CI test emulates a P3 screen, so this can't silently come back.
+
 **Why Shaka:** it's the tried-and-tested option. Offline storage is a first-class, documented feature with `store()`, `list()`, `remove()`, progress callbacks and app metadata, and it's used in production. We hand-roll nothing on the storage side.
 
 **The cost: videos are prepared on the Mac once.** Shaka stores DASH/HLS content (a manifest plus segmented media), not plain `.mp4` files. Each video is packaged once on the Mac (section 4), and the packaged output is shared through **Google Drive**, so the iPad never does any processing. At home-library scale this is a one-off step per video, not a burden.
