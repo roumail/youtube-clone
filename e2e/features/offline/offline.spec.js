@@ -2,7 +2,7 @@
 import { test, expect, goto, openVideo, startPlaying } from '../../support.js';
 
 test.describe('Feature: Works offline', () => {
-  test.fixme('Scenario: the app and a stored video work with no network', async ({ page, context, pinSet, seedLibrary }) => {
+  test('Scenario: the app and a stored video work with no network', async ({ page, context, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is stored and the app has loaded once', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');

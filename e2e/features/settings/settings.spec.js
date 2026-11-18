@@ -2,7 +2,7 @@
 import { test, expect, goto, enterPin, sha256Hex, PIN, WRONG_PIN } from '../../support.js';
 
 test.describe('Feature: Settings', () => {
-  test.fixme('Scenario: settings opens only with the PIN', async ({ page, pinSet }) => {
+  test('Scenario: settings opens only with the PIN', async ({ page, pinSet }) => {
     await test.step('Given the library is shown', async () => {
       await goto(page, '#/library');
     });
@@ -21,7 +21,7 @@ test.describe('Feature: Settings', () => {
     });
   });
 
-  test.fixme('Scenario: changing the PIN needs the current PIN', async ({ page, pinSet }) => {
+  test('Scenario: changing the PIN needs the current PIN', async ({ page, pinSet }) => {
     await test.step('Given settings is unlocked', async () => {
       await goto(page, '#/library');
       await page.getByTestId('settings-button').click();
