@@ -28,11 +28,27 @@ make_raw() { # name seconds
     "$RAW/$1.mp4"
 }
 
+# Episode-like source, mirroring a real web download: 1080p H.264 High,
+# BT.709, 25 fps, and TWO audio tracks with Chinese first, English second.
+make_episode_like() { # name seconds
+  "$FFMPEG" -hide_banner -loglevel error -y \
+    -f lavfi -i "testsrc=size=1920x1080:rate=25:duration=$2" \
+    -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=$2" \
+    -f lavfi -i "sine=frequency=880:sample_rate=48000:duration=$2" \
+    -map 0:v -map 1:a -map 2:a \
+    -vf "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709" \
+    -c:v libx264 -profile:v high -preset veryfast -g 50 \
+    -c:a aac -b:a 128k -ac 2 \
+    -metadata:s:a:0 language=zho -metadata:s:a:1 language=eng -shortest \
+    "$RAW/$1.mp4"
+}
+
 make_raw tiny 3
+make_episode_like episode-like 10
 make_raw medium 60
 make_raw broken-missing-audio 3
 
-for name in tiny medium broken-missing-audio; do
+for name in tiny medium broken-missing-audio episode-like; do
   "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 rm "$OUT/broken-missing-audio/audio.mp4"   # the "broken" part
@@ -42,6 +58,8 @@ rm "$OUT/broken-missing-audio/audio.mp4"   # the "broken" part
 # carry the same signal so CI covers it.
 grep -q 'TransferCharacteristics" value="1"' "$OUT/tiny/tiny.mpd" \
   || { echo "fixture manifest lacks BT.709 TransferCharacteristics" >&2; exit 1; }
+grep -q 'lang="en"' "$OUT/episode-like/episode-like.mpd" \
+  || { echo "prepare.sh did not pick the English audio track" >&2; exit 1; }
 
 # Raw inputs: already-H.264 (repackage path) and VP9/Opus (re-encode path).
 cp "$RAW/tiny.mp4" "$OUT/raw-h264.mp4"

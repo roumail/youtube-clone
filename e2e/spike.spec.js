@@ -81,3 +81,17 @@ test('spike: SDR video still stores and plays on a wide-gamut (P3) screen', asyn
     await expect(result(page, 'play')).toHaveAttribute('data-result', 'pass');
   });
 });
+
+test('spike: an episode-like video (1080p High, BT.709, Chinese + English audio) stores English and plays', async ({ page }) => {
+  await test.step('When I pick the 4 files of "episode-like"', async () => {
+    await page.getByTestId('spike-files').setInputFiles(fixtureFiles('episode-like'));
+  });
+  await test.step('Then it is stored with the English audio track', async () => {
+    await expect(result(page, 'store')).toHaveAttribute('data-result', 'pass');
+    await expect(page.getByTestId('spike-log')).toContainText('lang=en');
+  });
+  await test.step('And it plays', async () => {
+    await page.getByTestId('spike-play').click();
+    await expect(result(page, 'play')).toHaveAttribute('data-result', 'pass');
+  });
+});
