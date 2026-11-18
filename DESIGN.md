@@ -386,59 +386,10 @@ e2e/
   - Tests and tooling are never shipped.
 - No nightly or scheduled runs.
 
-### Security and release gates (owner decision 2026-11-18)
-**Threat model.** The site is static, with no backend, accounts or server-side data. Each device's videos and PIN hash stay in its own browser storage. The realistic attack is changing **what gets deployed**, through the repo, a GitHub Action or a dependency. So the protections focus on the supply chain and on gates that keep a failure from reaching the public site.
-
-**Before merge (all required on PRs to `main`):**
-
-| Gate | What it blocks |
-|---|---|
-| `e2e` | Any failing scenario. Also: **any CSP violation or uncaught page error in any test** (fail hook in `e2e/support.js`), and a vendored Shaka that isn't byte-identical to the npm release (`tools/verify-vendor.sh`). |
-| `dependency-review` | A PR adding a dependency with a known vulnerability (moderate or worse). |
-| `analyze (javascript-typescript)`, `analyze (actions)` | CodeQL findings in the app code and in the workflows (e.g. untrusted input reaching a shell). A ruleset blocks merging on high-severity findings. |
-
-**After deploy (`deploy.yml`):**
-- `verify-live` waits until the public URL serves the new commit (`version.json`), then runs `e2e/live/` against it in the pinned Chrome on macOS, headed:
-  - the app boots;
-  - the PIN setup and the library show;
-  - no CSP violations or page errors;
-  - the spike is not public.
-- If that fails, `rollback` **automatically redeploys the last version that deployed and verified successfully**, and the run fails loudly. A rollback never triggers another rollback.
-- Known limit: the bad version is public for the few minutes between deploy and rollback.
-
-**Hardening:**
-- **Every action is pinned to a full commit SHA** (version in a comment). The repo requires SHA pinning and allows GitHub-owned actions only, after the 2025 `tj-actions` tag-hijack attacks.
-- **Content Security Policy** `<meta>` in every page: scripts, connections and workers only from the site itself; images and media also from `data:`/`blob:` (posters, Media Source); no plugins, `<base>` or form posts. Shaka needs no `eval`. GitHub Pages can't set headers, hence the meta tag.
-- **Dependabot:**
-  - alerts and security updates are on;
-  - weekly grouped updates for the pinned actions and the npm test tooling. They go through the same gates.
-- **Secret scanning and push protection:** on, plus GitGuardian on PRs.
-- **Fork PRs:** workflows from outside contributors need the owner's approval.
-- **Workflow token:** read-only by default. Only the deploy and rollback jobs get the extra permissions they need.
-- **The public site excludes the M0 spike** (`app/spike/`). It stays in the repo and in CI.
-- **No HTML injection sinks:** the app never uses `innerHTML`, `eval` or the like. Titles from file names are inserted as text.
-
-### Threat analysis: "CI or its tokens are compromised" (owner's scenario, 2026-11-18)
-Assumptions: the owner's GitHub account is safe, and changes reach `main` only through PRs the owner merges. The question is what a compromised workflow, action, dependency or workflow token could do.
-
-| Attack | Blocked by |
-|---|---|
-| Push or force-push to `main` | Branch protection (applies to admins too); every workflow token is **read-only for code**. No workflow is ever given `contents: write` or `pull-requests: write`, so a stolen token can't push or merge. |
-| Merge an unreviewed PR | Same: no workflow token can merge, and merging needs the owner's account. |
-| **Deploy an unmerged or unreviewed commit** (e.g. a fork PR's commit, through `workflow_dispatch` with a crafted `ref`). **This was a real gap, closed here.** | The deploy **guard**: the commit must be a full SHA, **on `main`**, with a **successful `e2e` check**, or nothing is published. This applies to merges, manual runs and the automatic rollback alike. |
-| Change the deploy workflow itself | `workflow_run` and `workflow_dispatch` always run the workflow file from `main`, so a PR can't alter it before merge. |
-| Swap the published files (artifact or CDN substitution) | The Pages artifact lives only inside its own run (immutable artifacts). After every deploy, `verify-live` **compares every published file byte for byte** with the commit; any mismatch fails and rolls back. |
-| Malicious code in an action | Only GitHub-owned actions are allowed, each pinned to a full commit SHA (enforced by repo settings), with weekly Dependabot bumps going through the same gates. |
-| Malicious npm package in the test tooling | `npm ci --ignore-scripts` (no install scripts run); the lockfile pins exact versions with integrity hashes; dependency review runs on PRs. Test tooling is never published. |
-| Tampered Shaka | `tools/verify-vendor.sh` compares it byte for byte with the npm release on every PR. |
-| Poisoned Actions cache | Caches only speed up CI (browser, fixtures). Nothing published comes from a cache: the site is built from the checked-out commit. |
-| Forged commit authorship | Commits on `main` must be **signed** (branch protection). Squash merges are signed by GitHub. |
-
-**Residual risks (can't be engineered away here):**
-- a compromise of GitHub itself, or of the owner's account or the `gh` token on the owner's Mac (which the LLM session also uses);
-- the few minutes a bad-but-merged version is live before `verify-live` rolls it back.
-
-**On the owner's machine:** the app runs inside the browser sandbox. It can't read or write files except the ones the owner picks, and it can't run programs. The Mac-side tools (`tools/*.sh`) are reviewed code in this repo. `get-packager.sh` checks the packager's SHA-256.
+### Release gates
+- Every PR to `main` must pass the required checks before it can be merged.
+- After a deploy, the live site is checked automatically, and the previous version is restored if that check fails.
+- Security measures are **not documented in this repo**. The owner keeps private notes; ask the owner before changing workflows, permissions, deploy steps or page security headers.
 
 ## Milestones
 0. **T0 – Test foundation (before any feature code):**

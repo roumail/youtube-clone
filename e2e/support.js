@@ -40,7 +40,7 @@ export const test = base.extend({
         };
       }
     });
-    // Fail hook (DESIGN.md §7, Release gates): any Content Security Policy
+    // Any Content Security Policy
     // violation or uncaught page error fails the test, whatever it was testing.
     const problems = [];
     page.on('console', (m) => {

@@ -2,10 +2,8 @@ name: Deploy
 # The run name carries the deployed commit; the rollback reads it back.
 run-name: Deploy ${{ inputs.ref || github.event.workflow_run.head_sha || github.sha }}
 
-# Publishes the app to GitHub Pages after CI passes on main (i.e. after a
-# squash-merge), then checks the LIVE site in a real browser. If that check
-# fails, the previous good version is redeployed automatically (DESIGN.md §7,
-# "Release gates"). No gh-pages branch: Actions-based Pages deployment.
+# Publishes the app to GitHub Pages after CI passes on main, then checks the
+# live site; if that fails, the previous good version is restored.
 on:
   workflow_run:
     workflows: [CI]
@@ -61,9 +59,7 @@ jobs:
           ref: ${{ steps.target.outputs.sha }}
           fetch-depth: 0
 
-      # Guard: whoever triggered this (merge, owner, or the automatic rollback),
-      # only a commit that is ON main and PASSED the required e2e check can be
-      # published. Blocks deploying unreviewed code via a crafted `ref` input.
+      # Only commits on main that passed e2e are published.
       - name: Guard — commit is on main and passed CI
         env:
           GH_TOKEN: ${{ github.token }}

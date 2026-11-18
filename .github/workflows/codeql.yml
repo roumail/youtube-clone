@@ -1,8 +1,6 @@
 name: CodeQL
 
-# Code scanning (DESIGN.md §7, Security): the app's JavaScript and the
-# workflow files (e.g. untrusted input reaching a shell). Required on PRs;
-# high-severity findings block the merge (repository ruleset).
+# Code scanning for the app's JavaScript and the workflow files.
 on:
   pull_request:
     branches: [main]
