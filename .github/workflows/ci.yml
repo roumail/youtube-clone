@@ -14,36 +14,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e:
+  # Media fixtures need no browser: generated on the plain runner with pinned
+  # static tools, cached, and handed to e2e as an artifact.
+  fixtures:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
-
-      - name: Lint specs (no sleeps allowed)
-        run: npm run lint
-
-      - name: Cache Playwright browser (keyed on pinned version)
-        id: pw-cache
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install pinned Chromium + system deps
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      - name: Install system deps only (browser restored from cache)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
 
       - name: Restore fixtures (keyed on generator + tool versions)
         id: fx-cache
@@ -65,6 +42,39 @@ jobs:
       - name: Generate fixtures
         if: steps.fx-cache.outputs.cache-hit != 'true'
         run: fixtures/generate.sh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fixtures
+          path: fixtures/out
+          retention-days: 1
+
+  # Required check. Runs inside the official Playwright image, pinned by digest:
+  # OS, system libraries and the browser build cannot drift.
+  e2e:
+    needs: fixtures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      # mcr.microsoft.com/playwright:v1.65.1-noble (must match @playwright/test in package.json)
+      image: mcr.microsoft.com/playwright@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint specs (no sleeps allowed)
+        run: npm run lint
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: fixtures
+          path: fixtures/out
 
       - name: Run e2e
         run: npx playwright test
