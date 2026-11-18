@@ -128,6 +128,14 @@ Kids Library/
 Batch titles come from file names. For nicer titles in a batch, rename the
 files first, or prepare those one at a time with `--title`.
 
+## Commit hygiene (once per clone)
+```bash
+git config core.hooksPath tools/hooks
+```
+Before every commit, this checks the staged changes for credentials, personal
+data (home-folder paths, email addresses), `.env` files, video files and files
+over 2 MB. If `gitleaks` is installed (`brew install gitleaks`) it runs too.
+
 ## Lower-level tools
 - `tools/prepare.sh <video> [output-root]` — prepares exactly one video
   (default output: `./prepared`, gitignored). `run_prepare.sh` calls this.
