@@ -20,7 +20,30 @@ const isUsable = (c) => c.size > 0 && !c.isIncomplete;
 export async function listVideos() {
   if (!shaka.offline.Storage.support()) return [];
   const all = await withStorage((s) => s.list());
-  return all.filter(isUsable);
+  return all.filter(isUsable).sort(byLibraryOrder);
+}
+
+/**
+ * Series info lives in the title (= the .mpd file name, DESIGN.md §3):
+ * "Bluey - S01E03 - Keepy Uppy" -> { series: 'Bluey', season: 1, episode: 3, episodeTitle: 'Keepy Uppy' }.
+ * Anything else is a standalone video: { series: null }.
+ */
+export function parseTitle(title = '') {
+  const m = /^(.+?) - S(\d{1,3})E(\d{1,3})(?: - (.*))?$/i.exec(title.trim());
+  if (!m) return { series: null, title };
+  return { series: m[1], season: Number(m[2]), episode: Number(m[3]), episodeTitle: m[4] ?? '', title };
+}
+
+// Episodes of a series sit together, in season/episode order; everything is
+// otherwise alphabetical (a series sorts by its name).
+function byLibraryOrder(a, b) {
+  const pa = parseTitle(a.appMetadata?.title);
+  const pb = parseTitle(b.appMetadata?.title);
+  const key = (p) => (p.series ?? p.title).toLocaleLowerCase();
+  const byName = key(pa).localeCompare(key(pb));
+  if (byName !== 0) return byName;
+  if (pa.series && pb.series) return pa.season - pb.season || pa.episode - pb.episode;
+  return pa.series ? 1 : pb.series ? -1 : 0;
 }
 
 /**

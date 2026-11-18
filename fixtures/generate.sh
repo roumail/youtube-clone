@@ -53,6 +53,13 @@ for name in tiny medium broken-missing-audio episode-like; do
 done
 rm "$OUT/broken-missing-audio/audio.mp4"   # the "broken" part
 
+# Series episodes (DESIGN.md §3): titles "Series - SxxEyy - Episode". Prepared
+# from copies of "tiny" named like real episodes, out of order on purpose.
+for ep in "Show - S01E10 - Tenth" "Show - S01E02 - Second" "Show - S01E01 - First"; do
+  cp "$RAW/tiny.mp4" "$RAW/$ep.mp4"
+  "$PREPARE" "$RAW/$ep.mp4" "$OUT" >/dev/null
+done
+
 # Real episodes declare SDR colour (BT.709). Shaka marks such video hdr=SDR,
 # which its default offline track picker drops on P3 screens. Fixtures must
 # carry the same signal so CI covers it.

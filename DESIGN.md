@@ -127,6 +127,7 @@ app/                                  published to GitHub Pages
   spike/                            ✅ M0 diagnostic page (remove when the owner decides)
 tools/
   get-packager.sh, prepare.sh       ✅ Mac: video → packaged folder for Google Drive
+  run_prepare.sh, README.md         ✅ Mac wrapper: single file or batch → KIDS_LIBRARY (.env)
   real-episode-check.mjs            ✅ manual check with a real episode in local Chrome
 fixtures/generate.sh                ✅ synthetic fixtures (CI)
 e2e/                                ✅ specs (section 7)
@@ -135,12 +136,25 @@ e2e/                                ✅ specs (section 7)
 ## 3. Fixed library for rendering (~10%)
 - The library is `storage.list()` from Shaka, shown as a thumbnail grid.
 - Title and poster thumbnail come from `appMetadata`, which is saved at import time. The title is the manifest's file name without `.mpd`: the iPad picker gives the app file names only, not the folder name.
+- **Series (groundwork, owner decision 2026-11-18):**
+  - A video belongs to a series when its title follows **`Series - S01E03 - Episode title`**. The title is the `.mpd` file name, because the iPad picker only gives the app file names.
+  - `run_prepare.sh --series "Name"` produces these titles and files them under `Kids Library/Name/` in Drive.
+  - The app reads series, season and episode **from the title when listing** (`parseTitle` in `library.js`). No extra stored data is needed, so nothing has to be re-imported later.
+  - **Now:** the library lists a series' episodes together, in season/episode order (E10 after E02); everything else is alphabetical, with a series sorting by its name.
+  - **Later (its own feature, with scenarios first):** a series screen with one tile per series, then its episodes. Never autoplay the next episode.
 - Library grid only: no search, categories, or recommendations.
 - The app never fetches video content from the internet.
 
 ## 4. Adding media (~10%)
-**Step 1, on the Mac, once per video:**
-- `tools/prepare.sh "My Video.mp4"` writes a folder into the Google Drive for desktop folder:
+**Step 1, on the Mac, once per video** (usage and examples: `tools/README.md`):
+- `tools/run_prepare.sh` is the everyday command. It's a wrapper around `prepare.sh` for the owner's Mac:
+  - takes single files or whole folders (batch mode);
+  - `--title` sets a clean title for a single file;
+  - `--series "Name"` names episodes `Name - S01E03 - Episode title` (season and episode read from `S01E03`/`s1e3`/`1x03` in the file name) and files them under `Name/`;
+  - reads paths from stdin too (`ls *.mp4 | run_prepare`), and works through a symlink on the PATH;
+  - skips videos already prepared and keeps going if one fails, printing a summary;
+  - writes to `--dest`, or by default to `KIDS_LIBRARY` from a **gitignored `.env`** (so the owner's local path is never public; `.env.example` is committed).
+- `tools/prepare.sh "My Video.mp4" <dest>` prepares one video and writes a folder into the Google Drive for desktop folder:
   ```
   Google Drive/Kids Library/My Video/
     My Video.mpd      // DASH manifest; its file name is the title
@@ -243,6 +257,7 @@ Any new feature gets proposed first and added only after it's approved.
 | `broken-missing-audio/` | Import error handling (a file is missing from the folder). |
 | `episode-like` (10 s, 1080p H.264 High, BT.709, audio: Chinese first + English second) | Mirrors a real web-download episode: the P3/SDR track-picker case, and `prepare.sh` choosing English. |
 | `unplayable` (`tiny` with a codec no browser supports) | Import of a video the device can't play: must be an error, with no empty entry left behind. |
+| `Show - S01E01 - First`, `… S01E02 - Second`, `… S01E10 - Tenth` | Series episodes (copies of `tiny`), for the library order of a series. |
 
 ### Avoiding races in user-action tests
 The principle: **tests wait on observable state, never on time.**
@@ -321,7 +336,7 @@ e2e/
   spike/spike.spec.js               M0 diagnostic page (active)
   features/
     first-run/set-pin               Feature: Set a PIN on first run
-    library/browse                  Feature: Browse the library (empty, several videos, reload)
+    library/browse                  Feature: Browse the library (empty, several videos, reload, series order)
     library/add-video               Feature: Add a video (PIN, 4 files, second video, wrong PIN, missing file, unplayable video)
     library/remove-video            Feature: Remove a video
     playback/open-video             Feature: Open a video (same app, never a new tab; paused at 0:00; locked-down <video>)
@@ -424,11 +439,11 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 
 | Milestone | Feature files (`e2e/features/…`) | Scenarios | Needs first |
 |---|---|---|---|
-| **M2 – Library + import** | `library/browse`, `library/add-video`, `library/remove-video` | 3 + 5 + 1 = **9** | — (the shell + `local-scheme.js` exist). `remove-video` needs the settings screen to unlock with the PIN, so `pin.js` verify mode comes with it. |
+| **M2 – Library + import** ✅ | `library/browse`, `library/add-video`, `library/remove-video` | 4 + 5 + 1 = **10** (incl. series order) | — (the shell + `local-scheme.js` exist). `remove-video` needs the settings screen to unlock with the PIN, so `pin.js` verify mode comes with it. |
 | **M3 – Player + PIN gate** | `playback/open-video`, `playback/play-requires-pin`, `playback/pause-and-resume`, `playback/multiple-videos`, `playback/no-autoplay`, `parental-controls/no-way-around-the-pin` | 3 + 3 + 3 + 3 + 1 + 3 = **16** | M2 (videos must be in the library) |
 | **M4 – First run, lockout, settings, offline** | `first-run/set-pin`, `parental-controls/pin-lockout`, `settings/settings`, `offline/offline` | 3 + 2 + 2 + 1 = **8** | M2, M3. Also adds `manifest.webmanifest`, icons, `sw.js` (network-first) and the startup `persist()` call |
 | **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
-| | | **33 to switch on** | |
+| | | **34 in total** (M2 done: 10) | |
 
 Already active and passing: `smoke/` (5) and `spike/` (5).
 

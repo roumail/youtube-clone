@@ -5,3 +5,4 @@ test-results/
 .DS_Store
 tools/bin/
 prepared/
+.env
