@@ -42,7 +42,7 @@ A native iPad app runs into Apple's signing paywall. A free Apple ID install sto
 - **Works offline:** a service worker caches the app's code, so the URL only has to be reachable to install and update.
 
 ### Hosting
-- Install requires HTTPS, so the static files (HTML/JS/CSS only; **never videos**) live on free static hosting such as GitHub Pages or Cloudflare Pages. No server code and no database.
+- Install requires HTTPS, so the static files (HTML/JS/CSS only; **never videos**) live on **GitHub Pages** at **https://www.rohailtaimour.com/youtube-clone/** (this project site inherits the owner's custom domain; HTTPS is enforced). This is the address the devices install from. No server code and no database.
 - On the Mac, it can also run from `localhost` while developing.
 
 ### Storage per device: decision = Shaka Player offline storage
@@ -309,7 +309,12 @@ The specs depend only on what's listed here. Changing it means changing the spec
 - **Required check, run on every PR to `main`:** a single job.
   - `e2e`: Playwright on the pinned Chrome, codec canary first. Fixtures are generated in the job and cached by a hash of the fixture script plus the tool versions.
 - **Artifacts on failure:** the Playwright trace, screenshots, video and the HTML report. These are what the LLM reads (via `gh`) to debug without running anything locally.
-- **On merge to `main`:** deploy the static app to GitHub Pages. Tests and tooling are never shipped.
+- **On merge to `main`:** `deploy.yml` runs after CI succeeds on the push to `main`.
+  - It publishes **only `app/`**, at the exact commit CI tested.
+  - It uses the Actions-based Pages deployment (`upload-pages-artifact` + `deploy-pages`): no `gh-pages` branch and no force-pushes.
+  - Each deploy is recorded in the `github-pages` environment.
+  - It can also be run manually (`workflow_dispatch`).
+  - Tests and tooling are never shipped.
 - No nightly or scheduled runs.
 
 ## Milestones
