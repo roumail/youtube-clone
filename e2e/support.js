@@ -70,8 +70,16 @@ export const test = base.extend({
           storage.configure({ offline: {
             trackSelectionCallback: async (tracks) => tracks.filter((t) => t.type === 'variant').slice(0, 1),
           } });
-          const stored = await storage.store(url, { title, poster }).promise;
-          await storage.destroy();
+          let stored;
+          try {
+            // Shaka needs an absolute URI (it picks the network plugin by scheme).
+            stored = await storage.store(new URL(url, location.href).href, { title, poster }).promise;
+          } catch (e) {
+            // Shaka's compiled errors stringify to nothing useful; surface code + data.
+            throw new Error(`seedLibrary: storing "${title}" failed: Shaka ${e.code} ${JSON.stringify(e.data ?? e.message)}`);
+          } finally {
+            await storage.destroy();
+          }
           if (!stored.size) throw new Error(`seedLibrary: "${title}" stored 0 bytes`);
         }, { url: fixtureUrl(name), title: name, posterUrl: `/fixtures/${name}/poster.jpg` });
       }
