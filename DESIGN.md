@@ -127,6 +127,7 @@ app/                                  published to GitHub Pages
   spike/                            ✅ M0 diagnostic page (remove when the owner decides)
 tools/
   get-packager.sh, prepare.sh       ✅ Mac: video → packaged folder for Google Drive
+  run_prepare.sh, README.md         ✅ Mac wrapper: single file or batch → KIDS_LIBRARY (.env)
   real-episode-check.mjs            ✅ manual check with a real episode in local Chrome
 fixtures/generate.sh                ✅ synthetic fixtures (CI)
 e2e/                                ✅ specs (section 7)
@@ -139,8 +140,13 @@ e2e/                                ✅ specs (section 7)
 - The app never fetches video content from the internet.
 
 ## 4. Adding media (~10%)
-**Step 1, on the Mac, once per video:**
-- `tools/prepare.sh "My Video.mp4"` writes a folder into the Google Drive for desktop folder:
+**Step 1, on the Mac, once per video** (usage and examples: `tools/README.md`):
+- `tools/run_prepare.sh` is the everyday command. It's a wrapper around `prepare.sh` for the owner's Mac:
+  - takes single files or whole folders (batch mode);
+  - `--title` sets a clean title for a single file;
+  - skips videos already prepared and keeps going if one fails, printing a summary;
+  - writes to `--dest`, or by default to `KIDS_LIBRARY` from a **gitignored `.env`** (so the owner's local path is never public; `.env.example` is committed).
+- `tools/prepare.sh "My Video.mp4" <dest>` prepares one video and writes a folder into the Google Drive for desktop folder:
   ```
   Google Drive/Kids Library/My Video/
     My Video.mpd      // DASH manifest; its file name is the title

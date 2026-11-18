@@ -57,7 +57,8 @@ of truth.** This file only says *how* to work here.
   vendored, pinned Shaka Player in `app/vendor/`.
 
 ## Useful commands
-- Prepare a real video (owner's Mac): `tools/get-packager.sh` once, then
-  `tools/prepare.sh "<video file>" "<Google Drive>/Kids Library"`.
+- Prepare real videos (owner's Mac): `tools/run_prepare.sh [--title "…"] <files or folders>`.
+  The destination comes from `KIDS_LIBRARY` in a gitignored `.env` (see
+  `.env.example`); never commit the owner's paths. Details: `tools/README.md`.
 - Manual real-episode check in local Chrome (not CI):
   `node tools/real-episode-check.mjs "prepared/<Title>"`.
