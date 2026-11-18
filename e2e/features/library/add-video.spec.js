@@ -93,4 +93,17 @@ test.describe('Feature: Add a video', () => {
       await expect(page.getByTestId('library-item')).toHaveCount(0);
     });
   });
+
+  test('Scenario: the library explains which files to pick', async ({ page, pinSet }) => {
+    await test.step('Given the library is shown', async () => {
+      await goto(page, '#/library');
+    });
+    await test.step('Then it says to pick the 4 files of one prepared folder', async () => {
+      const help = page.getByTestId('import-help');
+      await expect(help).toBeVisible();
+      for (const name of ['4 files', '.mpd', 'video.mp4', 'audio.mp4', 'poster.jpg']) {
+        await expect(help).toContainText(name);
+      }
+    });
+  });
 });

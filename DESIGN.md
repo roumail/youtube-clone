@@ -169,7 +169,7 @@ e2e/                                ✅ specs (section 7)
 - Already-packaged folders in Drive are reused as they are. Nothing is processed twice.
 
 **Step 2, on any device:**
-- **"Add video"** button, behind the PIN. After the correct PIN, the file picker opens straight away, within the same tap on "OK".
+- **"Add video"** button, behind the PIN. A short note on the library screen says what to pick: all 4 files of one prepared folder (`.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). After the correct PIN, the file picker opens straight away, within the same tap on "OK".
   - **iPad risk to check (Appendix A, item 2):** Safari may refuse to open the picker after the asynchronous PIN check. If it does, the fallback is a second "Choose files" tap. That would change the add-video scenario, so it goes back to the owner first.
 - Pick the 4 files of one video folder. On iPad: Files → Google Drive → folder → Select all. On the Mac: Finder.
 - The app:
@@ -297,7 +297,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 | `import-status` | `data-import`: `idle` · `storing` · `done` · `error` |
 
 **Controls** (`data-testid`):
-- Library: `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`.
+- Library: `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`, `import-help` (always-visible note on which 4 files to pick).
 - Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`.
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.

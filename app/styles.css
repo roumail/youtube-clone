@@ -34,3 +34,6 @@ progress[data-testid="import-progress"] { width: 100%; margin: 8px 0; }
 [data-role="settings-list"] { list-style: none; padding: 0; display: grid; gap: 8px; }
 [data-role="settings-list"] li { display: flex; align-items: center; gap: 12px; background: #1d1d1d; padding: 8px 12px; border-radius: 10px; }
 [data-role="settings-list"] li span { flex: 1; }
+
+.import-help { color: var(--muted); font-size: 0.9rem; margin: -8px 0 12px; }
+.import-help strong { color: var(--fg); font-weight: 600; }
