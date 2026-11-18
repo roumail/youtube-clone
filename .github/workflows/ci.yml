@@ -22,6 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Workflow files are valid YAML (a broken deploy.yml silently stops deploys)
+        run: |
+          for f in .github/workflows/*.yml .github/dependabot.yml; do
+            ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$f" || { echo "::error file=$f::invalid YAML"; exit 1; }
+          done
+
       - name: Restore fixtures (keyed on generator, prepare script, packager pin)
         id: fx-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -82,8 +88,12 @@ jobs:
   # (pinned Playwright build) in a visible window, P3 screen emulated.
   e2e:
     needs: fixtures
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Official Playwright image, pinned by digest: OS, system libraries and the
+    # browser build can't drift. Must match @playwright/test in package.json.
+    container:
+      image: mcr.microsoft.com/playwright@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579 # v1.65.1-noble
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -97,34 +107,15 @@ jobs:
       - name: Lint specs (no sleeps allowed)
         run: npm run lint
 
-      - name: Workflow files are valid YAML (a broken deploy.yml silently stops deploys)
-        run: |
-          for f in .github/workflows/*.yml .github/dependabot.yml; do
-            ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$f" || { echo "::error file=$f::invalid YAML"; exit 1; }
-          done
-
       - name: Verify vendored Shaka matches the official npm release
         run: tools/verify-vendor.sh
-
-      - name: Cache Playwright browser (keyed on pinned version)
-        id: pw-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/Library/Caches/ms-playwright
-          key: pw-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install pinned Chromium
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install chromium
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: fixtures
           path: fixtures/out
 
-      - name: Run e2e (headed, like on the Mac)
-        env:
-          PW_HEADED: '1'
+      - name: Run e2e
         run: npx playwright test
 
       - name: Upload report and traces

@@ -3,7 +3,7 @@
 ## Working agreement (read first)
 
 **Order of work: the owner sets it.**
-- **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing), the GitHub Pages deploy, and CI on macOS mirroring the owner's Mac (the pinned Playwright Docker image was used briefly, then replaced).
+- **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing), the GitHub Pages deploy, and CI on Ubuntu in the digest-pinned Playwright image (it ran on macOS for a while; the owner moved it back on 2026-11-18, see section 7).
 - **M0 (Shaka offline spike): core question answered yes.** See "M0 results" under Milestones for exactly what is and isn't verified.
 - **Built:** M2 (library + import), M3 (player + PIN gate), M4 (first-run PIN, lockout, settings, offline, installable), series groundwork, and security/release gates. **Next:** M5, the owner's iPad test (Appendix A).
 - **Before that:** the product features went milestone by milestone, using the **milestone ↔ feature map** under Milestones. The owner picks the order. Open questions for the owner are under **Open decisions**.
@@ -223,12 +223,13 @@ Any new feature gets proposed first and added only after it's approved.
 ### Ground rules (from the owner)
 - **Fixtures and a test harness come before any feature code.** The app is built against fixtures, never against real videos.
 - **CI is the source of truth.** The LLM never runs tests locally. It pushes a branch, CI runs, and the LLM reads the results (`gh run view --log-failed` plus the downloaded artifacts) and iterates.
-- **Behaviour is pinned to Chrome, and CI mirrors the owner's Mac.** Automated tests run in one exact Chrome build (pinned by the Playwright version):
-  - on a **macOS Apple Silicon runner**;
-  - **headed** (in a visible window);
-  - with a **P3 screen emulated for every test**.
+- **Behaviour is pinned to Chrome.** Automated tests run in one exact Chrome build:
+  - **Ubuntu**, inside the official Playwright Docker image, **pinned by digest**, so the OS, system libraries and browser can't drift;
+  - with a **P3 screen emulated for every test**, as on the family's devices. This is what catches the Shaka/P3 class of bug, and it works the same on any OS.
 
-  The iPad (WebKit) is covered by a short manual checklist, because CI can't run real iPad Safari. `tools/real-episode-check.mjs` repeats the CI flow by hand with a real episode in the Mac's installed Chrome.
+  **Owner decision (2026-11-18):** CI ran on macOS runners for a while, to mirror the owner's Mac. It was moved back to Ubuntu because the macOS queue slowed every PR and couldn't be pinned, while the real target, the iPad, can't be reproduced in CI anyway.
+  - **Real-Mac checks are local:** `tools/real-episode-check.mjs` drives the Mac's installed Chrome, in a visible window, with a real episode. Run it when preparing new content.
+  - **The iPad** is covered by the manual checklist (Appendix A).
 
 ### Layers
 | Layer | Tool | What it covers |
@@ -242,8 +243,7 @@ Any new feature gets proposed first and added only after it's approved.
 
 ### Pinning Chrome
 - Pin Playwright to an exact version in `package-lock.json`. That pins the exact browser build Playwright downloads (Chrome for Testing in recent versions), so every CI run uses the same Chrome.
-- In CI the pinned browser is downloaded once and cached, keyed on the lockfile. Browser upgrades only happen through a deliberate Playwright bump PR.
-- **Trade-off, chosen by the owner:** a macOS runner's OS image can't be pinned by digest the way a Docker image can. Matching the owner's Mac matters more. The Docker-image approach was dropped, since GitHub's macOS runners can't run containers.
+- In CI the browser comes preinstalled in the Playwright image, whose tag must match `@playwright/test`. Browser upgrades only happen through a deliberate bump PR that changes **both** `package.json` and the image digest.
 - **Codec canary test (runs first):** it asserts that `MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')` and the AAC equivalent are `true`. Open-source Chromium builds lack H.264/AAC, so if a bump ever switches to one, this fails loudly instead of every playback test failing in confusing ways.
 
 ### Fixtures (generated, deterministic, nothing big committed)
@@ -374,9 +374,9 @@ e2e/
 - **Jobs, run on every PR to `main`:**
   - `fixtures`: generates the media fixtures on a plain runner with the pinned static tools. It's cached by a hash of the generator script plus the tool versions, and handed to `e2e` as an artifact.
   - `e2e` (**the required check**):
-    - runs on **`macos-15` (Apple Silicon)** with the pinned Playwright Chromium, headed (`PW_HEADED=1`);
+    - runs on **Ubuntu inside the digest-pinned Playwright image** (`mcr.microsoft.com/playwright:v1.65.1-noble`);
     - runs lint, the codec canary, then the specs.
-- **Bumping Playwright** means changing `package.json` in a PR. The browser cache key follows the lockfile.
+- **Bumping Playwright** means changing `package.json` **and** the image digest (in `ci.yml` and `deploy.yml`) in the same PR.
 - **Artifacts on failure:** the Playwright trace, screenshots, video and the HTML report. These are what the LLM reads (via `gh`) to debug without running anything locally.
 - **On merge to `main`:** `deploy.yml` runs after CI succeeds on the push to `main`.
   - It publishes **only `app/`**, at the exact commit CI tested.
@@ -429,7 +429,7 @@ e2e/
 
    **What M0 taught us (each now a rule elsewhere in this spec):**
    1. **Shaka on P3 screens drops SDR video by default.** Its default offline track picker uses `hdrLevel: 'AUTO'`, which on P3 screens means "prefer PQ"; it dropped the only SDR (BT.709) track and stored **0 tracks without any error** ("0 MB in 0.0 s", then 4036 on play). This hit the Mac and the iPad alike. Fix: our own track picker, and storing 0 tracks counts as a failure (section 1).
-   2. **CI didn't catch it, because it didn't look like the family's devices:** headless Linux, no P3, and synthetic fixtures without colour info. Fix: CI runs on macOS, headed, with P3 emulated, plus an `episode-like` fixture (1080p, BT.709, two audio languages). See section 7.
+   2. **CI didn't catch it, because it didn't look like the family's devices:** headless Linux, no P3, and synthetic fixtures without colour info. Fix: every CI test emulates a P3 screen, plus an `episode-like` fixture (1080p, BT.709, two audio languages). See section 7.
    3. **A cache-first service worker kept showing stale versions** after deploys. Fix: network-first when online, `cache: 'reload'` on install, and a visible version marker.
    4. **`apt-get install ffmpeg` hung CI for 10 minutes.** Fix: pinned static binaries only.
    5. **Real downloads have several audio tracks** (the episode's first was Chinese). Fix: `prepare.sh` prefers English.
