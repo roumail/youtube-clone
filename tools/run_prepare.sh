@@ -2,7 +2,7 @@
 # Prepare one or many videos for the kids library (owner's Mac).
 # A wrapper around tools/prepare.sh — see tools/README.md for examples.
 #
-#   tools/run_prepare.sh [--dest DIR] [--title "Clean Title"] INPUT...
+#   tools/run_prepare.sh [--dest DIR] [--title "T"] [--series "S"] [--tmux] INPUT...
 #   ls *.mp4 | tools/run_prepare.sh          (paths on stdin, one per line)
 #
 # INPUT: video files and/or folders (folders are searched recursively for
@@ -17,6 +17,8 @@
 # --series: these are episodes of NAME. Each file name must contain its season
 #          and episode (S01E03 / s1e3 / 1x03). Titles become
 #          "NAME - S01E03 - Episode title", filed under DEST/NAME/.
+# --tmux:  run the job detached in a tmux session (survives closing the
+#          terminal); prints how to watch it. Needs tmux (brew install tmux).
 #
 # Already-prepared videos are skipped; a failure doesn't stop the batch.
 set -uo pipefail
@@ -33,12 +35,13 @@ ROOT="$(cd "$HERE/.." && pwd)"
 
 usage() { sed -n '2,23p' "$SELF" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
 
-DEST=""; TITLE=""; SERIES=""; INPUTS=()
+DEST=""; TITLE=""; SERIES=""; USE_TMUX=0; INPUTS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dest) DEST="${2:-}"; shift 2 ;;
     --title) TITLE="${2:-}"; shift 2 ;;
     --series) SERIES="${2:-}"; shift 2 ;;
+    --tmux) USE_TMUX=1; shift ;;
     -h|--help) usage 0 ;;
     --) shift; INPUTS+=("$@"); break ;;
     -*) echo "unknown option: $1" >&2; usage ;;
@@ -86,6 +89,29 @@ done
 if [[ -n "$TITLE" && ${#FILES[@]} -ne 1 ]]; then
   # (with --series, --title names the single episode)
   echo "--title only works with exactly one video (got ${#FILES[@]})" >&2; exit 2
+fi
+
+# --tmux: re-run this same job in a detached tmux session, so a long re-encode
+# survives closing the terminal. The file list is passed along (a detached
+# session can't read your pipe). Inside the session $TMUX is set, so no loop.
+if [[ "$USE_TMUX" == 1 && -z "${TMUX:-}" ]]; then
+  command -v tmux >/dev/null || { echo "--tmux needs tmux (brew install tmux); or run without --tmux" >&2; exit 1; }
+  session="kids-prepare-$(date +%m%d-%H%M%S)"
+  mkdir -p "$ROOT/prepared"
+  log="$ROOT/prepared/run_prepare-$session.log"
+  args=("$SELF" --dest "$DEST")
+  [[ -n "$TITLE" ]] && args+=(--title "$TITLE")
+  [[ -n "$SERIES" ]] && args+=(--series "$SERIES")
+  args+=("${FILES[@]}")
+  inner="$(printf '%q ' "${args[@]}") 2>&1 | tee $(printf '%q' "$log"); echo; echo '[finished — press Enter to close this window]'; read -r"
+  tmux new-session -d -s "$session" -c "$PWD" "bash -c $(printf '%q' "$inner")"
+  echo "running detached in tmux session: $session  (${#FILES[@]} video(s))"
+  echo "  watch it:   tmux attach -t $session     (leave it running again: Ctrl-b then d)"
+  echo "  log:        $log"
+  exit 0
+fi
+if [[ -z "${TMUX:-}" && -t 2 ]] && command -v tmux >/dev/null; then
+  echo "tip: long jobs (re-encodes) can run detached with --tmux" >&2
 fi
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
