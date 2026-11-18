@@ -1,6 +1,6 @@
 // Spike service worker: cache-first app shell so the installed spike opens
 // offline. Videos are not here; they live in Shaka's IndexedDB storage.
-const CACHE = 'spike-v3';
+const CACHE = 'spike-v4';
 const SHELL = [
   './', './index.html', './spike.js', './manifest.webmanifest', './icon-180.png', './icon-512.png',
   '../local-scheme.js', '../vendor/shaka-player-5.3.5.compiled.js',

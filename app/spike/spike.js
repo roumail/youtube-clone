@@ -116,7 +116,15 @@ async function onPick(files) {
     const uri = registerPickedFiles(files);
     const poster = await fileToDataUrl(info.poster);
     progress.hidden = false;
-    s.configure({ offline: { progressCallback: (_c, p) => { progress.value = p; } } });
+    s.configure({ offline: {
+      progressCallback: (_c, p) => { progress.value = p; },
+      // Log what survives Shaka's capability filter, then store the first variant.
+      trackSelectionCallback: async (tracks) => {
+        const variants = tracks.filter((t) => t.type === 'variant');
+        log(`Shaka offered ${variants.length} variant(s) after filtering: ${variants.map((t) => `${t.videoCodec}+${t.audioCodec} ${t.width}x${t.height} lang=${t.language}`).join('; ') || 'none'}`);
+        return variants.slice(0, 1);
+      },
+    } });
     log(`storing "${info.title}"…`);
     const stored = await s.store(uri, { title: info.title, poster }).promise;
     const secs = ((performance.now() - started) / 1000).toFixed(1);
