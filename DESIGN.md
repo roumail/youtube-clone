@@ -5,7 +5,8 @@
 **Order of work: the owner sets it.**
 - **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing), the GitHub Pages deploy, and CI on macOS mirroring the owner's Mac (the pinned Playwright Docker image was used briefly, then replaced).
 - **M0 (Shaka offline spike): core question answered yes.** See "M0 results" under Milestones for exactly what is and isn't verified.
-- **Next:** the product features, milestone by milestone, using the **milestone ↔ feature map** under Milestones. The owner picks the order. Open questions for the owner are under **Open decisions**.
+- **Built:** M2 (library + import), M3 (player + PIN gate), M4 (first-run PIN, lockout, settings, offline, installable), series groundwork, and security/release gates. **Next:** M5, the owner's iPad test (Appendix A).
+- **Before that:** the product features went milestone by milestone, using the **milestone ↔ feature map** under Milestones. The owner picks the order. Open questions for the owner are under **Open decisions**.
 - **How to work in this repo** (PRs, CI-only testing, safety rules) is in `AGENTS.md`. `CLAUDE.md` points to it.
 
 **Rules while working:**
@@ -121,8 +122,8 @@ app/                                  published to GitHub Pages
   app.js                            ✅ routing + render(state); behaviour to build
   local-scheme.js                   ✅ Shaka "local:" scheme for picked files (from M0, kept)
   vendor/shaka-player-5.3.5.compiled.js   ✅ pinned
-  manifest.webmanifest, sw.js, icons      ◻ installable + offline (sw: network-first, see M0 lesson 3)
-  library.js, pin.js                ✅ M2: Shaka storage (own track picker, 0-track cleanup); PIN hash + verify
+  manifest.webmanifest, sw.js, icons/    ✅ M4: installable + offline (sw: network-first, see M0 lesson 3)
+  library.js, pin.js                ✅ M2/M4: Shaka storage (own track picker, 0-track cleanup); PIN hash, set/change, 5-strike 60 s lockout
   player.js                         ✅ M3: Shaka player on our <video>; PIN-gated play, free pause, safety net
   spike/                            ✅ M0 diagnostic page: in the repo and CI, **not published** (removal: owner decides)
 tools/
@@ -494,8 +495,8 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | Milestone | Feature files (`e2e/features/…`) | Scenarios | Needs first |
 |---|---|---|---|
 | **M2 – Library + import** ✅ | `library/browse`, `library/add-video`, `library/remove-video` | 4 + 5 + 1 = **10** (incl. series order) | — (the shell + `local-scheme.js` exist). `remove-video` needs the settings screen to unlock with the PIN, so `pin.js` verify mode comes with it. |
-| **M3 – Player + PIN gate** | `playback/open-video`, `playback/play-requires-pin`, `playback/pause-and-resume`, `playback/multiple-videos`, `playback/no-autoplay`, `parental-controls/no-way-around-the-pin` | 3 + 3 + 3 + 3 + 1 + 3 = **16** | M2 (videos must be in the library) |
-| **M4 – First run, lockout, settings, offline** | `first-run/set-pin`, `parental-controls/pin-lockout`, `settings/settings`, `offline/offline` | 3 + 2 + 2 + 1 = **8** | M2, M3. Also adds `manifest.webmanifest`, icons, `sw.js` (network-first) and the startup `persist()` call |
+| **M3 – Player + PIN gate** ✅ | `playback/open-video`, `playback/play-requires-pin`, `playback/pause-and-resume`, `playback/multiple-videos`, `playback/no-autoplay`, `parental-controls/no-way-around-the-pin` | 3 + 3 + 3 + 3 + 1 + 3 = **16** | M2 (videos must be in the library) |
+| **M4 – First run, lockout, settings, offline** ✅ | `first-run/set-pin`, `parental-controls/pin-lockout`, `settings/settings`, `offline/offline` | 3 + 2 + 2 + 1 = **8** | M2, M3. Also adds `manifest.webmanifest`, icons, `sw.js` (network-first) and the startup `persist()` call |
 | **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
 | | | **34 in total** (M2 done: 10) | |
 

@@ -3,7 +3,7 @@
 import { test, expect, goto, enterPin, PIN, WRONG_PIN } from '../../support.js';
 
 test.describe('Feature: PIN lockout', () => {
-  test.fixme('Scenario: 5 wrong PINs lock out for 60 seconds, even across a reload', async ({ page, pinSet }) => {
+  test('Scenario: 5 wrong PINs lock out for 60 seconds, even across a reload', async ({ page, pinSet }) => {
     await page.clock.install();
     const prompt = page.getByTestId('pin-prompt');
     await test.step('Given the settings PIN prompt is open', async () => {
@@ -33,7 +33,7 @@ test.describe('Feature: PIN lockout', () => {
     });
   });
 
-  test.fixme('Scenario: 4 wrong PINs then the right one does not lock out', async ({ page, pinSet }) => {
+  test('Scenario: 4 wrong PINs then the right one does not lock out', async ({ page, pinSet }) => {
     await test.step('Given the settings PIN prompt is open', async () => {
       await goto(page, '#/settings');
     });
