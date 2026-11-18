@@ -1,6 +1,6 @@
 // App service worker (DESIGN.md §1, M0 lesson 3). Online: network first, so a
 // deploy shows up on the next open. Offline: the cached app shell. Videos are
-// not here; they live in Shaka's IndexedDB storage. The spike has its own.
+// not here; they live in Shaka's IndexedDB storage.
 const CACHE = 'app-v1';
 const SHELL = [
   './', './index.html', './styles.css', './app.js', './library.js', './pin.js', './player.js',
@@ -27,7 +27,6 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const { request } = e;
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
-  if (new URL(request.url).pathname.includes('/spike/')) return; // the spike's own worker
   e.respondWith((async () => {
     try {
       const fresh = await fetch(request, { cache: 'no-cache' });

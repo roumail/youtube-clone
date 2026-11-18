@@ -5,7 +5,7 @@
 **Order of work: the owner sets it.**
 - **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing), the GitHub Pages deploy, and CI on Ubuntu in the digest-pinned Playwright image (it ran on macOS for a while; the owner moved it back on 2026-11-18, see section 7).
 - **M0 (Shaka offline spike): core question answered yes.** See "M0 results" under Milestones for exactly what is and isn't verified.
-- **Built:** M2 (library + import), M3 (player + PIN gate), M4 (first-run PIN, lockout, settings, offline, installable), series groundwork, and security/release gates. **Next:** M5, the owner's iPad test (Appendix A).
+- **Built and released as v1.0.0:** M2 (library + import), M3 (player + PIN gate), M4 (first-run PIN, lockout, settings, offline, installable), series groundwork, release gates. **M5: the owner's iPad UI test passed (2026-11-18).** Changes from here on are released as versions (section 7, "Releases").
 - **Before that:** the product features went milestone by milestone, using the **milestone ↔ feature map** under Milestones. The owner picks the order. Open questions for the owner are under **Open decisions**.
 - **How to work in this repo** (PRs, CI-only testing, safety rules) is in `AGENTS.md`. `CLAUDE.md` points to it.
 
@@ -125,7 +125,6 @@ app/                                  published to GitHub Pages
   manifest.webmanifest, sw.js, icons/    ✅ M4: installable + offline (sw: network-first, see M0 lesson 3)
   library.js, pin.js                ✅ M2/M4: Shaka storage (own track picker, 0-track cleanup); PIN hash, set/change, 5-strike 60 s lockout
   player.js                         ✅ M3: Shaka player on our <video>; PIN-gated play, free pause, safety net
-  spike/                            ✅ M0 diagnostic page: in the repo and CI, **not published** (removal: owner decides)
 tools/
   get-packager.sh, prepare.sh       ✅ Mac: video → packaged folder for Google Drive
   run_prepare.sh, README.md         ✅ Mac wrapper: single file or batch → KIDS_LIBRARY (.env)
@@ -201,6 +200,7 @@ e2e/                                ✅ specs (section 7)
   - 5 wrong attempts trigger a 60-second lockout.
   - Changing the PIN requires the current one.
   - Forgotten PIN: delete and re-add the home-screen app (this also clears the library).
+  - **Honest limit:** the stored SHA-256 of a 4–6 digit PIN can be brute-forced quickly by someone who can read the device's browser storage. The PIN keeps a child from starting playback (section 6); it isn't meant to resist a determined adult with device access. A test checks that the PIN itself is never stored or left behind (storage, cookies, URL, input field).
   - Same code on both devices for now; revisit later.
 - Tip, no code involved: turn on iPad **Guided Access** to keep a child inside the app.
 
@@ -334,7 +334,6 @@ A scenario that isn't built yet is `test.fixme`: it shows as skipped and is swit
 e2e/
   support.js, server.js             shared fixtures/helpers, test server
   smoke/smoke.spec.js               the 4 screens load + codec canary (active)
-  spike/spike.spec.js               M0 diagnostic page (active)
   features/
     first-run/set-pin               Feature: Set a PIN on first run
     library/browse                  Feature: Browse the library (empty, several videos, reload, series order)
@@ -385,6 +384,19 @@ e2e/
   - It can also be run manually (`workflow_dispatch`).
   - Tests and tooling are never shipped.
 - No nightly or scheduled runs.
+
+### Releases (owner decision 2026-11-18)
+- **Every merge to `main` still deploys** (after the gates below). A **release** names a point in that stream: the commit that is live and verified gets a version tag.
+- **Versions** follow `vMAJOR.MINOR.PATCH`:
+  - **major** for big or incompatible changes (e.g. a new storage format that needs re-adding videos);
+  - **minor** for new features;
+  - **patch** for fixes only.
+- **The first release is v1.0.0:** the feature set above, as tested by the owner on the iPad.
+- **The owner cuts releases** with `tools/release.sh major|minor|patch` (or an explicit version), using their own GitHub login. The script:
+  - only runs from a clean, up-to-date `main`;
+  - refuses unless that exact commit has been deployed and verified, and is what the live site serves;
+  - creates the tag and the GitHub Release, with notes listing the PRs merged since the last release.
+- No workflow creates tags. Release tags are permanent: they're never moved or deleted.
 
 ### Release gates
 - Every PR to `main` must pass the required checks before it can be merged.
@@ -451,15 +463,16 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
 | | | **34 in total** (M2 done: 10) | |
 
-Already active and passing: `smoke/` (5) and `spike/` (5).
+Also active: `smoke/` (5). The M0 spike and its tests were removed after the owner's iPad test (2026-11-18); `local-scheme.js` from it is part of the app.
 
 ## Open decisions (owner)
-1. **7-day persistence:** a gate, or trust the documented exemption? (Undecided.)
-2. **Poster frame:** `prepare.sh` takes the frame at 10%, which was plain white for "The Snowy Day". Should it use ffmpeg's `thumbnail` filter to pick a representative frame?
-3. **The M0 spike** (`app/spike/`, `e2e/spike/`): no longer published, since the iPad tests the real app now. When should it be deleted from the repo? Its `local-scheme.js` stays either way.
-4. **iPad M0 checks not yet reported:** offline (airplane mode after a force-close) and lock-screen "play".
-5. **Release management** (version tags and GitHub releases via Actions on merge to `main`): the owner asked to add it to this spec **after their first UI test of the real app**. Not before.
-6. **Per-device PIN:** same code on both devices for now (section 5); revisit later.
+1. **Per-device PIN:** same code on both devices for now (section 5); revisit later.
+
+Closed on 2026-11-18:
+- **7-day persistence:** not a gate. Prepared videos stay in Google Drive, so a cleared library is simply re-added.
+- **Poster frame:** not important; it stays at 10% into the video.
+- **M0 spike:** deleted from the repo.
+- **Release management:** see section 7, "Releases".
 
 ## Appendix A – iPad manual checklist
 Run on the real iPad, in the app **installed from the home screen**, after each milestone that changes behaviour (and fully at M5). The Mac equivalent runs in CI.
