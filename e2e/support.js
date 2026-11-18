@@ -11,9 +11,9 @@ export const WRONG_PIN = '9999';
 
 export const sha256Hex = (s) => createHash('sha256').update(s).digest('hex');
 
-// Generated in CI (not committed). Served by the test server under /fixtures/.
+// Generated in CI (not committed). Served by the test server (repo root) under /fixtures/out/.
 export const FIXTURES_DIR = path.resolve(import.meta.dirname, '..', 'fixtures', 'out');
-export const fixtureUrl = (name) => `/fixtures/${name}/${name}.mpd`;
+export const fixtureUrl = (name) => `/fixtures/out/${name}/${name}.mpd`;
 export const fixtureFiles = (name) =>
   [`${name}.mpd`, 'video.mp4', 'audio.mp4', 'poster.jpg'].map((f) => path.join(FIXTURES_DIR, name, f));
 
@@ -70,10 +70,18 @@ export const test = base.extend({
           storage.configure({ offline: {
             trackSelectionCallback: async (tracks) => tracks.filter((t) => t.type === 'variant').slice(0, 1),
           } });
-          const stored = await storage.store(url, { title, poster }).promise;
-          await storage.destroy();
+          let stored;
+          try {
+            // Shaka needs an absolute URI (it picks the network plugin by scheme).
+            stored = await storage.store(new URL(url, location.href).href, { title, poster }).promise;
+          } catch (e) {
+            // Shaka's compiled errors stringify to nothing useful; surface code + data.
+            throw new Error(`seedLibrary: storing "${title}" failed: Shaka ${e.code} ${JSON.stringify(e.data ?? e.message)}`);
+          } finally {
+            await storage.destroy();
+          }
           if (!stored.size) throw new Error(`seedLibrary: "${title}" stored 0 bytes`);
-        }, { url: fixtureUrl(name), title: name, posterUrl: `/fixtures/${name}/poster.jpg` });
+        }, { url: fixtureUrl(name), title: name, posterUrl: `/fixtures/out/${name}/poster.jpg` });
       }
       await page.reload();
       await appReady(page);

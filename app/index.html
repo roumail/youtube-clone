@@ -21,7 +21,8 @@
       <p class="empty-note">No videos yet.</p>
       <ul class="grid" data-role="library-grid"></ul>
       <input type="file" data-testid="import-input" multiple hidden>
-      <div data-testid="import-status" data-import="idle"></div>
+      <progress data-testid="import-progress" max="1" value="0" hidden></progress>
+      <div data-testid="import-status" data-import="idle" role="status"></div>
     </section>
 
     <section data-testid="screen-player" data-state="loading" hidden>
