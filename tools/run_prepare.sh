@@ -11,7 +11,8 @@
 # --dest:  where prepared folders go (e.g. your Google Drive "Kids Library").
 #          Default: $KIDS_LIBRARY, from the environment or from .env in the
 #          repo root (gitignored; copy .env.example).
-# --title: clean title for a single input file (otherwise its file name is used).
+# --title: title for a single input file. Otherwise the file name is tidied:
+#          "Frozen.2.2019.1080p.BluRay.x264-GRP" -> "Frozen 2 2019".
 #          With --series it's the episode title.
 # --series: these are episodes of NAME. Each file name must contain its season
 #          and episode (S01E03 / s1e3 / 1x03). Titles become
@@ -30,7 +31,7 @@ done
 HERE="$(cd "$(dirname "$SELF")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
-usage() { sed -n '2,22p' "$SELF" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
+usage() { sed -n '2,23p' "$SELF" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
 
 DEST=""; TITLE=""; SERIES=""; INPUTS=()
 while [[ $# -gt 0 ]]; do
@@ -90,13 +91,21 @@ fi
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 done_n=0; skip_n=0; fail_n=0; FAILED=()
 
-# Episode title from a release-style name: the text after SxxEyy, with dots and
-# underscores as spaces, cut at the first quality/source tag.
+# Tidy a release-style name into a title: dots/underscores become spaces (only
+# when the name has no spaces, so "Mr. Bean" keeps its dot), a leading [group]
+# is dropped, and everything from the first quality/source/size tag on is cut.
+#   "Frozen.2.2019.1080p.BluRay.1400MB.DD5.1.x264-GalaxyRG" -> "Frozen 2 2019"
+clean_name() {
+  printf '%s' "$1" | perl -pe '
+    s/^\s*[\[(][^\])]*[\])]\s*//;
+    if (!/ /) { s/[._]+/ /g } else { s/_+/ /g }
+    s/\b(2160p|1080p|720p|576p|480p|4k|uhd|hdr10?|dv|web[- ]?dl|webrip|web|bluray|blu ray|bdrip|brrip|hdtv|dvdrip|remux|amzn|nf|dsnp|hmax|atvp|x26[45]|h ?26[45]|hevc|avc|aac\d?|ac3|eac3|ddp?\d?|dts|truehd|atmos|proper|repack|extended|multi|\d+(?:\.\d+)? ?[mg]b)\b.*$//i;
+    s/\s{2,}/ /g; s/^[\s\-]+|[\s\-.\[(]+$//g;'
+}
+
+# Episode title: the text after the SxxEyy tag, tidied the same way.
 episode_title_from() { # basename-without-extension, matched-episode-tag
-  printf '%s' "${1#*"$2"}" | perl -pe '
-    s/[._]+/ /g;
-    s/\b(2160p|1080p|720p|576p|480p|4k|uhd|hdr|web[- ]?dl|webrip|web|bluray|bdrip|brrip|hdtv|dvdrip|amzn|nf|dsnp|hmax|atvp|x26[45]|h ?26[45]|hevc|avc|aac|ddp?\d?|dts|proper|repack|multi)\b.*$//i;
-    s/^[\s\-]+|[\s\-]+$//g;'
+  clean_name "${1#*"$2"}"
 }
 
 for f in "${FILES[@]}"; do
@@ -119,6 +128,9 @@ for f in "${FILES[@]}"; do
     dest="$DEST/$SERIES"
   elif [[ -n "$TITLE" ]]; then
     title="$TITLE"
+  else
+    cleaned="$(clean_name "$stem")"
+    title="${cleaned:-$stem}"
   fi
 
   src="$f"

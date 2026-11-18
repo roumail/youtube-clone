@@ -125,7 +125,7 @@ Kids Library/
 - Keeps going if one video fails, and prints a summary at the end
   (exit code is non-zero if anything failed).
 
-Batch titles come from file names. For nicer titles in a batch, rename the
+Batch titles come from the file names, tidied: dots/underscores become spaces and release tags are cut (`Frozen.2.2019.1080p.BluRay.x264-GRP` → `Frozen 2 2019`). For nicer titles in a batch, rename the
 files first, or prepare those one at a time with `--title`.
 
 ## Commit hygiene (once per clone)
