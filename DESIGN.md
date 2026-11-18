@@ -206,6 +206,26 @@ e2e/                                ✅ specs (section 7)
   - Same code on both devices for now; revisit later.
 - Tip, no code involved: turn on iPad **Guided Access** to keep a child inside the app.
 
+### Optional parental features (feature flags) — drafted 2026-11-19, not built
+**Mechanism** (owner: "modular, toggled on for a behaviour, behind the PIN"):
+- Each optional feature is **its own module**, `app/features/<id>.js`, exporting `{ id, title, init(ctx) }`.
+  - `ctx` gives it what it needs: player events (play, pause, ended, tick), the PIN prompt, and a place to render.
+- The flags live in `localStorage['features']` (e.g. `{ "watchTimeLimit": true }`). **They are switched in Settings, so changing one needs the PIN.**
+- **A feature that's off is never loaded**, so there's no hidden behaviour. The core rules (PIN to play, free pause, no autoplay) are always on and aren't features.
+- Every feature defaults to **off**.
+
+**First feature: watch-time limit (`watchTimeLimit`)** — scenarios in `e2e/features/parental-controls/watch-time-limit.spec.js`:
+- **Session:** a session starts when the parent sets a **budget** at the first play, right after the PIN (e.g. 20 / 30 / 45 min).
+  - One budget covers **all videos**.
+  - It is stored locally (`localStorage['watchTime.session']`: `{ budget, used }` in seconds), so **a refresh or relaunch keeps it**.
+- **Counting:** only **actual playing time** counts: not paused time, the library, or the app in the background. It's measured with the browser's monotonic clock, so changing the device time doesn't affect it.
+- **Display:** the player shows **time watched**, **time left** and the **current time** (clock).
+- **When the budget runs out:**
+  - playback pauses, and the player shows **"Time is up"** (`data-state="time-up"`);
+  - playing again needs the PIN, which offers more time.
+- **Ending a session:** the parent can end it in Settings (PIN); the next play then asks for a new budget.
+- **Honest limit:** it's enforced in the browser, like the PIN. It stops a child, but an adult who clears the browser data resets it.
+
 ## 6. Feature-minimal guardrail (~10%)
 **Users are the parents (mum and dad) plus a child watching.**
 - The **PIN prompt is the only access control.**
@@ -303,6 +323,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 - Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`.
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
+- **Proposed for optional features (not built yet):** `feature-toggle-<id>` (Settings checkbox), `budget-prompt`, `budget-option-<minutes>`, `session-time` (with `data-seconds`), `session-remaining`, `clock`, `end-session-button`, and the player state `time-up`.
 - `back-button` exists on both the player and settings screens, so tests scope it by screen, e.g. `getByTestId('screen-settings').getByTestId('back-button')`.
 
 **Persisted data the tests may seed:**
@@ -348,6 +369,7 @@ e2e/
     playback/no-autoplay            Feature: No autoplay (end of video: nothing else starts)
     parental-controls/no-way-around-the-pin   Feature: backgrounding, OS "play", script play
     parental-controls/pin-lockout   Feature: PIN lockout (5 wrong → 60 s, survives reload)
+    parental-controls/watch-time-limit   Feature: Watch-time limit (optional, flag; drafted, fixme)
     settings/settings               Feature: Settings (PIN-gated; change PIN needs current)
     offline/offline                 Feature: Works offline
 ```
@@ -466,12 +488,15 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M3 – Player + PIN gate** ✅ | `playback/open-video`, `playback/play-requires-pin`, `playback/pause-and-resume`, `playback/multiple-videos`, `playback/no-autoplay`, `parental-controls/no-way-around-the-pin` | 3 + 3 + 3 + 3 + 1 + 3 = **16** | M2 (videos must be in the library) |
 | **M4 – First run, lockout, settings, offline** ✅ | `first-run/set-pin`, `parental-controls/pin-lockout`, `settings/settings`, `offline/offline` | 3 + 2 + 2 + 1 = **8** | M2, M3. Also adds `manifest.webmanifest`, icons, `sw.js` (network-first) and the startup `persist()` call |
 | **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
+| **M6 – Optional features + watch-time limit** | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
 | | | **34 in total** (M2 done: 10) | |
 
 Also active: `smoke/` (5). The M0 spike and its tests were removed after the owner's iPad test (2026-11-18); `local-scheme.js` from it is part of the app.
 
 ## Open decisions (owner)
 1. **Per-device PIN:** same code on both devices for now (section 5); revisit later.
+2. **Watch-time sessions — automatic end:** a session survives refreshes and relaunches. Should it also end on its own, e.g. at midnight, or after N hours without playing? Until decided: only the parent (Settings) or a used-up budget ends it.
+3. **Watch-time budget choices:** which options the prompt offers (draft: 20 / 30 / 45 minutes), and whether "no limit" is one of them.
 
 Closed on 2026-11-18:
 - **7-day persistence:** not a gate. Prepared videos stay in Google Drive, so a cleared library is simply re-added.
