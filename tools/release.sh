@@ -57,7 +57,7 @@ NOTES="$(mktemp)"; trap 'rm -f "$NOTES"' EXIT
 if [[ -n "$LAST" ]]; then
   { echo "Changes since $LAST:"; echo; git log --format='- %s' "$LAST..$SHA"; } >"$NOTES"
 else
-  { echo "First release: the feature set in DESIGN.md, tested on the iPad."; echo; git log --format='- %s' "$SHA" -n 50; } >"$NOTES"
+  echo "First release: the feature set in DESIGN.md, tested on the iPad." >"$NOTES"
 fi
 
 echo "release $TAG  ->  $SHA  (previous: ${LAST:-none})"
