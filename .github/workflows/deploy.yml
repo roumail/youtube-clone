@@ -14,10 +14,10 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Commit to deploy (default: the current main)
+        description: 'Commit to deploy (default: the current main)'
         required: false
       rollback:
-        description: Set by the automatic rollback; disables a further rollback
+        description: 'Set by the automatic rollback; disables a further rollback'
         required: false
         default: 'false'
 
