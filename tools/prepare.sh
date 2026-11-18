@@ -47,6 +47,33 @@ VCODEC="$(probe v:0)"; ACODEC="$(probe "$AIDX")"
 EXT="$(tr '[:upper:]' '[:lower:]' <<<"${NAME##*.}")"
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+
+# Live progress for long re-encodes, drawn straight on the terminal (callers
+# like run_prepare.sh filter stdout line by line, which would hide a bar).
+# No terminal (CI, redirected output): no bar. PROGRESS_OUT overrides the target.
+PROGRESS_OUT="${PROGRESS_OUT:-/dev/tty}"
+can_draw() { { : >"$PROGRESS_OUT"; } 2>/dev/null; }
+fmt_time() { local s=$1; if (( s >= 3600 )); then printf '%d:%02d:%02d' $((s/3600)) $((s%3600/60)) $((s%60)); else printf '%d:%02d' $((s/60)) $((s%60)); fi; }
+draw_progress() { # stdin: ffmpeg -progress key=value lines; $1: total seconds
+  local total_us t=0 speed="?" pct=0 start=$SECONDS elapsed eta bar
+  total_us=$(awk -v d="$1" 'BEGIN { printf "%d", d * 1000000 }')
+  while IFS='=' read -r key val; do
+    case "$key" in
+      out_time_us) [[ "$val" =~ ^[0-9]+$ ]] && t=$val ;;
+      speed) speed="${val// /}" ;;
+      progress)
+        (( total_us > 0 )) && pct=$(( t * 100 / total_us )); (( pct > 100 )) && pct=100
+        [[ "$val" == end ]] && pct=100
+        elapsed=$(( SECONDS - start ))
+        if (( pct > 0 )); then eta="ETA $(fmt_time $(( elapsed * (100 - pct) / pct )))"; else eta="ETA ?"; fi
+        bar=$(printf '%*s' $(( pct / 5 )) '' | tr ' ' '#')$(printf '%*s' $(( 20 - pct / 5 )) '' | tr ' ' '-')
+        printf '\r   re-encoding [%s] %3d%%  %s / %s  speed %s  %s   ' "$bar" "$pct" \
+          "$(fmt_time $(( t / 1000000 )))" "$(fmt_time $(( total_us / 1000000 )))" "$speed" "$eta" >>"$PROGRESS_OUT"
+        [[ "$val" == end ]] && printf '\n' >>"$PROGRESS_OUT"
+        ;;
+    esac
+  done
+}
 SRC="$INPUT"
 if [[ "$VCODEC" != h264 || "$ACODEC" != aac || ! "$EXT" =~ ^(mp4|m4v|mov)$ ]]; then
   echo "re-encoding ($EXT, video=$VCODEC, audio=$ACODEC) -> H.264/AAC"
@@ -54,8 +81,16 @@ if [[ "$VCODEC" != h264 || "$ACODEC" != aac || ! "$EXT" =~ ^(mp4|m4v|mov)$ ]]; t
   AARGS=(-c:a aac -b:a 128k -ac 2)
   [[ "$VCODEC" == h264 ]] && VARGS=(-c:v copy)
   [[ "$ACODEC" == aac ]] && AARGS=(-c:a copy)
-  "$FFMPEG" -hide_banner -loglevel error -y -i "$INPUT" -map 0:v:0 -map "0:$AIDX" \
-    "${VARGS[@]}" "${AARGS[@]}" -movflags +faststart "$WORK/src.mp4"
+  ENC=("$FFMPEG" -hide_banner -loglevel error -y -i "$INPUT" -map 0:v:0 -map "0:$AIDX"
+       "${VARGS[@]}" "${AARGS[@]}" -movflags +faststart)
+  STARTED=$SECONDS
+  if can_draw; then
+    IN_DUR="$("$FFPROBE" -v error -show_entries format=duration -of csv=p=0 "$INPUT")"
+    "${ENC[@]}" -nostats -progress pipe:1 "$WORK/src.mp4" | draw_progress "${IN_DUR:-0}"
+  else
+    "${ENC[@]}" "$WORK/src.mp4"
+  fi
+  echo "re-encoded in $(fmt_time $(( SECONDS - STARTED )))"
   SRC="$WORK/src.mp4"
   ASEL=audio   # the re-encoded file has exactly one audio track
 else
