@@ -1,6 +1,6 @@
 // Smoke: the pinned Chrome can play our codecs, and the 4 screens load.
 // Nothing is played here. Active from step 4 of the working agreement.
-import { test, expect, goto } from './support.js';
+import { test, expect, goto } from '../support.js';
 
 test.describe('codec canary', () => {
   test('pinned Chrome supports H.264 + AAC via Media Source Extensions', async ({ page }) => {

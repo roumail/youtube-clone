@@ -126,3 +126,10 @@ export async function setVisibility(page, state) {
 export async function mediaSessionAction(page, action) {
   await page.evaluate((a) => window.__mediaSessionHandlers[a]?.({ action: a }), action);
 }
+
+// Tap play, enter the PIN, and wait until media time actually advances.
+export async function startPlaying(page) {
+  await page.getByTestId('play-button').click();
+  await enterPin(page, PIN);
+  await expectPlaying(page);
+}

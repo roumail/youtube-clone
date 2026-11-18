@@ -1,6 +1,6 @@
 // M0 spike page in the pinned Chrome: picked files -> local: scheme -> Shaka
 // offline storage -> playback. The iPad run of the same page is manual.
-import { test, expect, fixtureFiles, mediaSessionAction } from './support.js';
+import { test, expect, fixtureFiles, mediaSessionAction } from '../support.js';
 
 const result = (page, id) => page.getByTestId(`check-${id}`);
 

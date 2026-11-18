@@ -3,8 +3,9 @@
 ## Working agreement (read first)
 
 **Order of work: the owner sets it.**
-- **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing), the pinned Playwright Docker image, and the GitHub Pages deploy.
-- **Current phase:** M0, the Shaka offline spike (see Milestones).
+- **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing) and the GitHub Pages deploy.
+- **M0 (Shaka offline spike): core question answered yes.** See "M0 results" under Milestones for exactly what is and isn't verified.
+- **Next:** the product features, built scenario by scenario from `e2e/features/` (section 7). The owner picks the order.
 
 **Rules while working:**
 - Ask for design clarifications along the way whenever they're needed.
@@ -285,18 +286,43 @@ The specs depend only on what's listed here. Changing it means changing the spec
 
 **Browser profile:** the pinned Chromium build at an iPad-sized viewport (1180×820) with touch enabled.
 
-### Test style: plain Playwright with Given / When / Then labels
-- No Gherkin or Cucumber layer, and no extra dependency. Each test reads as a behaviour spec through `test.step` labels, which also show up in the HTML report and the CI traces:
-  ```js
-  test('resuming after pause asks for the PIN', async ({ page, library }) => {
-    await test.step('Given "tiny" is playing', async () => { /* ... */ });
-    await test.step('When I tap pause',          async () => { /* ... */ });
-    await test.step('Then the player is paused', async () => { /* ... */ });
-    await test.step('When I tap play',           async () => { /* ... */ });
-    await test.step('Then the PIN prompt is shown', async () => { /* ... */ });
-  });
-  ```
-- One test per behaviour rule. File names follow the rules, e.g. `play-requires-pin.spec.js`, `no-autoplay.spec.js`. Together they double as a readable spec for review.
+### Test style: features as a hierarchy (Gherkin-equivalent, plain Playwright)
+No Gherkin or Cucumber layer, and no extra dependency. The structure mirrors `.feature` files:
+
+| Gherkin | Here |
+|---|---|
+| a folder of `.feature` files | `e2e/features/<area>/` |
+| `Feature:` (one file) | one `*.spec.js` with `test.describe('Feature: …')` |
+| `Scenario:` | `test('Scenario: …')` |
+| `Given / When / Then` | `test.step('Given …')` labels, shown in the HTML report and CI traces |
+
+A scenario that isn't built yet is `test.fixme`: it shows as skipped and is switched on in the milestone that builds it. A new feature starts as a new file of `fixme` scenarios, reviewed before any code.
+
+```
+e2e/
+  support.js, server.js             shared fixtures/helpers, test server
+  smoke/smoke.spec.js               the 4 screens load + codec canary (active)
+  spike/spike.spec.js               M0 diagnostic page (active)
+  features/
+    first-run/set-pin               Feature: Set a PIN on first run
+    library/browse                  Feature: Browse the library (empty, several videos, reload)
+    library/add-video               Feature: Add a video (PIN, 4 files, second video, wrong PIN, missing file)
+    library/remove-video            Feature: Remove a video
+    playback/open-video             Feature: Open a video (same app, never a new tab; paused at 0:00; locked-down <video>)
+    playback/play-requires-pin      Feature: Playing needs the PIN (correct, wrong, cancel)
+    playback/pause-and-resume       Feature: Pause and resume (pause never shows a PIN window; resume needs it; resumes in place)
+    playback/multiple-videos        Feature: Several videos (back stops playback; switching starts paused; reopen from 0:00)
+    playback/no-autoplay            Feature: No autoplay (end of video: nothing else starts)
+    parental-controls/no-way-around-the-pin   Feature: backgrounding, OS "play", script play
+    parental-controls/pin-lockout   Feature: PIN lockout (5 wrong → 60 s, survives reload)
+    settings/settings               Feature: Settings (PIN-gated; change PIN needs current)
+    offline/offline                 Feature: Works offline
+```
+
+**Decided by these scenarios:**
+- Opening a video stays **in the same app** (the `#/player/…` route), never a new tab or window.
+- Going back to the library **stops** the video.
+- Reopening a video starts **from 0:00, paused**. Resuming in place only happens within one viewing, after a pause.
 
 ### Harness language
 - **Node.js (pinned to the current LTS) + `@playwright/test`, written in plain JS.** This is CI-only and never shipped with the app.
@@ -349,6 +375,29 @@ The specs depend only on what's listed here. Changing it means changing the spec
    - the Media Session `play` handler is honoured.
 
    If Shaka fails on iPad, switch to the OPFS + range-response fallback (section 1).
+
+   **M0 results (2026-11-18), stated honestly:**
+
+   | Check | Mac (Chrome 157, P3 screen) | iPad (installed from home screen) |
+   |---|---|---|
+   | Pick the 4 files (Finder / Google Drive in Files) | ✅ | ✅ |
+   | Store a real episode via the `local:` scheme | ✅ "The Snowy Day": 39 min, 1080p, 1,289 MB in 3 s | ✅ stored (size not reported back) |
+   | Play it | ✅ | ✅ played |
+   | Pause | n/a | ❌ **spike limitation:** the spike has no pause button (native controls are off by design). The real player has one. |
+   | Plays offline (airplane mode, after a force-close) | not tested | **not yet reported** |
+   | Lock-screen / headphone "play" is ignored | ✅ in CI (emulated) | **not yet reported** |
+   | `persist()` granted | ❌ in a plain tab (expected) | ✅ granted in the installed app |
+   | Survives 7+ days | — | open; owner hasn't decided whether it's a gate |
+
+   **The spike's UI is a diagnostic page, not the product.** Its list sits among log text and it has no pause button. The owner noted this as detail, not a blocker.
+
+   **What M0 taught us (each now a rule elsewhere in this spec):**
+   1. **Shaka on P3 screens drops SDR video by default.** Its default offline track picker uses `hdrLevel: 'AUTO'`, which on P3 screens means "prefer PQ"; it dropped the only SDR (BT.709) track and stored **0 tracks without any error** ("0 MB in 0.0 s", then 4036 on play). This hit the Mac and the iPad alike. Fix: our own track picker, and storing 0 tracks counts as a failure (section 1).
+   2. **CI didn't catch it, because it didn't look like the family's devices:** headless Linux, no P3, and synthetic fixtures without colour info. Fix: CI runs on macOS, headed, with P3 emulated, plus an `episode-like` fixture (1080p, BT.709, two audio languages). See section 7.
+   3. **A cache-first service worker kept showing stale versions** after deploys. Fix: network-first when online, `cache: 'reload'` on install, and a visible version marker.
+   4. **`apt-get install ffmpeg` hung CI for 10 minutes.** Fix: pinned static binaries only.
+   5. **Real downloads have several audio tracks** (the episode's first was Chinese). Fix: `prepare.sh` prefers English.
+   6. **The 2 GB+ stress size was wrong for this family.** Typical media is 5–20 min episodes; the largest so far is 39 min / 1.3 GB, and it stored fine.
 2. **M1 – Mac prepare script:** *pulled into M0*, because M0 needs a real episode packaged. It covers:
    - `tools/get-packager.sh` (pinned binary + SHA-256);
    - `tools/prepare.sh` (codec check, re-encode only if needed, package, poster);
