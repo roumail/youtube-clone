@@ -15,6 +15,10 @@ of truth.** This file only says *how* to work here.
   Ask; don't guess.
 
 ## How changes land
+- **Once per clone:** `git config core.hooksPath tools/hooks`. The pre-commit
+  hook (`tools/check-hygiene.sh`) blocks credentials, personal data (home
+  paths, email addresses), `.env` files, media and files over 2 MB. Never use
+  `--no-verify`. CI runs the same check on every PR (`repo-hygiene`).
 - `main` is protected: PRs only, **squash merge only**, the `e2e` check must be
   green. Branch from an up-to-date `main`; one concern per PR.
 - **CI is the only test runner.** Don't run the Playwright suite locally. Push,

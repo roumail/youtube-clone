@@ -53,6 +53,20 @@ jobs:
           path: fixtures/out
           retention-days: 1
 
+  # Required check on PRs: no credentials, personal data or media in the change.
+  repo-hygiene:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check the PR's changes
+        env:
+          BASE: ${{ github.base_ref }}
+        run: tools/check-hygiene.sh --range "origin/${BASE}...HEAD"
+
   # Required check on PRs: blocks adding dependencies with known vulnerabilities.
   dependency-review:
     if: github.event_name == 'pull_request'

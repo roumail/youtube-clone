@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Enable once per clone:  git config core.hooksPath tools/hooks
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+"$root/tools/check-hygiene.sh" --staged
+# Optional deeper scan with a much larger rule set (brew install gitleaks).
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner
+fi
