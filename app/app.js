@@ -1,8 +1,10 @@
 // App: routing + one state object + render(state) (DESIGN.md §2, §7 contract).
-// Built so far: M2 (library, import, remove, PIN verify) and M3 (player + PIN
-// gate). First-run PIN setup / lockout / offline (M4) come later.
+// M2 library/import, M3 player + PIN gate, M4 first-run PIN, lockout, change
+// PIN, offline (service worker) and installability.
 import { installLocalScheme } from './local-scheme.js';
-import { hasPin, verifyPin } from './pin.js';
+import {
+  hasPin, verifyPin, savePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
+} from './pin.js';
 import { listVideos, importVideo, removeVideo } from './library.js';
 import {
   playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
@@ -15,8 +17,10 @@ const state = {
   pinSet: false,
   library: [], // usable Shaka StoredContent
   settingsUnlocked: false,
-  // PIN prompt opened for an action: { purpose: 'import' | 'settings' | 'play', status: 'entry' | 'wrong' }
+  // PIN prompt: { purpose: 'setup' | 'import' | 'settings' | 'play' | 'change',
+  //              mode: 'setup' | 'confirm' | 'verify' | 'change', status: 'entry' | 'wrong', error }
   prompt: null,
+  newPin: null, // first entry of a new PIN, until it is confirmed
   importStatus: { phase: 'idle', progress: 0, message: '' },
 };
 
@@ -31,10 +35,18 @@ const go = (hash) => { location.hash = hash; };
 
 // ---------- render ----------
 
+const PROMPT_TITLES = { setup: 'Set a PIN (4–6 digits)', confirm: 'Enter the PIN again', verify: 'Enter PIN', change: 'New PIN (4–6 digits)' };
+
 function pinPromptFor(s) {
-  if (!s.pinSet) return { mode: 'setup', status: 'entry', title: 'Set a PIN' };
-  if (s.prompt) return { mode: 'verify', status: s.prompt.status, title: 'Enter PIN' };
-  return null;
+  if (!s.prompt) return null;
+  const locked = s.prompt.mode === 'verify' && lockoutRemaining() > 0;
+  return {
+    mode: s.prompt.mode,
+    status: locked ? 'locked-out' : s.prompt.status,
+    title: PROMPT_TITLES[s.prompt.mode],
+    error: locked ? 'Too many wrong tries. Wait a minute.' : s.prompt.error,
+    cancellable: s.prompt.purpose !== 'setup',
+  };
 }
 
 function videoTile(c) {
@@ -105,9 +117,11 @@ function render(s) {
     $('pin-prompt').dataset.mode = prompt.mode;
     $('pin-prompt').dataset.state = prompt.status;
     $('pin-prompt').querySelector('[data-role="pin-title"]').textContent = prompt.title;
-    show('pin-cancel', prompt.mode !== 'setup');
-    show('pin-error', prompt.status === 'wrong');
-    $('pin-error').textContent = prompt.status === 'wrong' ? 'Wrong PIN' : '';
+    show('pin-cancel', prompt.cancellable);
+    show('pin-error', !!prompt.error);
+    $('pin-error').textContent = prompt.error ?? '';
+    $('pin-submit').disabled = prompt.status === 'locked-out';
+    $('pin-input').disabled = prompt.status === 'locked-out';
   }
 }
 
@@ -119,8 +133,14 @@ async function refreshLibrary() {
   state.library = await listVideos();
 }
 
+// Re-render when a lockout ends (also after a reload during a lockout).
+function scheduleLockoutEnd() {
+  const left = lockoutRemaining();
+  if (left > 0) setTimeout(update, left + 10);
+}
+
 function askPin(purpose) {
-  state.prompt = { purpose, status: 'entry' };
+  state.prompt = { purpose, mode: 'verify', status: 'entry', error: '' };
   $('pin-input').value = '';
   update();
   $('pin-input').focus();
@@ -128,15 +148,52 @@ function askPin(purpose) {
 
 async function onPinSubmit(event) {
   event.preventDefault();
-  if (!state.pinSet || !state.prompt) return; // first-run setup is M4
+  const prompt = state.prompt;
+  if (!prompt) return;
   const input = $('pin-input');
-  const ok = await verifyPin(input.value);
+  const value = input.value;
   input.value = '';
-  if (!ok) {
-    state.prompt.status = 'wrong';
+
+  // Choosing a new PIN (first run, or "Change PIN"), then confirming it.
+  if (prompt.mode === 'setup' || prompt.mode === 'change') {
+    if (!isValidNewPin(value)) {
+      Object.assign(prompt, { status: 'wrong', error: 'Use 4 to 6 digits.' });
+      return update();
+    }
+    state.newPin = value;
+    Object.assign(prompt, { mode: 'confirm', status: 'entry', error: '' });
     return update();
   }
-  const { purpose } = state.prompt;
+  if (prompt.mode === 'confirm') {
+    if (value !== state.newPin) {
+      state.newPin = null;
+      Object.assign(prompt, {
+        mode: prompt.purpose === 'setup' ? 'setup' : 'change', status: 'wrong', error: "The PINs didn't match. Try again.",
+      });
+      return update();
+    }
+    await savePin(value);
+    state.newPin = null;
+    state.pinSet = true;
+    recordSuccess();
+    state.prompt = null;
+    return update();
+  }
+
+  // Checking the current PIN.
+  if (lockoutRemaining() > 0) return update();
+  const ok = await verifyPin(value);
+  if (!ok) {
+    if (recordFailure()) scheduleLockoutEnd();
+    Object.assign(prompt, { status: 'wrong', error: 'Wrong PIN.' });
+    return update();
+  }
+  recordSuccess();
+  const { purpose } = prompt;
+  if (purpose === 'change') {
+    Object.assign(prompt, { mode: 'change', status: 'entry', error: '' });
+    return update();
+  }
   state.prompt = null;
   if (purpose === 'import') {
     // Still within the tap on "OK", so the browser allows opening the picker.
@@ -164,7 +221,9 @@ function onPause() {
 
 function onPinCancel() {
   const purpose = state.prompt?.purpose;
+  if (purpose === 'setup') return; // the first-run PIN can't be skipped
   state.prompt = null;
+  state.newPin = null;
   if (purpose === 'settings') go('#/library');
   if (purpose === 'play') cancelPlay();
   update();
@@ -210,7 +269,7 @@ function onRouteChange() {
   }
   if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
   if (state.route.name === 'settings' && !state.settingsUnlocked && state.pinSet) {
-    state.prompt = { purpose: 'settings', status: 'entry' };
+    state.prompt = { purpose: 'settings', mode: 'verify', status: 'entry', error: '' };
   } else if (state.prompt?.purpose === 'settings') {
     state.prompt = null;
   }
@@ -233,6 +292,7 @@ async function boot() {
   $('import-input').addEventListener('change', onFilesPicked);
   $('play-button').addEventListener('click', onPlayRequested);
   $('pause-button').addEventListener('click', onPause);
+  $('change-pin-button').addEventListener('click', () => askPin('change'));
   window.addEventListener('hashchange', onRouteChange);
 
   initPlayer($('player-video'), update);
@@ -248,10 +308,17 @@ async function boot() {
     navigator.mediaSession.setActionHandler('pause', onPause);
   }
 
+  // Offline + installable: cache the app shell (network-first, sw.js).
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // One user, no UI: just ask the browser to keep the library (DESIGN.md §1).
+  navigator.storage?.persist?.().catch(() => {});
+
   state.pinSet = hasPin();
+  if (!state.pinSet) state.prompt = { purpose: 'setup', mode: 'setup', status: 'entry', error: '' };
   await refreshLibrary();
   state.route = { name: '' };
   onRouteChange();
+  scheduleLockoutEnd();
   $('app').dataset.ready = 'true';
 }
 

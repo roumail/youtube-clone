@@ -2,7 +2,7 @@
 import { test, expect, goto, enterPin, sha256Hex } from '../../support.js';
 
 test.describe('Feature: Set a PIN on first run', () => {
-  test.fixme('Scenario: set and confirm a PIN, then land on the library', async ({ page }) => {
+  test('Scenario: set and confirm a PIN, then land on the library', async ({ page }) => {
     await test.step('Given a fresh install with no PIN set', async () => {
       await goto(page, '#/library');
     });
@@ -23,7 +23,7 @@ test.describe('Feature: Set a PIN on first run', () => {
     });
   });
 
-  test.fixme('Scenario: a mismatched confirmation starts setup again', async ({ page }) => {
+  test('Scenario: a mismatched confirmation starts setup again', async ({ page }) => {
     await test.step('Given a fresh install with no PIN set', async () => {
       await goto(page, '#/library');
     });
@@ -38,7 +38,7 @@ test.describe('Feature: Set a PIN on first run', () => {
     });
   });
 
-  test.fixme('Scenario: the setup prompt cannot be dismissed', async ({ page }) => {
+  test('Scenario: the setup prompt cannot be dismissed', async ({ page }) => {
     await test.step('Given a fresh install with no PIN set', async () => {
       await goto(page, '#/library');
     });
