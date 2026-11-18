@@ -22,8 +22,8 @@ make_raw() { # name seconds
   "$FFMPEG" -hide_banner -loglevel error -y \
     -f lavfi -i "testsrc=size=640x360:rate=30:duration=$2" \
     -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=$2" \
-    -c:v libx264 -profile:v main -pix_fmt yuv420p -g 60 -keyint_min 60 -sc_threshold 0 \
-    -color_primaries bt709 -color_trc bt709 -colorspace bt709 \
+    -vf "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709" \
+    -c:v libx264 -profile:v main -g 60 -keyint_min 60 -sc_threshold 0 \
     -c:a aac -b:a 96k -ac 2 -shortest \
     "$RAW/$1.mp4"
 }
