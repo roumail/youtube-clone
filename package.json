@@ -1,0 +1,16 @@
+{
+  "name": "youtube-clone",
+  "private": true,
+  "type": "module",
+  "description": "Offline, PIN-gated kids video library (PWA). Dev deps are CI-only; the app in app/ has no build step.",
+  "engines": { "node": "26.13.1" },
+  "scripts": {
+    "lint": "eslint e2e",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "eslint": "10.15.0",
+    "eslint-plugin-playwright": "2.12.2"
+  }
+}
