@@ -27,6 +27,11 @@ test('spike: picked fixture files are stored via the local: scheme and play back
   await test.step('Then the playback check passes', async () => {
     await expect(result(page, 'play')).toHaveAttribute('data-result', 'pass');
   });
+  await test.step('And the codec probe reports the stored codecs', async () => {
+    await expect(result(page, 'codec-probe')).toHaveAttribute('data-result', 'info');
+    await expect(result(page, 'codec-probe')).toContainText('avc1.');
+    await expect(result(page, 'codec-probe')).toContainText('mp4a.40.2');
+  });
 });
 
 test('spike: a pick with a missing file is rejected', async ({ page }) => {

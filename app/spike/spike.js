@@ -151,7 +151,46 @@ async function playItem(c) {
   } catch (e) {
     check('play', 'fail', `playback failed: ${e.code ?? ''} ${e.message ?? e}`);
     log(`playback failed: ${JSON.stringify(e)}`);
+  } finally {
+    await codecProbe(c);
   }
+}
+
+// Ask the browser, through every API Shaka relies on, whether it can play the
+// exact codecs of this stored video. Written to the codec-probe row and the log.
+async function codecProbe(c) {
+  const lines = [`UA: ${navigator.userAgent}`, `Shaka ${shaka.Player.version}`];
+  const tracks = (c.tracks ?? []).filter((t) => t.type === 'variant');
+  const t = tracks[0] ?? {};
+  const video = { mime: t.videoMimeType ?? 'video/mp4', codec: t.videoCodec, width: t.width, height: t.height, fps: t.frameRate, bitrate: t.videoBandwidth || t.bandwidth };
+  const audio = { mime: t.audioMimeType ?? 'audio/mp4', codec: t.audioCodec, bitrate: t.audioBandwidth || 128000 };
+  lines.push(`stored variant: video ${video.codec} ${video.width}x${video.height}@${video.fps} ${video.bitrate}bps, audio ${audio.codec}`);
+
+  for (const [kind, x] of [['video', video], ['audio', audio]]) {
+    if (!x.codec) { lines.push(`${kind}: no codec recorded`); continue; }
+    const type = `${x.mime}; codecs="${x.codec}"`;
+    lines.push(`${kind} ${type}`);
+    lines.push(`  MediaSource.isTypeSupported: ${window.MediaSource?.isTypeSupported(type) ?? 'no MediaSource'}`);
+    lines.push(`  ManagedMediaSource.isTypeSupported: ${window.ManagedMediaSource?.isTypeSupported(type) ?? 'no ManagedMediaSource'}`);
+    lines.push(`  video.canPlayType: "${document.createElement('video').canPlayType(type)}"`);
+    if (navigator.mediaCapabilities) {
+      const cfg = kind === 'video'
+        ? { video: { contentType: type, width: x.width || 1920, height: x.height || 1080, bitrate: x.bitrate || 5e6, framerate: Number(x.fps) || 25 } }
+        : { audio: { contentType: type, bitrate: x.bitrate, channels: '2', samplerate: 48000 } };
+      for (const mode of ['media-source', 'file']) {
+        try {
+          const r = await navigator.mediaCapabilities.decodingInfo({ type: mode, ...cfg });
+          lines.push(`  decodingInfo(${mode}): supported=${r.supported} smooth=${r.smooth}`);
+        } catch (err) {
+          lines.push(`  decodingInfo(${mode}) threw: ${err.message}`);
+        }
+      }
+    }
+  }
+  const text = lines.join('\n');
+  $('check-codec-probe').dataset.result = 'info';
+  $('check-codec-probe').textContent = text;
+  log(text);
 }
 
 async function main() {
