@@ -3,7 +3,7 @@
 // PIN, offline (service worker) and installability.
 import { installLocalScheme } from './local-scheme.js';
 import {
-  hasPin, verifyPin, savePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
+  hasPin, verifyPinSync, savePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
 } from './pin.js';
 import { listVideos, importVideo, removeVideo } from './library.js';
 import {
@@ -180,9 +180,10 @@ async function onPinSubmit(event) {
     return update();
   }
 
-  // Checking the current PIN.
+  // Checking the current PIN. Synchronous on purpose: the file picker and
+  // playback below must start within the user's tap, or Safari (iPad) refuses.
   if (lockoutRemaining() > 0) return update();
-  const ok = await verifyPin(value);
+  const ok = verifyPinSync(value);
   if (!ok) {
     if (recordFailure()) scheduleLockoutEnd();
     Object.assign(prompt, { status: 'wrong', error: 'Wrong PIN.' });

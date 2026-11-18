@@ -106,4 +106,27 @@ test.describe('Feature: Add a video', () => {
       }
     });
   });
+
+  // iPad bug (v1.0.0–v1.0.2): Safari opens a file picker only *during* the
+  // tap; the app hashed the PIN asynchronously first, so the picker came too
+  // late and silently never opened. Chrome allows 5 s after a tap, so this
+  // test slows the browser's async hashing to 6 s: any async step between the
+  // tap and the picker then fails here too, deterministically.
+  test('Scenario: after the correct PIN the file picker opens at once, even on a slow device @ipad', async ({ page, pinSet }) => {
+    await test.step('Given a device where asynchronous hashing takes 6 seconds', async () => {
+      await page.addInitScript(() => {
+        const digest = crypto.subtle.digest.bind(crypto.subtle);
+        crypto.subtle.digest = (...args) => new Promise((resolve) => { setTimeout(resolve, 6000); }).then(() => digest(...args));
+      });
+      await goto(page, '#/library');
+    });
+    const chooser = page.waitForEvent('filechooser', { timeout: 4000 });
+    await test.step('When I tap "Add video" and enter the correct PIN', async () => {
+      await page.getByTestId('add-video-button').click();
+      await enterPin(page, PIN);
+    });
+    await test.step('Then the file picker opens straight away', async () => {
+      await chooser;
+    });
+  });
 });

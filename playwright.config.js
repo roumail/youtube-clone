@@ -34,6 +34,13 @@ export default defineConfig({
         hasTouch: true,
       },
     },
+    // Safari's engine with an iPad profile, for behaviour that differs from
+    // Chrome (e.g. what counts as "during a tap"). Only scenarios tagged @ipad.
+    {
+      name: 'ipad-webkit',
+      grep: /@ipad/,
+      use: { ...devices['iPad Pro 11 landscape'] },
+    },
   ],
   webServer: LIVE ? undefined : {
     command: `node e2e/server.js ${PORT}`,
