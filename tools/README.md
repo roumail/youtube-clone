@@ -31,11 +31,24 @@ The pinned Shaka Packager is downloaded automatically on first use
 
 ```bash
 tools/run_prepare.sh [--dest DIR] [--title "Clean Title"] INPUT...
+ls *.mp4 | tools/run_prepare.sh        # paths on stdin, one per line
+```
+
+### Put it on your PATH (once)
+Link it into a `bin` folder on your PATH, so `run_prepare` works from any
+folder. It follows the link back to the repo, so it still finds `.env` (your
+`KIDS_LIBRARY`) and the other tools:
+
+```bash
+mkdir -p ~/bin
+ln -sf ~/home/2_AREAS/work/youtube-clone/tools/run_prepare.sh ~/bin/run_prepare
+# if ~/bin isn't on your PATH yet (zsh):
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 ```
 
 | Option | Meaning |
 |---|---|
-| `INPUT...` | Video files and/or folders. Folders are searched recursively for `.mp4 .m4v .mov .mkv .webm .avi`. |
+| `INPUT...` | Video files and/or folders. Folders are searched recursively for `.mp4 .m4v .mov .mkv .webm .avi`. With no `INPUT`, paths are read from stdin, one per line (`ls *.mp4 \| run_prepare`). |
 | `--dest DIR` | Where prepared folders go. Default: `KIDS_LIBRARY` from the environment or `.env`. |
 | `--title "…"` | Clean title for a **single** file (instead of its file name). |
 
@@ -48,7 +61,19 @@ tools/run_prepare.sh --title "The Snowy Day" ~/Downloads/The.Snowy.Day.2016.1080
 
 One file, title taken from the file name:
 ```bash
-tools/run_prepare.sh "~/Videos/Bluey - Keepy Uppy.mp4"
+tools/run_prepare.sh ~/Videos/"Bluey - Keepy Uppy.mp4"
+```
+
+Everything matching a pattern in the current folder, piped in (populates
+`KIDS_LIBRARY` on Google Drive):
+```bash
+cd ~/Downloads/Bluey
+ls *.mp4 | run_prepare
+```
+
+Pipe from `find` for nested folders or several extensions:
+```bash
+find ~/Downloads -iname '*.mkv' -o -iname '*.mp4' | run_prepare
 ```
 
 A whole folder (batch):

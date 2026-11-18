@@ -3,9 +3,11 @@
 # A wrapper around tools/prepare.sh — see tools/README.md for examples.
 #
 #   tools/run_prepare.sh [--dest DIR] [--title "Clean Title"] INPUT...
+#   ls *.mp4 | tools/run_prepare.sh          (paths on stdin, one per line)
 #
 # INPUT: video files and/or folders (folders are searched recursively for
-#        .mp4 .m4v .mov .mkv .webm .avi).
+#        .mp4 .m4v .mov .mkv .webm .avi). With no INPUT, paths are read from
+#        stdin. Works through a symlink on your PATH (e.g. ~/bin/run_prepare).
 # --dest:  where prepared folders go (e.g. your Google Drive "Kids Library").
 #          Default: $KIDS_LIBRARY, from the environment or from .env in the
 #          repo root (gitignored; copy .env.example).
@@ -14,10 +16,17 @@
 # Already-prepared videos are skipped; a failure doesn't stop the batch.
 set -uo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
+# Resolve symlinks (e.g. ~/bin/run_prepare -> repo/tools/run_prepare.sh) so the
+# repo's .env and sibling tools are found from anywhere.
+SELF="$0"
+while [[ -L "$SELF" ]]; do
+  link="$(readlink "$SELF")"
+  case "$link" in /*) SELF="$link" ;; *) SELF="$(dirname "$SELF")/$link" ;; esac
+done
+HERE="$(cd "$(dirname "$SELF")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
-usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
+usage() { sed -n '2,18p' "$SELF" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
 
 DEST=""; TITLE=""; INPUTS=()
 while [[ $# -gt 0 ]]; do
@@ -30,6 +39,10 @@ while [[ $# -gt 0 ]]; do
     *) INPUTS+=("$1"); shift ;;
   esac
 done
+# No arguments: read paths from stdin (e.g. `ls *.mp4 | run_prepare`).
+if [[ ${#INPUTS[@]} -eq 0 && ! -t 0 ]]; then
+  while IFS= read -r line; do [[ -n "$line" ]] && INPUTS+=("$line"); done
+fi
 [[ ${#INPUTS[@]} -gt 0 ]] || usage
 
 if [[ -z "$DEST" ]]; then
