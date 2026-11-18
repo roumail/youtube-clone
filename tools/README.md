@@ -141,6 +141,16 @@ over 2 MB. If `gitleaks` is installed (`brew install gitleaks`) it runs too.
   (default output: `./prepared`, gitignored). `run_prepare.sh` calls this.
 - `tools/get-packager.sh` — downloads the pinned Shaka Packager into
   `tools/bin/` (gitignored).
-- `node tools/real-episode-check.mjs "<prepared folder>"` — stores and plays a
-  prepared video in your local Chrome to check it end to end (manual; needs
-  `npm ci` once).
+- `node tools/real-episode-check.mjs "<prepared folder>"` — adds and plays a
+  prepared video in the live app, in your installed Chrome, with a throwaway
+  profile and PIN (manual; needs `npm ci --ignore-scripts` once).
+
+## Releases
+```bash
+git checkout main && git pull
+tools/release.sh 1.0.0 --dry-run   # first release: explicit version; preview
+tools/release.sh 1.0.0
+tools/release.sh minor             # later: major | minor | patch
+```
+It only releases the commit that is live and verified, and creates the tag and
+GitHub Release with your own `gh` login.

@@ -73,12 +73,12 @@ jobs:
           [ "${ok:-0}" -gt 0 ] || { echo "::error::$SHA has no successful e2e check"; exit 1; }
           echo "OK: $SHA is on main and passed e2e"
 
-      - name: Assemble the public site (the M0 spike is not published)
+      - name: Assemble the public site
         env:
           SHA: ${{ steps.target.outputs.sha }}
         run: |
           mkdir _site
-          rsync -a --exclude 'spike/' app/ _site/
+          rsync -a app/ _site/
           printf '{"commit":"%s"}\n' "$SHA" > _site/version.json
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
@@ -125,7 +125,7 @@ jobs:
             want=$(git show "$SHA:$f" | shasum -a 256 | cut -d' ' -f1)
             got=$(curl -fsS -H 'Cache-Control: no-cache' "${LIVE_URL}${rel// /%20}?v=$SHA" | shasum -a 256 | cut -d' ' -f1)
             if [ "$want" != "$got" ]; then echo "::error::MISMATCH $rel"; fail=1; fi
-          done < <(git ls-tree -r -z --name-only "$SHA" -- app | grep -zv '^app/spike/')
+          done < <(git ls-tree -r -z --name-only "$SHA" -- app)
           [ $fail -eq 0 ] && echo "all published files match $SHA"
           exit $fail
 

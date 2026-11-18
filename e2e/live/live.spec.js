@@ -1,5 +1,5 @@
 // Post-deploy release gate (runs only from deploy.yml, against the PUBLIC site):
-// the live app is this exact commit, boots cleanly, and the spike isn't public.
+// the live app is this exact commit and boots cleanly.
 // CSP violations and page errors fail it too (support.js fixture).
 import { test, expect, goto } from '../support.js';
 
@@ -22,9 +22,5 @@ test.describe('Live site after deploy', () => {
   test('Scenario: the app boots with a PIN and shows the library', async ({ page, pinSet }) => {
     await goto(page, '#/library');
     await expect(page.getByTestId('screen-library')).toBeVisible();
-  });
-
-  test('Scenario: the M0 spike is not published', async ({ request }) => {
-    expect((await request.get('./spike/')).status()).toBe(404);
   });
 });

@@ -69,9 +69,16 @@ of truth.** This file only says *how* to work here.
 - No frameworks, no build step for the app. The only app dependency is the
   vendored, pinned Shaka Player in `app/vendor/`.
 
+## Releases
+- Every merge deploys; releases (`vMAJOR.MINOR.PATCH` tags + GitHub Releases)
+  are cut **by the owner** with `tools/release.sh`. Never create, move or delete
+  tags yourself. When a PR is user-visible, say in it whether it's a
+  major, minor or patch change.
+
 ## Useful commands
 - Prepare real videos (owner's Mac): `tools/run_prepare.sh [--title "…"] <files or folders>`.
   The destination comes from `KIDS_LIBRARY` in a gitignored `.env` (see
   `.env.example`); never commit the owner's paths. Details: `tools/README.md`.
-- Manual real-episode check in local Chrome (not CI):
-  `node tools/real-episode-check.mjs "prepared/<Title>"`.
+- Manual real-episode check in the owner's Chrome (not CI): adds and plays a
+  prepared episode in the live app: `node tools/real-episode-check.mjs "prepared/<Title>"`.
+- Release (owner only): `tools/release.sh minor` (or `major`/`patch`/`1.0.0`, `--dry-run`).

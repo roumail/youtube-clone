@@ -47,4 +47,36 @@ test.describe('Feature: Set a PIN on first run', () => {
       await expect(page.getByTestId('pin-cancel')).toBeHidden();
     });
   });
+
+  test('Scenario: the PIN itself is never stored or left behind', async ({ page, context }) => {
+    const pin = '24680';
+    await test.step('Given I set the PIN on first run and then use it to unlock settings', async () => {
+      await goto(page, '#/library');
+      await enterPin(page, pin);
+      await enterPin(page, pin);
+      await page.getByTestId('settings-button').click();
+      await enterPin(page, pin);
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
+    });
+    await test.step('Then only its SHA-256 hash is stored', async () => {
+      expect(await page.evaluate(() => localStorage.getItem('pin.sha256'))).toBe(sha256Hex(pin));
+    });
+    await test.step('And the PIN appears nowhere: storage, cookies, URL, or the input field', async () => {
+      const found = await page.evaluate((p) => {
+        const hits = [];
+        for (const [name, store] of [['localStorage', localStorage], ['sessionStorage', sessionStorage]]) {
+          for (let i = 0; i < store.length; i++) {
+            const k = store.key(i);
+            if (k.includes(p) || (store.getItem(k) ?? '').includes(p)) hits.push(`${name}:${k}`);
+          }
+        }
+        if (document.cookie.includes(p)) hits.push('cookie');
+        if (location.href.includes(p)) hits.push('url');
+        if (document.querySelector('[data-testid="pin-input"]').value !== '') hits.push('pin-input not cleared');
+        return hits;
+      }, pin);
+      expect(found).toEqual([]);
+      expect((await context.cookies()).filter((c) => c.value.includes(pin))).toEqual([]);
+    });
+  });
 });
