@@ -92,33 +92,16 @@ jobs:
 
   # Release gate after deploy: the public URL serves this exact commit, and the
   # app boots in the pinned Chrome on macOS without errors or CSP violations.
-  verify-live:
+  # After deploy: the public URL serves exactly this commit, file for file.
+  verify-files:
     needs: deploy
-    runs-on: macos-15
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      # Tooling comes from main's own checkout; the deployed commit is only
-      # read as data (git show) for the comparison below.
+      # The deployed commit is only read as data (git show), never executed.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci --ignore-scripts
-
-      - name: Cache Playwright browser
-        id: pw-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/Library/Caches/ms-playwright
-          key: pw-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
-
-      - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install chromium
 
       - name: Wait until the CDN serves this commit
         env:
@@ -146,10 +129,26 @@ jobs:
           [ $fail -eq 0 ] && echo "all published files match $SHA"
           exit $fail
 
-      - name: Smoke-test the live site (headed, like on the Mac)
+  # After deploy: the live app boots cleanly in the pinned browser.
+  verify-browser:
+    needs: [deploy, verify-files]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579 # v1.65.1-noble
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Smoke-test the live site
         env:
           EXPECTED_SHA: ${{ needs.deploy.outputs.sha }}
-          PW_HEADED: '1'
         run: npx playwright test
 
       - name: Upload report and traces
@@ -165,7 +164,7 @@ jobs:
   # A failed live check rolls the site back to the last commit that deployed
   # and verified successfully. Never chains: a rollback doesn't roll back.
   rollback:
-    needs: [deploy, verify-live]
+    needs: [deploy, verify-files, verify-browser]
     if: failure() && needs.deploy.result == 'success' && inputs.rollback != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5

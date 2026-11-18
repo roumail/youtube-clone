@@ -1,5 +1,6 @@
 // Pinned Chrome only (Playwright version pins the exact build). DESIGN.md §7.
-// CI runs this on macOS, headed, to mirror the owner's Mac.
+// CI runs it on Ubuntu in the pinned Playwright image; real Mac checks are local
+// (tools/real-episode-check.mjs).
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4173;
@@ -18,7 +19,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: LIVE ?? `http://127.0.0.1:${PORT}/app/`,
-    // CI runs headed on macOS (PW_HEADED=1) to match the owner's Mac.
+    // PW_HEADED=1 shows the browser window (e.g. when run on a Mac).
     headless: !process.env.PW_HEADED,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

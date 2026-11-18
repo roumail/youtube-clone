@@ -55,8 +55,9 @@ of truth.** This file only says *how* to work here.
 - Tests wait on app state (`data-state`, `data-import`, …), never on time;
   `waitForTimeout` is banned by lint. The app ↔ test contract (routes, test ids,
   states, persisted keys) is in DESIGN.md §7 — change the spec before changing it.
-- CI mirrors the owner's Mac: macOS runner, headed Chrome (pinned via
-  Playwright), P3 screen emulated for every test.
+- CI runs on Ubuntu in the digest-pinned Playwright image, with a P3 screen
+  emulated for every test. A Playwright bump changes `package.json` and the
+  image digest together. Real-Mac checks are local (`tools/real-episode-check.mjs`).
 
 ## Must-keep technical rules (details in DESIGN.md)
 - Shaka offline: **always pass our own `offline.trackSelectionCallback`**
