@@ -40,7 +40,15 @@ export const test = base.extend({
         };
       }
     });
+    // Fail hook (DESIGN.md §7, Release gates): any Content Security Policy
+    // violation or uncaught page error fails the test, whatever it was testing.
+    const problems = [];
+    page.on('console', (m) => {
+      if (m.type() === 'error' && /Content Security Policy/i.test(m.text())) problems.push(`CSP: ${m.text()}`);
+    });
+    page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
     await use(page);
+    expect(problems, 'CSP violations / uncaught page errors').toEqual([]);
   },
 
   // A PIN already exists, so first-run setup is skipped. Only seeds once, so a

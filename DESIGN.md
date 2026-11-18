@@ -124,7 +124,7 @@ app/                                  published to GitHub Pages
   manifest.webmanifest, sw.js, icons      ◻ installable + offline (sw: network-first, see M0 lesson 3)
   library.js, pin.js                ✅ M2: Shaka storage (own track picker, 0-track cleanup); PIN hash + verify
   player.js                         ✅ M3: Shaka player on our <video>; PIN-gated play, free pause, safety net
-  spike/                            ✅ M0 diagnostic page (remove when the owner decides)
+  spike/                            ✅ M0 diagnostic page: in the repo and CI, **not published** (removal: owner decides)
 tools/
   get-packager.sh, prepare.sh       ✅ Mac: video → packaged folder for Google Drive
   run_prepare.sh, README.md         ✅ Mac wrapper: single file or batch → KIDS_LIBRARY (.env)
@@ -385,6 +385,38 @@ e2e/
   - Tests and tooling are never shipped.
 - No nightly or scheduled runs.
 
+### Security and release gates (owner decision 2026-11-18)
+**Threat model.** The site is static, with no backend, accounts or server-side data. Each device's videos and PIN hash stay in its own browser storage. The realistic attack is changing **what gets deployed**, through the repo, a GitHub Action or a dependency. So the protections focus on the supply chain and on gates that keep a failure from reaching the public site.
+
+**Before merge (all required on PRs to `main`):**
+
+| Gate | What it blocks |
+|---|---|
+| `e2e` | Any failing scenario. Also: **any CSP violation or uncaught page error in any test** (fail hook in `e2e/support.js`), and a vendored Shaka that isn't byte-identical to the npm release (`tools/verify-vendor.sh`). |
+| `dependency-review` | A PR adding a dependency with a known vulnerability (moderate or worse). |
+| `analyze (javascript-typescript)`, `analyze (actions)` | CodeQL findings in the app code and in the workflows (e.g. untrusted input reaching a shell). A ruleset blocks merging on high-severity findings. |
+
+**After deploy (`deploy.yml`):**
+- `verify-live` waits until the public URL serves the new commit (`version.json`), then runs `e2e/live/` against it in the pinned Chrome on macOS, headed:
+  - the app boots;
+  - the PIN setup and the library show;
+  - no CSP violations or page errors;
+  - the spike is not public.
+- If that fails, `rollback` **automatically redeploys the last version that deployed and verified successfully**, and the run fails loudly. A rollback never triggers another rollback.
+- Known limit: the bad version is public for the few minutes between deploy and rollback.
+
+**Hardening:**
+- **Every action is pinned to a full commit SHA** (version in a comment). The repo requires SHA pinning and allows GitHub-owned actions only, after the 2025 `tj-actions` tag-hijack attacks.
+- **Content Security Policy** `<meta>` in every page: scripts, connections and workers only from the site itself; images and media also from `data:`/`blob:` (posters, Media Source); no plugins, `<base>` or form posts. Shaka needs no `eval`. GitHub Pages can't set headers, hence the meta tag.
+- **Dependabot:**
+  - alerts and security updates are on;
+  - weekly grouped updates for the pinned actions and the npm test tooling. They go through the same gates.
+- **Secret scanning and push protection:** on, plus GitGuardian on PRs.
+- **Fork PRs:** workflows from outside contributors need the owner's approval.
+- **Workflow token:** read-only by default. Only the deploy and rollback jobs get the extra permissions they need.
+- **The public site excludes the M0 spike** (`app/spike/`). It stays in the repo and in CI.
+- **No HTML injection sinks:** the app never uses `innerHTML`, `eval` or the like. Titles from file names are inserted as text.
+
 ## Milestones
 0. **T0 – Test foundation (before any feature code):**
    - public repo `roumail/youtube-clone` with protected `main` (squash only, required checks);
@@ -450,7 +482,7 @@ Already active and passing: `smoke/` (5) and `spike/` (5).
 ## Open decisions (owner)
 1. **7-day persistence:** a gate, or trust the documented exemption? (Undecided.)
 2. **Poster frame:** `prepare.sh` takes the frame at 10%, which was plain white for "The Snowy Day". Should it use ffmpeg's `thumbnail` filter to pick a representative frame?
-3. **The M0 spike** (`app/spike/`, `e2e/spike/`): when to delete it? Its `local-scheme.js` stays either way.
+3. **The M0 spike** (`app/spike/`, `e2e/spike/`): no longer published, since the iPad tests the real app now. When should it be deleted from the repo? Its `local-scheme.js` stays either way.
 4. **iPad M0 checks not yet reported:** offline (airplane mode after a force-close) and lock-screen "play".
 5. **Release management** (version tags and GitHub releases via Actions on merge to `main`): the owner asked to add it to this spec **after their first UI test of the real app**. Not before.
 6. **Per-device PIN:** same code on both devices for now (section 5); revisit later.

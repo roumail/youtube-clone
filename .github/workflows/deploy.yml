@@ -1,13 +1,25 @@
 name: Deploy
+# The run name carries the deployed commit; the rollback reads it back.
+run-name: Deploy ${{ inputs.ref || github.event.workflow_run.head_sha || github.sha }}
 
-# Publishes app/ to GitHub Pages after CI passes on main (i.e. after a
-# squash-merge). No gh-pages branch: uses the Actions-based Pages deployment.
+# Publishes the app to GitHub Pages after CI passes on main (i.e. after a
+# squash-merge), then checks the LIVE site in a real browser. If that check
+# fails, the previous good version is redeployed automatically (DESIGN.md §7,
+# "Release gates"). No gh-pages branch: Actions-based Pages deployment.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit to deploy (default: the current main)
+        required: false
+      rollback:
+        description: Set by the automatic rollback; disables a further rollback
+        required: false
+        default: 'false'
 
 permissions:
   contents: read
@@ -15,6 +27,9 @@ permissions:
 concurrency:
   group: pages
   cancel-in-progress: false
+
+env:
+  LIVE_URL: https://www.rohailtaimour.com/youtube-clone/
 
 jobs:
   deploy:
@@ -29,17 +44,113 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      sha: ${{ steps.target.outputs.sha }}
     steps:
-      - uses: actions/checkout@v7
+      - id: target
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: echo "sha=${INPUT_REF:-${RUN_SHA:-$GITHUB_SHA}}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Deploy exactly the commit CI tested.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ steps.target.outputs.sha }}
 
-      - uses: actions/configure-pages@v6
+      - name: Assemble the public site (the M0 spike is not published)
+        env:
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          mkdir _site
+          rsync -a --exclude 'spike/' app/ _site/
+          printf '{"commit":"%s"}\n' "$SHA" > _site/version.json
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: app
+          path: _site
 
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  # Release gate after deploy: the public URL serves this exact commit, and the
+  # app boots in the pinned Chrome on macOS without errors or CSP violations.
+  verify-live:
+    needs: deploy
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.deploy.outputs.sha }}
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cache Playwright browser
+        id: pw-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/ms-playwright
+          key: pw-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Wait until the CDN serves this commit
+        env:
+          SHA: ${{ needs.deploy.outputs.sha }}
+        run: |
+          for i in $(seq 1 30); do
+            got=$(curl -fsS -H 'Cache-Control: no-cache' "${LIVE_URL}version.json?t=$(date +%s)" | sed -n 's/.*"commit":"\([0-9a-f]*\)".*/\1/p' || true)
+            [ "$got" = "$SHA" ] && { echo "live: $got"; exit 0; }
+            echo "waiting for $SHA (live: ${got:-none})"; sleep 10
+          done
+          echo "the live site never served $SHA" >&2; exit 1
+
+      - name: Smoke-test the live site (headed, like on the Mac)
+        env:
+          EXPECTED_SHA: ${{ needs.deploy.outputs.sha }}
+          PW_HEADED: '1'
+        run: npx playwright test
+
+      - name: Upload report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: live-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  # A failed live check rolls the site back to the last commit that deployed
+  # and verified successfully. Never chains: a rollback doesn't roll back.
+  rollback:
+    needs: [deploy, verify-live]
+    if: failure() && needs.deploy.result == 'success' && inputs.rollback != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      deployments: read
+    steps:
+      - name: Redeploy the previous good version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BAD_SHA: ${{ needs.deploy.outputs.sha }}
+        run: |
+          # A successful Deploy run = deployed AND verified live. Its name is "Deploy <sha>".
+          good=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?status=success&per_page=30" \
+            --jq '[.workflow_runs[].display_title | capture("^Deploy (?<sha>[0-9a-f]{40})$").sha] | map(select(. != env.BAD_SHA)) | .[0] // empty')
+          if [ -z "$good" ]; then echo "no previous good deploy found; leaving the site as is" >&2; exit 1; fi
+          echo "rolling back to $good"
+          gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main -f ref="$good" -f rollback=true
+          echo "::error::Live check failed for $BAD_SHA; rolled back to $good"
+          exit 1

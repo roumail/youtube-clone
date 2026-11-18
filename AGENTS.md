@@ -33,6 +33,18 @@ of truth.** This file only says *how* to work here.
 - Fixtures are synthetic and generated in CI (`fixtures/generate.sh`); nothing
   large is committed.
 
+## Security rules (DESIGN.md §7, "Security and release gates")
+- **Pin every GitHub Action to a full commit SHA** (version in a comment). Only
+  GitHub-owned actions are allowed; adding any other needs the owner's OK.
+- Keep the **Content Security Policy** meta tag on every page. If a change
+  needs a new source, update the CSP and the spec deliberately. CI fails on any
+  CSP violation or uncaught page error.
+- Never build HTML from data (`innerHTML`, `eval`, …). Insert text.
+- Never edit `app/vendor/` by hand: CI checks it byte-for-byte against npm.
+- Required checks: `e2e`, `dependency-review`, `analyze (javascript-typescript)`,
+  `analyze (actions)`. After a deploy, `verify-live` checks the public site, and a
+  failure rolls back automatically. Never disable these to get a change through.
+
 ## How features are built
 - Behaviour specs live in `e2e/features/<area>/*.spec.js`: one file per
   `Feature:`, one `test('Scenario: …')` per scenario, Given/When/Then as
