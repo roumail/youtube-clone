@@ -45,6 +45,27 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
+      - name: Restore fixtures (keyed on generator + tool versions)
+        id: fx-cache
+        uses: actions/cache@v6
+        with:
+          path: fixtures/out
+          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'fixtures/tools.txt') }}
+
+      - name: Install pinned media tools
+        if: steps.fx-cache.outputs.cache-hit != 'true'
+        run: |
+          python3 -m venv /tmp/mediatools
+          /tmp/mediatools/bin/pip install --quiet -r fixtures/tools.txt
+          # Use the fully static ffmpeg, not the distro-specific hw-encoder build.
+          FFPROBE=$(/tmp/mediatools/bin/python -c 'import streamer_binaries as b; print(b.ffprobe)')
+          echo "FFMPEG=${FFPROBE/ffprobe-/ffmpeg-}" >> "$GITHUB_ENV"
+          echo "PACKAGER=$(/tmp/mediatools/bin/python -c 'import streamer_binaries as b; print(b.packager)')" >> "$GITHUB_ENV"
+
+      - name: Generate fixtures
+        if: steps.fx-cache.outputs.cache-hit != 'true'
+        run: fixtures/generate.sh
+
       - name: Run e2e
         run: npx playwright test
 

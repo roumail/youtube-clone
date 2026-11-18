@@ -64,7 +64,7 @@ test.fixme('removing a video', async ({ page, pinSet, seedLibrary }) => {
   });
   await test.step('Then only "medium" is left in the library', async () => {
     await expect(page.getByTestId('settings-video-item')).toHaveCount(1);
-    await page.getByTestId('back-button').click();
+    await page.getByTestId('screen-settings').getByTestId('back-button').click();
     await expect(page.getByTestId('library-item')).toHaveCount(1);
     await expect(page.getByTestId('library-item').filter({ hasText: 'medium' })).toBeVisible();
   });

@@ -212,7 +212,7 @@ Any new feature gets proposed first and added only after it's approved.
 - **Codec canary test (runs first):** it asserts that `MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')` and the AAC equivalent are `true`. Open-source Chromium builds lack H.264/AAC, so if a bump ever switches to one, this fails loudly instead of every playback test failing in confusing ways.
 
 ### Fixtures (generated, deterministic, nothing big committed)
-- Generated in CI with pinned **ffmpeg** + **Shaka Packager** from synthetic sources (`testsrc2` video with a burned-in frame counter, plus a `sine` tone). There's no copyrighted or real content.
+- Generated in CI with pinned **ffmpeg** + **Shaka Packager** from synthetic sources (`testsrc` video, which has a built-in frame counter, plus a `sine` tone). Both tools come from the pinned `shaka-streamer-binaries` package. There's no copyrighted or real content.
 - Cached by a hash of the fixture script plus the tool versions.
 
 | Fixture | Purpose |
@@ -263,6 +263,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 - Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`.
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
+- `back-button` exists on both the player and settings screens, so tests scope it by screen, e.g. `getByTestId('screen-settings').getByTestId('back-button')`.
 
 **Persisted data the tests may seed:**
 - `localStorage['pin.sha256']`: the hex SHA-256 of the PIN.
