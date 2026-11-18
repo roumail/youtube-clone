@@ -23,3 +23,14 @@ video { width: 100%; max-height: 70vh; background: #000; border-radius: 12px; }
 .pin-card input { font-size: 1.6rem; letter-spacing: 0.4em; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid #444; background: #000; color: var(--fg); }
 .pin-actions { display: flex; gap: 12px; justify-content: flex-end; }
 [data-testid="pin-error"] { color: var(--accent); margin: 0; }
+
+/* Library grid (M2) */
+.grid li { background: #1d1d1d; border-radius: 12px; overflow: hidden; cursor: pointer; display: grid; }
+.grid li img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; display: block; }
+.grid li span { padding: 10px 12px; font-weight: 600; }
+progress[data-testid="import-progress"] { width: 100%; margin: 8px 0; }
+[data-testid="import-status"] { color: var(--muted); min-height: 1.4em; }
+[data-import="error"] { color: var(--accent); }
+[data-role="settings-list"] { list-style: none; padding: 0; display: grid; gap: 8px; }
+[data-role="settings-list"] li { display: flex; align-items: center; gap: 12px; background: #1d1d1d; padding: 8px 12px; border-radius: 10px; }
+[data-role="settings-list"] li span { flex: 1; }
