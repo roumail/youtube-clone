@@ -24,8 +24,10 @@ of truth.** This file only says *how* to work here.
 - **CI is the only test runner.** Don't run the Playwright suite locally. Push,
   then read results with `gh run view <id> --log-failed` and the
   `playwright-report` artifact (trace, screenshots, video).
-- Merging deploys: after CI passes on `main`, `deploy.yml` publishes `app/` to
-  GitHub Pages (https://www.rohailtaimour.com/youtube-clone/).
+- Merging does **not** deploy. Only a release published by the owner
+  (`tools/release.sh`) deploys `app/` to GitHub Pages
+  (https://www.rohailtaimour.com/youtube-clone/); the site runs exactly the
+  latest release.
 
 ## Safety rules (learned the hard way)
 - **Stage files by explicit path. Never `git add -A` / `git add .`** — the owner
@@ -70,8 +72,8 @@ of truth.** This file only says *how* to work here.
   vendored, pinned Shaka Player in `app/vendor/`.
 
 ## Releases
-- Every merge deploys; releases (`vMAJOR.MINOR.PATCH` tags + GitHub Releases)
-  are cut **by the owner** with `tools/release.sh`. Never create, move or delete
+- Releases (`vMAJOR.MINOR.PATCH` tags + GitHub Releases) are cut **by the
+  owner** with `tools/release.sh`, and publishing one deploys it. Never create, move or delete
   tags yourself. When a PR is user-visible, say in it whether it's a
   major, minor or patch change.
 

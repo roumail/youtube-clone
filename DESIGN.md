@@ -377,16 +377,17 @@ e2e/
     - runs lint, the codec canary, then the specs.
 - **Bumping Playwright** means changing `package.json` **and** the image digest (in `ci.yml` and `deploy.yml`) in the same PR.
 - **Artifacts on failure:** the Playwright trace, screenshots, video and the HTML report. These are what the LLM reads (via `gh`) to debug without running anything locally.
-- **On merge to `main`:** `deploy.yml` runs after CI succeeds on the push to `main`.
-  - It publishes **only `app/`**, at the exact commit CI tested.
+- **On publishing a release** (not on merge): `deploy.yml` deploys the release's tag.
+  - It publishes **only `app/`**, at the tagged commit, which must be on `main` and have passed CI.
+  - `version.json` on the site records the release version and commit.
   - It uses the Actions-based Pages deployment (`upload-pages-artifact` + `deploy-pages`): no `gh-pages` branch and no force-pushes.
   - Each deploy is recorded in the `github-pages` environment.
-  - It can also be run manually (`workflow_dispatch`).
+  - It can be re-run manually for an existing release tag (`workflow_dispatch`), which is also how the automatic rollback restores the previous release.
   - Tests and tooling are never shipped.
 - No nightly or scheduled runs.
 
 ### Releases (owner decision 2026-11-18)
-- **Every merge to `main` still deploys** (after the gates below). A **release** names a point in that stream: the commit that is live and verified gets a version tag.
+- **The site runs exactly the latest release** (owner decision 2026-11-18, revised the same day: releases and deploys must not live independently). **Merges to `main` don't deploy**; they only have to pass CI. Publishing a release deploys it.
 - **Versions** follow `vMAJOR.MINOR.PATCH`:
   - **major** for big or incompatible changes (e.g. a new storage format that needs re-adding videos);
   - **minor** for new features;
@@ -394,13 +395,15 @@ e2e/
 - **The first release is v1.0.0:** the feature set above, as tested by the owner on the iPad.
 - **The owner cuts releases** with `tools/release.sh major|minor|patch` (or an explicit version), using their own GitHub login. The script:
   - only runs from a clean, up-to-date `main`;
-  - refuses unless that exact commit has been deployed and verified, and is what the live site serves;
-  - creates the tag and the GitHub Release, with notes listing the PRs merged since the last release.
+  - refuses unless that commit passed CI on `main` and comes after the previous release;
+  - creates the tag and publishes the GitHub Release, with notes listing the PRs merged since the last release;
+  - **publishing it deploys it.** The live site is then checked, and if the check fails, the **previous release** is restored automatically.
+- **Trade-off, accepted by the owner:** nothing reaches the iPad, fixes included, until a release is cut. In return, the iPad only ever runs deliberately released versions.
 - No workflow creates tags. Release tags are permanent: they're never moved or deleted.
 
 ### Release gates
 - Every PR to `main` must pass the required checks before it can be merged.
-- After a deploy, the live site is checked automatically, and the previous version is restored if that check fails.
+- Only published releases deploy. After a deploy, the live site is checked automatically, and the previous release is restored if that check fails.
 - Security measures are **not documented in this repo**. The owner keeps private notes; ask the owner before changing workflows, permissions, deploy steps or page security headers.
 
 ## Milestones

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Cut a release: tag the commit that is live (deployed AND verified) as
-# vMAJOR.MINOR.PATCH and create its GitHub Release. Run by the owner, with the
-# owner's own GitHub login — no workflow creates tags.
+# Cut a release: tag main's current commit as vMAJOR.MINOR.PATCH and publish
+# its GitHub Release. Publishing the release DEPLOYS it (deploy.yml): the site
+# always runs the latest release. Run by the owner, with the owner's own GitHub
+# login — no workflow creates tags.
 #
 #   tools/release.sh minor              # 1.2.3 -> 1.3.0  (new feature)
 #   tools/release.sh patch              # 1.2.3 -> 1.2.4  (fixes only)
@@ -42,15 +43,14 @@ if [[ -n "$LAST" ]]; then
   [[ "$(printf '%s\n%s\n' "${LAST#v}" "$NEXT" | sort -V | tail -1)" == "$NEXT" && "${LAST#v}" != "$NEXT" ]] \
     || die "$TAG isn't newer than $LAST"
   [[ "$(git rev-parse "$LAST^{commit}")" != "$SHA" ]] || die "$LAST already points at this commit; nothing new to release"
+  git merge-base --is-ancestor "$LAST" "$SHA" || die "this commit doesn't come after $LAST"
 fi
 
-# 3. The commit must be live: deployed and verified, and served by the site.
-LIVE_URL="$(sed -n 's/^  LIVE_URL: *//p' .github/workflows/deploy.yml | head -1)"
-deployed="$(gh run list --workflow deploy.yml --limit 30 --json displayTitle,conclusion \
-  --jq "[.[] | select(.displayTitle == \"Deploy $SHA\" and .conclusion == \"success\")] | length")"
-[[ "${deployed:-0}" -gt 0 ]] || die "$SHA hasn't been deployed and verified yet (wait for the Deploy run)"
-live="$(curl -fsS "${LIVE_URL}version.json?t=$(date +%s)" | sed -n 's/.*"commit":"\([0-9a-f]*\)".*/\1/p')"
-[[ "$live" == "$SHA" ]] || die "the live site serves ${live:-nothing}, not $SHA"
+# 3. The commit must have passed CI on main (the deploy re-checks this too).
+REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+passed="$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=e2e&filter=all" \
+  --jq '[.check_runs[] | select(.conclusion == "success")] | length')"
+[[ "${passed:-0}" -gt 0 ]] || die "$SHA hasn't passed CI (e2e) on main yet; wait for it"
 
 # 4. Notes: the PRs merged since the last release.
 NOTES="$(mktemp)"; trap 'rm -f "$NOTES"' EXIT
@@ -65,4 +65,6 @@ sed 's/^/  /' "$NOTES"
 if [[ "$DRY" == --dry-run ]]; then echo "(dry run: nothing created)"; exit 0; fi
 
 gh release create "$TAG" --target "$SHA" --title "$TAG" --notes-file "$NOTES"
-echo "released $TAG"
+echo "released $TAG — deploying now. Follow it with:"
+echo "  gh run list --workflow deploy.yml --limit 1"
+echo "The site serves $TAG once the Deploy run succeeds (it rolls back to the previous release if the live check fails)."
