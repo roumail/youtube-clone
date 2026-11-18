@@ -106,4 +106,20 @@ test.describe('Feature: Add a video', () => {
       }
     });
   });
+
+  // iPad bug (v1.0.0–v1.0.2): the picker must open within the tap on "OK".
+  // Safari refuses a file picker that's opened after the tap has "ended".
+  test('Scenario: after the correct PIN the file picker opens @ipad', async ({ page, pinSet }) => {
+    await test.step('Given the library is shown', async () => {
+      await goto(page, '#/library');
+    });
+    const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
+    await test.step('When I tap "Add video" and enter the correct PIN', async () => {
+      await page.getByTestId('add-video-button').click();
+      await enterPin(page, PIN);
+    });
+    await test.step('Then the file picker opens', async () => {
+      await chooser;
+    });
+  });
 });
