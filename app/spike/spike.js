@@ -109,6 +109,7 @@ async function onPick(files) {
     check('store', 'fail', `bad pick: ${e.message}`);
     return log(`pick rejected: ${e.message}`);
   }
+  await codecProbe(await info.manifest.text());
   const started = performance.now();
   const s = await storage();
   try {
@@ -119,7 +120,12 @@ async function onPick(files) {
     log(`storing "${info.title}"…`);
     const stored = await s.store(uri, { title: info.title, poster }).promise;
     const secs = ((performance.now() - started) / 1000).toFixed(1);
-    check('store', 'pass', `"${info.title}" stored: ${mb(stored.size)} in ${secs} s`);
+    const kept = (stored.tracks ?? []).filter((t) => t.type === 'variant').length;
+    if (kept === 0 || stored.size === 0) {
+      check('store', 'fail', `"${info.title}": Shaka kept 0 playable tracks (all filtered as unsupported); nothing downloaded. See codec probe.`);
+    } else {
+      check('store', 'pass', `"${info.title}" stored: ${mb(stored.size)}, ${kept} track(s) in ${secs} s`);
+    }
     log(`stored ${stored.offlineUri}`);
   } catch (e) {
     check('store', 'fail', `store failed: ${e.code ?? ''} ${e.message ?? e}`);
@@ -151,40 +157,60 @@ async function playItem(c) {
   } catch (e) {
     check('play', 'fail', `playback failed: ${e.code ?? ''} ${e.message ?? e}`);
     log(`playback failed: ${JSON.stringify(e)}`);
-  } finally {
-    await codecProbe(c);
   }
 }
 
-// Ask the browser, through every API Shaka relies on, whether it can play the
-// exact codecs of this stored video. Written to the codec-probe row and the log.
-async function codecProbe(c) {
+// Ask the browser exactly what Shaka asks it before storing (one combined
+// MediaCapabilities query per variant), plus variations to pinpoint which field
+// makes it say "unsupported". Input: the picked .mpd text.
+async function codecProbe(mpdText) {
   const lines = [`UA: ${navigator.userAgent}`, `Shaka ${shaka.Player.version}`];
-  const tracks = (c.tracks ?? []).filter((t) => t.type === 'variant');
-  const t = tracks[0] ?? {};
-  const video = { mime: t.videoMimeType ?? 'video/mp4', codec: t.videoCodec, width: t.width, height: t.height, fps: t.frameRate, bitrate: t.videoBandwidth || t.bandwidth };
-  const audio = { mime: t.audioMimeType ?? 'audio/mp4', codec: t.audioCodec, bitrate: t.audioBandwidth || 128000 };
-  lines.push(`stored variant: video ${video.codec} ${video.width}x${video.height}@${video.fps} ${video.bitrate}bps, audio ${audio.codec}`);
+  try {
+    const dev = shaka.device?.DeviceFactory?.getDevice?.();
+    if (dev) lines.push(`Shaka device: ${dev.getDeviceName?.()} ${dev.getVersion?.() ?? ''}, native MediaCapabilities: ${dev.supportsMediaCapabilities?.()}`);
+  } catch (e) { lines.push(`Shaka device: ${e.message}`); }
+  lines.push(`window.MediaSource: ${typeof window.MediaSource}, window.ManagedMediaSource: ${typeof window.ManagedMediaSource}`);
 
-  for (const [kind, x] of [['video', video], ['audio', audio]]) {
-    if (!x.codec) { lines.push(`${kind}: no codec recorded`); continue; }
-    const type = `${x.mime}; codecs="${x.codec}"`;
-    lines.push(`${kind} ${type}`);
-    lines.push(`  MediaSource.isTypeSupported: ${window.MediaSource?.isTypeSupported(type) ?? 'no MediaSource'}`);
-    lines.push(`  ManagedMediaSource.isTypeSupported: ${window.ManagedMediaSource?.isTypeSupported(type) ?? 'no ManagedMediaSource'}`);
-    lines.push(`  video.canPlayType: "${document.createElement('video').canPlayType(type)}"`);
-    if (navigator.mediaCapabilities) {
-      const cfg = kind === 'video'
-        ? { video: { contentType: type, width: x.width || 1920, height: x.height || 1080, bitrate: x.bitrate || 5e6, framerate: Number(x.fps) || 25 } }
-        : { audio: { contentType: type, bitrate: x.bitrate, channels: '2', samplerate: 48000 } };
-      for (const mode of ['media-source', 'file']) {
-        try {
-          const r = await navigator.mediaCapabilities.decodingInfo({ type: mode, ...cfg });
-          lines.push(`  decodingInfo(${mode}): supported=${r.supported} smooth=${r.smooth}`);
-        } catch (err) {
-          lines.push(`  decodingInfo(${mode}) threw: ${err.message}`);
-        }
-      }
+  const doc = new DOMParser().parseFromString(mpdText, 'application/xml');
+  const reps = [...doc.getElementsByTagName('Representation')].map((rep) => {
+    const set = rep.parentElement;
+    const attr = (n) => rep.getAttribute(n) ?? set?.getAttribute(n);
+    return {
+      mime: attr('mimeType'), codecs: attr('codecs'), width: Number(attr('width')) || 0, height: Number(attr('height')) || 0,
+      fps: attr('frameRate'), bandwidth: Number(attr('bandwidth')) || 1, rate: Number(attr('audioSamplingRate')) || 1,
+    };
+  });
+  const v = reps.find((x) => x.mime?.startsWith('video'));
+  const a = reps.find((x) => x.mime?.startsWith('audio'));
+  const fps = v?.fps?.includes('/') ? (([n, d]) => n / d)(v.fps.split('/').map(Number)) : Number(v?.fps) || 30;
+  lines.push(`manifest video: ${v?.mime} ${v?.codecs} ${v?.width}x${v?.height}@${fps} ${v?.bandwidth}bps`);
+  lines.push(`manifest audio: ${a?.mime} ${a?.codecs} ${a?.rate}Hz ${a?.bandwidth}bps`);
+
+  const vType = `${v?.mime}; codecs="${v?.codecs}"`;
+  const aType = `${a?.mime}; codecs="${a?.codecs}"`;
+  for (const [name, type] of [['video', vType], ['audio', aType]]) {
+    lines.push(`${name} isTypeSupported: MS=${window.MediaSource?.isTypeSupported(type) ?? '-'} MMS=${window.ManagedMediaSource?.isTypeSupported(type) ?? '-'} canPlayType="${document.createElement('video').canPlayType(type)}"`);
+  }
+
+  // Exactly as Shaka 5.3.5 StreamUtils.getDecodingConfigs_ builds it.
+  const shakaVideo = { contentType: vType, width: v?.width || 64, height: v?.height || 64, bitrate: v?.bandwidth || 1, framerate: fps || 30 };
+  const shakaAudio = { contentType: aType, channels: 2, bitrate: a?.bandwidth || 1, samplerate: a?.rate || 1, spatialRendering: false };
+  const { spatialRendering, ...audioNoSpatial } = shakaAudio;
+  const cases = [
+    ['SHAKA: media-source video+audio', { type: 'media-source', video: shakaVideo, audio: shakaAudio }],
+    ['media-source video only', { type: 'media-source', video: shakaVideo }],
+    ['media-source audio only', { type: 'media-source', audio: shakaAudio }],
+    ['media-source audio without spatialRendering', { type: 'media-source', audio: audioNoSpatial }],
+    ['media-source video+audio without spatialRendering', { type: 'media-source', video: shakaVideo, audio: audioNoSpatial }],
+    ['media-source video at 720p', { type: 'media-source', video: { ...shakaVideo, width: 1280, height: 720, bitrate: 4e6 } }],
+    ['file video+audio', { type: 'file', video: shakaVideo, audio: shakaAudio }],
+  ];
+  for (const [label, cfg] of cases) {
+    try {
+      const res = await navigator.mediaCapabilities.decodingInfo(cfg);
+      lines.push(`${label}: supported=${res.supported}`);
+    } catch (e) {
+      lines.push(`${label}: threw ${e.name}: ${e.message}`);
     }
   }
   const text = lines.join('\n');
@@ -192,15 +218,3 @@ async function codecProbe(c) {
   $('check-codec-probe').textContent = text;
   log(text);
 }
-
-async function main() {
-  shaka.polyfill.installAll();
-  installLocalScheme();
-  $('spike-files').addEventListener('change', (e) => onPick(e.target.files));
-  mediaSession();
-  await Promise.all([environmentChecks(), registerServiceWorker().catch((e) => check('sw', 'fail', String(e)))]);
-  await renderList();
-  log(`ready (${navigator.onLine ? 'online' : 'offline'})`);
-}
-
-main();
