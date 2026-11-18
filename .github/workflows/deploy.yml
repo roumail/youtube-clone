@@ -2,10 +2,8 @@ name: Deploy
 # The run name carries the deployed commit; the rollback reads it back.
 run-name: Deploy ${{ inputs.ref || github.event.workflow_run.head_sha || github.sha }}
 
-# Publishes the app to GitHub Pages after CI passes on main (i.e. after a
-# squash-merge), then checks the LIVE site in a real browser. If that check
-# fails, the previous good version is redeployed automatically (DESIGN.md §7,
-# "Release gates"). No gh-pages branch: Actions-based Pages deployment.
+# Publishes the app to GitHub Pages after CI passes on main, then checks the
+# live site; if that fails, the previous good version is restored.
 on:
   workflow_run:
     workflows: [CI]
@@ -14,10 +12,10 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Commit to deploy (default: the current main)
+        description: 'Commit to deploy (default: the current main)'
         required: false
       rollback:
-        description: Set by the automatic rollback; disables a further rollback
+        description: 'Set by the automatic rollback; disables a further rollback'
         required: false
         default: 'false'
 
@@ -39,6 +37,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      contents: read
+      checks: read
       pages: write
       id-token: write
     environment:
@@ -57,6 +57,21 @@ jobs:
         with:
           # Deploy exactly the commit CI tested.
           ref: ${{ steps.target.outputs.sha }}
+          fetch-depth: 0
+
+      # Only commits on main that passed e2e are published.
+      - name: Guard — commit is on main and passed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::ref must be a full commit SHA"; exit 1; }
+          git fetch -q origin main
+          git merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$SHA is not on main"; exit 1; }
+          ok=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=e2e&filter=all" \
+            --jq '[.check_runs[] | select(.conclusion == "success")] | length')
+          [ "${ok:-0}" -gt 0 ] || { echo "::error::$SHA has no successful e2e check"; exit 1; }
+          echo "OK: $SHA is on main and passed e2e"
 
       - name: Assemble the public site (the M0 spike is not published)
         env:
@@ -82,16 +97,18 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 15
     steps:
+      # Tooling comes from main's own checkout; the deployed commit is only
+      # read as data (git show) for the comparison below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.deploy.outputs.sha }}
+          fetch-depth: 0
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Cache Playwright browser
         id: pw-cache
@@ -113,6 +130,21 @@ jobs:
             echo "waiting for $SHA (live: ${got:-none})"; sleep 10
           done
           echo "the live site never served $SHA" >&2; exit 1
+
+      - name: Live files match the commit byte for byte
+        env:
+          SHA: ${{ needs.deploy.outputs.sha }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::bad sha"; exit 1; }
+          fail=0
+          while IFS= read -r -d '' f; do
+            rel="${f#app/}"
+            want=$(git show "$SHA:$f" | shasum -a 256 | cut -d' ' -f1)
+            got=$(curl -fsS -H 'Cache-Control: no-cache' "${LIVE_URL}${rel// /%20}?v=$SHA" | shasum -a 256 | cut -d' ' -f1)
+            if [ "$want" != "$got" ]; then echo "::error::MISMATCH $rel"; fail=1; fi
+          done < <(git ls-tree -r -z --name-only "$SHA" -- app | grep -zv '^app/spike/')
+          [ $fail -eq 0 ] && echo "all published files match $SHA"
+          exit $fail
 
       - name: Smoke-test the live site (headed, like on the Mac)
         env:

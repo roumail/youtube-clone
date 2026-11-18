@@ -1,5 +1,4 @@
-# Keeps pinned dependencies current (DESIGN.md §7, Security). Security fixes are
-# also raised automatically (Dependabot security updates, a repo setting).
+# Keeps pinned dependencies current.
 version: 2
 updates:
   - package-ecosystem: github-actions   # bumps the pinned commit SHAs

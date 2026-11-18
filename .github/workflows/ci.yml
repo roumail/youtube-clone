@@ -78,10 +78,16 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Lint specs (no sleeps allowed)
         run: npm run lint
+
+      - name: Workflow files are valid YAML (a broken deploy.yml silently stops deploys)
+        run: |
+          for f in .github/workflows/*.yml .github/dependabot.yml; do
+            ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$f" || { echo "::error file=$f::invalid YAML"; exit 1; }
+          done
 
       - name: Verify vendored Shaka matches the official npm release
         run: tools/verify-vendor.sh
