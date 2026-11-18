@@ -200,6 +200,8 @@ e2e/                                ✅ specs (section 7)
   - 5 wrong attempts trigger a 60-second lockout.
   - Changing the PIN requires the current one.
   - Forgotten PIN: delete and re-add the home-screen app (this also clears the library).
+  - **Checking the PIN is synchronous** (a built-in SHA-256, `verifyPinSync`). Safari on the iPad only opens a file picker, or starts unmuted playback, *during* the user's tap. Any `await` between tapping "OK" and the picker or `play()` makes it refuse silently. That was the v1.0.0–v1.0.2 iPad bug: after the PIN, Add video opened nothing. A scenario tagged `@ipad` slows the browser's async hashing to 6 s and checks the picker still opens at once. It runs on Chrome and on a Safari-engine (WebKit, iPad profile) project.
+  - **The PIN itself is never kept**, not even in memory beyond the submit handler. Only its hash is stored (`localStorage['pin.sha256']`), and a scenario checks the PIN appears nowhere else.
   - **Honest limit:** the stored SHA-256 of a 4–6 digit PIN can be brute-forced quickly by someone who can read the device's browser storage. The PIN keeps a child from starting playback (section 6); it isn't meant to resist a determined adult with device access. A test checks that the PIN itself is never stored or left behind (storage, cookies, URL, input field).
   - Same code on both devices for now; revisit later.
 - Tip, no code involved: turn on iPad **Guided Access** to keep a child inside the app.
