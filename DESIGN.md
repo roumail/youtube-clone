@@ -208,7 +208,7 @@ Any new feature gets proposed first and added only after it's approved.
 
 ### Pinning Chrome
 - Pin Playwright to an exact version in `package-lock.json`. That pins the exact browser build Playwright downloads (Chrome for Testing in recent versions), so every CI run uses the same Chrome.
-- The CI cache key is the Playwright version, and browser upgrades only happen through a deliberate Playwright bump PR.
+- In CI the browser comes preinstalled in the pinned Playwright image (see CI/CD below). Browser upgrades only happen through a deliberate Playwright bump PR.
 - **Codec canary test (runs first):** it asserts that `MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')` and the AAC equivalent are `true`. Open-source Chromium builds lack H.264/AAC, so if a bump ever switches to one, this fails loudly instead of every playback test failing in confusing ways.
 
 ### Fixtures (generated, deterministic, nothing big committed)
@@ -306,8 +306,13 @@ The specs depend only on what's listed here. Changing it means changing the spec
   - the required checks must be green before merge;
   - **squash merge only**;
   - no direct pushes.
-- **Required check, run on every PR to `main`:** a single job.
-  - `e2e`: Playwright on the pinned Chrome, codec canary first. Fixtures are generated in the job and cached by a hash of the fixture script plus the tool versions.
+- **Jobs, run on every PR to `main`:**
+  - `fixtures`: generates the media fixtures on a plain runner with the pinned static tools. It's cached by a hash of the generator script plus the tool versions, and handed to `e2e` as an artifact.
+  - `e2e` (**the required check**):
+    - runs **inside the official Playwright Docker image, pinned by digest** (`mcr.microsoft.com/playwright:v1.65.1-noble`), so the OS, system libraries and browser build can't drift;
+    - runs lint, the codec canary, then the specs.
+- **No custom Docker build:** the official image is used as-is.
+- **Bumping Playwright** means changing `package.json` **and** the image digest in the same PR. The tags must match.
 - **Artifacts on failure:** the Playwright trace, screenshots, video and the HTML report. These are what the LLM reads (via `gh`) to debug without running anything locally.
 - **On merge to `main`:** `deploy.yml` runs after CI succeeds on the push to `main`.
   - It publishes **only `app/`**, at the exact commit CI tested.
