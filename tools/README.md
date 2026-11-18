@@ -87,6 +87,13 @@ Several files and folders at once, into a different destination:
 tools/run_prepare.sh --dest ~/Desktop/test-library ep1.mp4 ep2.mkv ~/Videos/Specials/
 ```
 
+### Progress
+While a video is re-encoded (e.g. HEVC → H.264), a live line shows how far it is:
+`re-encoding [########------------]  41%  16:12 / 39:28  speed 2.3x  ETA 10m`.
+It's drawn on your terminal (also inside a `--tmux` session when you attach);
+logs only get the start and the total time. Repackaging needs no bar: it takes
+seconds.
+
 ### Long jobs: `--tmux`
 Re-encoding a film (e.g. HEVC → H.264) can take an hour. With `--tmux` the job
 runs in a detached tmux session, so closing the terminal doesn't stop it:
