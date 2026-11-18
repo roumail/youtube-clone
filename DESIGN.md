@@ -99,7 +99,7 @@ Deleting the home-screen icon (or clearing that app's data) deletes its library.
 
 **Mac-side tools (preparing videos only; nothing extra on the iPad):**
 - **Shaka Packager:** a single static binary, **pinned to v3.9.3**, downloaded from its GitHub releases (`packager-osx-arm64` on the Mac, `packager-linux-x64` in CI) and checked against a SHA-256. It repackages H.264/AAC `.mp4` into DASH **without re-encoding**, so it's fast. **No Python or venv anywhere.**
-- **ffmpeg**: whatever is installed, not version-pinned (Homebrew on the Mac, already present; Ubuntu's package in CI). The version is printed in the logs:
+- **ffmpeg 9.0.2**: Homebrew on the Mac (already installed). In CI, the static build from `mwader/static-ffmpeg:9.0.2-1-amd64`, pinned by image digest and copied out of the image. No `apt`, which hung CI once:
   - re-encodes inputs that aren't already H.264/AAC;
   - grabs a poster frame for the thumbnail.
 
@@ -210,7 +210,7 @@ Any new feature gets proposed first and added only after it's approved.
 - **Codec canary test (runs first):** it asserts that `MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')` and the AAC equivalent are `true`. Open-source Chromium builds lack H.264/AAC, so if a bump ever switches to one, this fails loudly instead of every playback test failing in confusing ways.
 
 ### Fixtures (generated, deterministic, nothing big committed)
-- Generated in CI with **ffmpeg** (Ubuntu's package) + the **pinned Shaka Packager binary** from synthetic sources (`testsrc` video, which has a built-in frame counter, plus a `sine` tone). There's no copyrighted or real content.
+- Generated in CI with the **pinned static ffmpeg 9.0.2** + the **pinned Shaka Packager binary** from synthetic sources (`testsrc` video, which has a built-in frame counter, plus a `sine` tone). There's no copyrighted or real content.
 - Cached by a hash of the fixture script plus the tool versions.
 
 | Fixture | Purpose |

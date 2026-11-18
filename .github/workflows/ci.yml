@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Media fixtures need no browser: generated on the plain runner with ffmpeg +
-  # the pinned Shaka Packager binary, cached, and handed to e2e as an artifact.
+  # Media fixtures need no browser: generated on the plain runner with pinned
+  # static ffmpeg + Shaka Packager binaries, cached, and handed to e2e as an artifact.
   fixtures:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -27,13 +27,20 @@ jobs:
         uses: actions/cache@v6
         with:
           path: fixtures/out
-          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'tools/prepare.sh', 'tools/get-packager.sh') }}
+          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'tools/prepare.sh', 'tools/get-packager.sh', '.github/workflows/ci.yml') }}
 
-      - name: Install ffmpeg + pinned Shaka Packager
+      - name: Install pinned ffmpeg + Shaka Packager (static binaries, no apt)
         if: steps.fx-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 3
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends ffmpeg
+          # mwader/static-ffmpeg:9.0.2-1-amd64 (same ffmpeg version as the Mac), pinned by digest.
+          IMG=mwader/static-ffmpeg@sha256:da43484f777f077a11f03f36a24ba56cb7b713d0f153dc488d434dab23d3d00c
+          mkdir -p tools/bin
+          docker create --name ff "$IMG" /ffmpeg >/dev/null
+          docker cp ff:/ffmpeg tools/bin/ffmpeg
+          docker cp ff:/ffprobe tools/bin/ffprobe
+          docker rm ff >/dev/null
+          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
           tools/get-packager.sh
 
       - name: Generate fixtures (via tools/prepare.sh)
