@@ -299,7 +299,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 | `import-status` | `data-import`: `idle` · `storing` · `done` · `error` |
 
 **Controls** (`data-testid`):
-- Library: `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`, `import-help` (always-visible note on which 4 files to pick).
+- Library: `app-version` (the released version from `version.json`, or `dev`), `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`, `import-help` (always-visible note on which 4 files to pick).
 - Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`.
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.

@@ -279,6 +279,19 @@ function onRouteChange() {
 
 // ---------- boot ----------
 
+// The released version (written to version.json at deploy), shown next to
+// "Library". Local and CI runs have no version.json: it stays "dev".
+async function showVersion() {
+  try {
+    const res = await fetch('version.json', { cache: 'no-cache' });
+    if (!res.ok) return;
+    const { version } = await res.json();
+    if (typeof version === 'string' && /^v\d+\.\d+\.\d+$/.test(version)) $('app-version').textContent = version;
+  } catch {
+    // offline and not cached yet: keep the current text
+  }
+}
+
 async function boot() {
   shaka.polyfill.installAll();
   installLocalScheme();
@@ -321,6 +334,7 @@ async function boot() {
   onRouteChange();
   scheduleLockoutEnd();
   $('app').dataset.ready = 'true';
+  showVersion();
 }
 
 boot();
