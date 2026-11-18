@@ -218,3 +218,15 @@ async function codecProbe(mpdText) {
   $('check-codec-probe').textContent = text;
   log(text);
 }
+
+async function main() {
+  shaka.polyfill.installAll();
+  installLocalScheme();
+  $('spike-files').addEventListener('change', (e) => onPick(e.target.files));
+  mediaSession();
+  await Promise.all([environmentChecks(), registerServiceWorker().catch((e) => check('sw', 'fail', String(e)))]);
+  await renderList();
+  log(`ready (${navigator.onLine ? 'online' : 'offline'})`);
+}
+
+main();
