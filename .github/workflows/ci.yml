@@ -53,15 +53,12 @@ jobs:
           path: fixtures/out
           retention-days: 1
 
-  # Required check. Runs inside the official Playwright image, pinned by digest:
-  # OS, system libraries and the browser build cannot drift.
+  # Required check. Mirrors the owner's Mac: macOS on Apple Silicon, Chrome
+  # (pinned Playwright build) in a visible window, P3 screen emulated.
   e2e:
     needs: fixtures
-    runs-on: ubuntu-24.04
+    runs-on: macos-15
     timeout-minutes: 20
-    container:
-      # mcr.microsoft.com/playwright:v1.65.1-noble (must match @playwright/test in package.json)
-      image: mcr.microsoft.com/playwright@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
     steps:
       - uses: actions/checkout@v7
 
@@ -75,12 +72,25 @@ jobs:
       - name: Lint specs (no sleeps allowed)
         run: npm run lint
 
+      - name: Cache Playwright browser (keyed on pinned version)
+        id: pw-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/Library/Caches/ms-playwright
+          key: pw-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install pinned Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
       - uses: actions/download-artifact@v8
         with:
           name: fixtures
           path: fixtures/out
 
-      - name: Run e2e
+      - name: Run e2e (headed, like on the Mac)
+        env:
+          PW_HEADED: '1'
         run: npx playwright test
 
       - name: Upload report and traces

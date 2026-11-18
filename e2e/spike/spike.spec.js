@@ -60,15 +60,8 @@ test('spike: an OS "play" command is received and ignored', async ({ page }) => 
 });
 
 test('spike: SDR video still stores and plays on a wide-gamut (P3) screen', async ({ page }) => {
-  await test.step('Given the screen reports a P3 colour gamut (like MacBooks and iPads)', async () => {
-    await page.addInitScript(() => {
-      const original = window.matchMedia.bind(window);
-      window.matchMedia = (q) => (/color-gamut:\s*p3|dynamic-range:\s*high/.test(q)
-        ? { matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }
-        : original(q));
-    });
-    await page.reload();
-    await expect(result(page, 'shaka')).toHaveAttribute('data-result', 'pass');
+  await test.step('Given the screen reports a P3 colour gamut (support.js emulates this for every test)', async () => {
+    expect(await page.evaluate(() => matchMedia('(color-gamut: p3)').matches)).toBe(true);
   });
   await test.step('When I pick the 4 files of "tiny" (manifest marks it SDR / BT.709)', async () => {
     await page.getByTestId('spike-files').setInputFiles(fixtureFiles('tiny'));
