@@ -1,0 +1,18 @@
+# Keeps pinned dependencies current (DESIGN.md §7, Security). Security fixes are
+# also raised automatically (Dependabot security updates, a repo setting).
+version: 2
+updates:
+  - package-ecosystem: github-actions   # bumps the pinned commit SHAs
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm              # CI test tooling only (Playwright, ESLint)
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      test-tooling:
+        patterns: ["*"]
