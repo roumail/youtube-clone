@@ -1,0 +1,358 @@
+# design document youtube clone
+
+## Working agreement (read first)
+
+**Order of work: the owner sets it. Current phase:**
+1. **Draft the Playwright specs.**
+2. **Set up GitHub (`gh`) and CI.**
+3. **Make CI fail:** there's no app yet, so the gate must go red for the right reason.
+4. **Add the fixtures and supporting pieces, and make the easiest smoke test pass:** the 4 screens load, even though nothing plays yet.
+
+**We reconvene after these four steps.** Nothing beyond them gets started before then.
+
+**Rules while working:**
+- Ask for design clarifications along the way whenever they're needed.
+- **Don't deviate from this spec.** If something learned during the work contradicts it, stop and raise it so the spec gets updated first. Then continue.
+- Tests are never run locally by the LLM. CI is the source of truth (see section 7).
+
+
+Specs: (spend more time on the ones on top - 60% top two bullets and 40% divided b/w remaining tasks)
+* Biggest constraint we need to consider - Ideally installable on mac and ipad. Each device points to it's own storage
+* stack needs to be chosen based on maximum reuse of existing functionality. Python might be easy with more projects but we have to also consider dependencies since mac and ipad are already big constraints.
+* Fixed library that is available for rendering
+* Rather easy to add new media to the library
+* Full control over UI: Parental controls for playing (pausing doesn't need a code but playing needs a code again) - no autoplay
+* feature minimal - nothing gets added without asking first
+
+---
+
+# Plan
+
+Effort split mirrors the specs: sections 1–2 (platform + stack) are the bulk of the thinking; sections 3–6 are deliberately short.
+
+## 1. Platform & installation: Mac + iPad, storage on each device (~30%)
+
+### Decision: an installable web app (PWA), not a native app
+A native iPad app runs into Apple's signing paywall. A free Apple ID install stops launching after 7 days; a lasting install needs the $99/yr developer program. A browser is already on every device, so we use that instead:
+
+- **No App Store, no Xcode, no developer account, no expiry.**
+- **Mac:** Chrome → ⋮ → Cast, save and share → **Install page as app** (Chrome's real Chromium engine, full OPFS support). Safari → Add to Dock works too.
+- **iPad:** Chrome (iPadOS 16.4+) or Safari → Share → **Add to Home Screen**. It gets its own icon, opens full-screen, and keeps **its own storage**.
+  - **Important:** on iPad, Chrome runs on the same WebKit engine as Safari. Apple requires this for every browser outside the EU. So the browser you pick on iPad doesn't change storage or playback behaviour, and the iPad limits below apply in either one.
+- **Works offline:** a service worker caches the app's code, so the URL only has to be reachable to install and update.
+
+### Hosting
+- Install requires HTTPS, so the static files (HTML/JS/CSS only; **never videos**) live on free static hosting such as GitHub Pages or Cloudflare Pages. No server code and no database.
+- On the Mac, it can also run from `localhost` while developing.
+
+### Storage per device: decision = Shaka Player offline storage
+Research summary, sources at the bottom of this doc:
+
+| Question | Status | Evidence |
+|---|---|---|
+| Is there enough space? | **Solved** | Since WebKit 17 (iPadOS 17 / macOS 14), a browser app gets up to **60% of disk per origin**. Installed web apps get the same quota. Chrome on Mac has similarly large quotas. |
+| Will the iPad delete it after 7 days unused? | **Solved** | Home-screen web apps are exempt from the 7-day cap on script-writable storage. `navigator.storage.persist()` is granted by heuristic, and installed home-screen apps are favoured. Eviction only happens under disk pressure, least-recently-used first, and persistent origins are excluded. |
+| Can the iPad play one big stored file? | **Avoid** | Turning a large stored file into a playable link (`URL.createObjectURL`) has a history of problems on iOS:<br>• memory blow-up (iOS 15);<br>• broken playback (iOS 17.4.1);<br>• crashes with 100–500 MB files in a Workbox issue that was never resolved. |
+| How do we store and play big videos offline? | **Solved: use Shaka Player offline** | Google's open-source player (Apache-2.0) with built-in offline storage:<br>• stores each video as **many small segments** (a few seconds each) in IndexedDB;<br>• plays them back through Media Source Extensions (`ManagedMediaSource` on iPadOS 17+);<br>• no single huge file is ever handed to the video element, so the big-file bugs above don't apply. |
+
+**Why Shaka:** it's the tried-and-tested option. Offline storage is a first-class, documented feature with `store()`, `list()`, `remove()`, progress callbacks and app metadata, and it's used in production. We hand-roll nothing on the storage side.
+
+**The cost: videos are prepared on the Mac once.** Shaka stores DASH/HLS content (a manifest plus segmented media), not plain `.mp4` files. Each video is packaged once on the Mac (section 4), and the packaged output is shared through **Google Drive**, so the iPad never does any processing. At home-library scale this is a one-off step per video, not a burden.
+
+**Fallback (only if Shaka on iPad fails M0):** keep the videos as plain files in OPFS and have the service worker feed them to the player a few MB at a time as `206` range responses (the Workbox range-requests pattern, read from OPFS). It's more hand-written code and less proven on iPad, which is why it's no longer the main plan.
+
+### Prior art: what we reuse vs. skip
+| Project | What it does | Use? |
+|---|---|---|
+| **Shaka Player** | Production offline video storage + playback | **Yes: core dependency** |
+| **Shaka Packager** | Google's packager that produces exactly what Shaka Player expects | **Yes: Mac-side tool** |
+| Local-Video-Player, OtterPlayer, dalyIsaac/video-player, pwa-player | PWA players for local files | No: they play a file you pick each time, with no persistent library |
+| Ke3516/offline-media-player | Offline media-library PWA | No: its iPad path is a Capacitor native build (paywall) |
+| ffamilyfriendly/Video-Storage | Chunked large-video storage in IndexedDB for iOS | No: archived in 2023. It does confirm the "small chunks" idea that Shaka uses |
+| Chronos (research issue #28) | Design notes for large offline video in a PWA | No: reference only, not tested on a device |
+
+### Remaining caveat
+Deleting the home-screen icon (or clearing that app's data) deletes its library. Re-importing from Google Drive is the recovery, and the packaged files there act as the backup.
+
+### Options considered
+| Option | Cost / friction | Verdict |
+|---|---|---|
+| **PWA (Install / Add to Home Screen)** | Free, no expiry, one codebase, Chrome or Safari | **Chosen** |
+| Native SwiftUI app + free Apple ID | Re-install from the Mac every 7 days | Rejected |
+| Native SwiftUI app + paid account | $99/yr | Rejected (paywall) |
+| Capacitor / Cordova wrapper | Still a native iOS build that needs signing | Rejected (same paywall) |
+| AltStore/SideStore (auto re-sign) | Free, but needs a helper running on the Mac, 3-app limit, and breaks often | Rejected: fragile |
+| Python (Kivy/BeeWare) | Same signing problem as native, plus an interpreter | Rejected |
+
+## 2. Stack: maximum reuse, minimum dependencies (~30%)
+
+**Plain HTML + CSS + vanilla JavaScript (ES modules), plus one vendored library: Shaka Player.** There's no framework, no build step and no npm. Shaka's pre-compiled `shaka-player.compiled.js` is copied into `vendor/` at a pinned version.
+
+| Need | Reused from |
+|---|---|
+| Offline video storage (segments in IndexedDB) | **Shaka** `shaka.offline.Storage`: `store()`, `list()`, `remove()`, `appMetadata` |
+| Offline playback | **Shaka** `shaka.Player` attached to our own `<video>` (no `controls`, no Shaka UI), using `player.load(offlineUri)` |
+| Reading packaged files picked from Google Drive / Files | **Shaka** `NetworkingEngine.registerScheme`: a small custom `local:` scheme that returns bytes from the picked `File` objects (`file.slice` for byte ranges). This is the documented plugin route for non-HTTP sources. |
+| Picking files | `<input type="file" multiple>`: on iPad it opens the Files picker, where Google Drive appears as a location; on the Mac it opens Finder |
+| Small data (PIN hash) | `localStorage` / IndexedDB |
+| PIN hashing | Web Crypto `crypto.subtle.digest('SHA-256')` |
+| Blocking lock-screen / headphone / media-key "play" | Media Session API action handlers |
+| Offline + installability | Service worker + `manifest.webmanifest` |
+
+**Mac-side tools (preparing videos only; nothing extra on the iPad):**
+- **Shaka Packager:** a single static binary (from GitHub releases, or the `shaka-streamer-binaries` package). It repackages H.264/AAC `.mp4` into DASH **without re-encoding**, so it's fast.
+- **ffmpeg** (Homebrew):
+  - re-encodes inputs that aren't already H.264/AAC;
+  - grabs a poster frame for the thumbnail.
+
+**Toolchain:** a text editor, a browser, a git push to the static host, and the two Mac tools above.
+
+Code layout (small on purpose):
+```
+index.html
+manifest.webmanifest       // name, icons, display: standalone
+sw.js                      // caches app shell (incl. vendor/) for offline
+vendor/shaka-player.compiled.js   // pinned version
+app.js                     // routing between library / player / settings
+library.js                 // Shaka Storage list/store/remove, grid
+local-scheme.js            // Shaka scheme plugin: serves picked Files by name + byte range
+player.js                  // shaka.Player + <video> + custom overlay controls
+pin.js                     // PIN prompt, hash check, lockout
+styles.css
+tools/prepare.sh           // Mac: video → packaged folder in Google Drive
+```
+
+## 3. Fixed library for rendering (~10%)
+- The library is `storage.list()` from Shaka, shown as a thumbnail grid.
+- Title and poster thumbnail come from `appMetadata`, which is saved at import time. The title is the manifest's file name without `.mpd`: the iPad picker gives the app file names only, not the folder name.
+- Library grid only: no search, categories, or recommendations.
+- The app never fetches video content from the internet.
+
+## 4. Adding media (~10%)
+**Step 1, on the Mac, once per video:**
+- `tools/prepare.sh "My Video.mp4"` writes a folder into the Google Drive for desktop folder:
+  ```
+  Google Drive/Kids Library/My Video/
+    My Video.mpd      // DASH manifest; its file name is the title
+    video.mp4         // fragmented video track (single file, byte-range segments)
+    audio.mp4         // fragmented audio track
+    poster.jpg        // thumbnail
+  ```
+- The script:
+  - runs ffmpeg first only if the input isn't already H.264/AAC (and always to grab the poster);
+  - then runs Shaka Packager in **on-demand profile**, which writes one file per track plus the manifest, so there are no thousands of tiny files.
+- Already-packaged folders in Drive are reused as they are. Nothing is processed twice.
+
+**Step 2, on any device:**
+- **"Add video"** button, behind the PIN.
+- Pick the 4 files of one video folder. On iPad: Files → Google Drive → folder → Select all. On the Mac: Finder.
+- The app:
+  - registers the picked files under the `local:` scheme;
+  - calls `storage.store('local://My Video.mpd', {title, poster})`, where the title is taken from the `.mpd` file name;
+  - shows Shaka's progress callback as a progress bar.
+- Once stored, the picked files and the Drive copy aren't needed by the app any more; it plays fully offline.
+
+**Also:**
+- **"Remove video,"** behind the PIN: `storage.remove(offlineUri)`.
+- iPad note: when you pick from Google Drive, the iPad downloads the files to a temporary location first. So it briefly needs about 2× the video's size free.
+
+## 5. Parental controls & playback rules (~10%)
+- **Custom controls only.** Shaka is used without its UI layer. The `<video>` element has no `controls` attribute and is never put into native fullscreen (`playsinline`, and no `webkitEnterFullscreen`), because the native controls would bypass the PIN. The app's own full-screen layout is done in CSS.
+- Opening a video shows it **paused** on the first frame.
+- **Pause:** free, no code.
+- **Play / resume:** always asks for the PIN, every time.
+- **No autoplay:** no `autoplay` attribute, and the `ended` event never loads another video.
+- Close the loopholes:
+  - The Media Session `play` handler shows the PIN prompt instead of resuming, so headphones, lock screen, Control Center, and Mac media keys can't resume playback.
+  - `disablePictureInPicture` and `disableRemotePlayback` (no AirPlay).
+  - `visibilitychange` → pause. Coming back requires the PIN again.
+  - Any `play` event not started by the PIN flow is immediately paused (a safety net).
+- **PIN:**
+  - Set on first run; only a SHA-256 hash is stored.
+  - 5 wrong attempts trigger a 60-second lockout.
+  - Changing the PIN requires the current one.
+  - Forgotten PIN: delete and re-add the home-screen app (this also clears the library).
+  - Same code on both devices for now; revisit later.
+- Tip, no code involved: turn on iPad **Guided Access** to keep a child inside the app.
+
+## 6. Feature-minimal guardrail (~10%)
+**Users are the parents (mum and dad) plus a child watching.**
+- The **PIN prompt is the only access control.**
+- There's no login, accounts, roles or other authentication or authorization, and none is planned.
+- The PIN keeps a child from starting playback. It is not meant to stop a determined adult.
+
+Explicitly **out of scope unless asked for**:
+- search, playlists, recommendations, history
+- seek bar, playback speed, subtitles, volume UI (hardware buttons only)
+- accounts, sync, cloud, multiple profiles
+- PiP, AirPlay, downloading from the internet, comments, likes
+
+Any new feature gets proposed first and added only after it's approved.
+
+## 7. Testing strategy
+
+### Ground rules (from the owner)
+- **Fixtures and a test harness come before any feature code.** The app is built against fixtures, never against real videos.
+- **CI is the source of truth.** The LLM never runs tests locally. It pushes a branch, CI runs, and the LLM reads the results (`gh run view --log-failed` plus the downloaded artifacts) and iterates.
+- **Behaviour is pinned to Chrome.** Automated tests run in one exact Chrome build. The iPad (WebKit) is covered by a short manual checklist, because CI can't run real iPad Safari.
+
+### Layers
+| Layer | Tool | What it covers |
+|---|---|---|
+| End-to-end (user actions) | **Playwright**, Chromium project only | The real app in a real browser: import, library grid, PIN gate, pause/play rules, no autoplay, offline. |
+| iPad | Manual checklist (milestone M5) | Install, Drive picking, storage persistence, lock-screen/headphone behaviour. |
+
+**End-to-end only. No committed unit tests.**
+- The owner's acceptance test is CI passing, then user testing.
+- The Mac prepare script gets no test of its own. From M1 on, CI **builds the e2e fixtures by running `tools/prepare.sh`**, so every e2e run exercises it through real use.
+
+### Pinning Chrome
+- Pin Playwright to an exact version in `package-lock.json`. That pins the exact browser build Playwright downloads (Chrome for Testing in recent versions), so every CI run uses the same Chrome.
+- The CI cache key is the Playwright version, and browser upgrades only happen through a deliberate Playwright bump PR.
+- **Codec canary test (runs first):** it asserts that `MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')` and the AAC equivalent are `true`. Open-source Chromium builds lack H.264/AAC, so if a bump ever switches to one, this fails loudly instead of every playback test failing in confusing ways.
+
+### Fixtures (generated, deterministic, nothing big committed)
+- Generated in CI with pinned **ffmpeg** + **Shaka Packager** from synthetic sources (`testsrc2` video with a burned-in frame counter, plus a `sine` tone). There's no copyrighted or real content.
+- Cached by a hash of the fixture script plus the tool versions.
+
+| Fixture | Purpose |
+|---|---|
+| `tiny` (3 s, H.264/AAC, packaged) | Most e2e tests. Short enough to reach the end quickly for the "no autoplay" test. |
+| `medium` (60 s, packaged) | Pause/resume mid-video, background-pause tests. |
+| `raw-h264.mp4`, `raw-vp9.webm` (unpackaged) | Raw inputs. From M1 on, `prepare.sh` packages them in CI, which covers its no-re-encode and transcode paths. |
+| `broken-missing-audio/` | Import error handling (a file is missing from the folder). |
+
+### Avoiding races in user-action tests
+The principle: **tests wait on observable state, never on time.**
+1. **Playwright auto-waiting + web-first assertions only.** Use `await expect(locator).toBeVisible()` / `toHaveAttribute(...)`, which retry until true or time out. **`waitForTimeout` / sleeps are banned** by a lint rule (`eslint-plugin-playwright`'s `no-wait-for-timeout`) that runs in CI.
+2. **The app publishes its state in the DOM.** The player root carries `data-state="loading|paused|pin-required|playing|ended|locked-out"`, and import carries `data-import="idle|storing|done|error"`. Tests assert on these attributes, so each step waits until the app has actually reached that state. This doubles as a clear, explicit state machine in the app.
+3. **Media playback is asserted by its effects, not by timing.** "Playing" means `data-state=playing` **and** `video.currentTime` has advanced (`expect.poll(() => currentTime).toBeGreaterThan(t0)`). "Paused" means `video.paused === true` and `currentTime` stays stable across two polls.
+4. **Fake clock for timers.** Playwright's `page.clock` controls the 60 s PIN lockout and any debounce. The test fast-forwards time instead of waiting 60 seconds.
+5. **Isolation.** Every test gets a fresh browser context, so IndexedDB, the service worker and storage start clean. There's no shared state between tests, so tests can run in parallel safely.
+6. **Arrange via API, act and assert via UI.** Tests that need a pre-filled library seed it through a test fixture that calls Shaka `storage.store()` in `page.evaluate`. Only the import tests themselves go through the file picker (`setInputFiles`).
+7. **Simulated environment events:**
+   - offline: `context.setOffline(true)`;
+   - app backgrounded: override `document.visibilityState` and dispatch `visibilitychange`;
+   - lock-screen/headphone "play": call the registered Media Session handler through a test-only hook (real OS media keys can't be pressed from CI, so this goes on the iPad manual checklist).
+8. **No retries hiding flakiness.** `retries: 0`. A flaky test fails the PR and gets fixed, not retried.
+
+### App ↔ test contract
+The specs depend only on what's listed here. Changing it means changing the spec first.
+
+**Routes** (hash-based, so a static host can serve every screen):
+
+| Route | Screen |
+|---|---|
+| `#/library` (default) | Library |
+| `#/player/<videoId>` | Player, where `videoId` = URL-encoded Shaka `offlineUri` |
+| `#/settings` | Settings (PIN-gated) |
+
+**The 4 screens and their states** (`data-testid` → `data-state`):
+
+| Element | States / attributes |
+|---|---|
+| `app` (root) | `data-ready="true"` once booted |
+| `screen-library` | `empty` · `ready` |
+| `screen-player` | `loading` · `paused` · `pin-required` · `playing` · `ended` · `error` |
+| `pin-prompt` (overlay, appears over any screen) | `data-mode`: `setup` · `confirm` · `verify` · `change`<br>`data-state`: `entry` · `wrong` · `locked-out` |
+| `screen-settings` | `locked` · `unlocked` |
+| `import-status` | `data-import`: `idle` · `storing` · `done` · `error` |
+
+**Controls** (`data-testid`):
+- Library: `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`.
+- Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`.
+- PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
+- Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
+
+**Persisted data the tests may seed:**
+- `localStorage['pin.sha256']`: the hex SHA-256 of the PIN.
+- `localStorage['pin.lockout']`: `{failures, until}`, where `until` is an epoch ms.
+- Shaka offline `appMetadata`: `{title, poster}`, where `poster` is a JPEG data URL.
+
+**No test hooks in the app.** Tests use only browser-level techniques:
+- Media Session handlers are captured by an init script that wraps `navigator.mediaSession.setActionHandler`.
+- Visibility is simulated by overriding `document.visibilityState`.
+
+**Drafted-but-not-built specs** are marked `test.fixme`. They show as skipped in the report and are switched on in the milestone that implements them, so CI stays green on what exists.
+
+**Browser profile:** the pinned Chromium build at an iPad-sized viewport (1180×820) with touch enabled.
+
+### Test style: plain Playwright with Given / When / Then labels
+- No Gherkin or Cucumber layer, and no extra dependency. Each test reads as a behaviour spec through `test.step` labels, which also show up in the HTML report and the CI traces:
+  ```js
+  test('resuming after pause asks for the PIN', async ({ page, library }) => {
+    await test.step('Given "tiny" is playing', async () => { /* ... */ });
+    await test.step('When I tap pause',          async () => { /* ... */ });
+    await test.step('Then the player is paused', async () => { /* ... */ });
+    await test.step('When I tap play',           async () => { /* ... */ });
+    await test.step('Then the PIN prompt is shown', async () => { /* ... */ });
+  });
+  ```
+- One test per behaviour rule. File names follow the rules, e.g. `play-requires-pin.spec.js`, `no-autoplay.spec.js`. Together they double as a readable spec for review.
+
+### Harness language
+- **Node.js (pinned to the current LTS) + `@playwright/test`, written in plain JS.** This is CI-only and never shipped with the app.
+- Playwright has official Python, Java and .NET bindings too, and a community Go port. Matching the app's language isn't required, but JS wins here:
+  1. Only the JS version comes with Playwright's full test runner built in: parallel workers, test fixtures, auto-retrying assertions including `expect.poll`, and the trace viewer.
+  2. The test steps that run inside the page are JavaScript in any binding anyway (seeding Shaka storage, reading `video.currentTime`).
+  3. That makes it **one toolchain in CI** instead of two.
+- **Speed isn't a factor.** Every binding drives the same browser over the same protocol, and the Python, Java, .NET and Go bindings all run Playwright's Node driver underneath. Test time is dominated by the browser and video playback.
+
+### CI/CD (GitHub Actions): simple PR gates, no scheduled jobs
+- **Repo:** `roumail/youtube-clone`, **public** (no sensitive content). Created with `gh repo create`.
+- **`main` is protected:**
+  - changes land only through PRs;
+  - the required checks must be green before merge;
+  - **squash merge only**;
+  - no direct pushes.
+- **Required check, run on every PR to `main`:** a single job.
+  - `e2e`: Playwright on the pinned Chrome, codec canary first. Fixtures are generated in the job and cached by a hash of the fixture script plus the tool versions.
+- **Artifacts on failure:** the Playwright trace, screenshots, video and the HTML report. These are what the LLM reads (via `gh`) to debug without running anything locally.
+- **On merge to `main`:** deploy the static app to GitHub Pages. Tests and tooling are never shipped.
+- No nightly or scheduled runs.
+
+## Milestones
+0. **T0 – Test foundation (before any feature code):**
+   - public repo `roumail/youtube-clone` with protected `main` (squash only, required checks);
+   - GitHub Actions PR gates;
+   - fixture generation;
+   - Playwright on the pinned Chrome, with the codec canary;
+   - an empty app shell with its `data-state` contract;
+   - the smoke test (4 screens load) plus the codec canary passing in CI;
+   - all other specs drafted as `test.fixme`.
+1. **M0 – Shaka offline spike (riskiest feature work, right after T0):** a bare PWA with Shaka installed on both the iPad and the Mac. Package one **2 GB+** video on the Mac, put it in Google Drive, then on the actual iPad confirm:
+   - the 4 files can be picked from Google Drive in the Files picker;
+   - `storage.store()` through the `local:` scheme completes;
+   - the video plays smoothly offline (airplane mode);
+   - it survives closing the app, rebooting, and 7+ days;
+   - `navigator.storage.persist()` is granted and the quota estimate covers the planned library;
+   - the Media Session `play` handler is honoured.
+
+   If Shaka fails on iPad, switch to the OPFS + range-response fallback (section 1).
+2. **M1 – Mac prepare script:** `tools/prepare.sh`, which checks the codec, re-encodes only if needed, packages, grabs the poster, and writes to the Drive folder.
+3. **M2 – Library + import:** Add video (pick files → `store` with progress), thumbnail grid, remove video.
+4. **M3 – Player + PIN gate:** custom controls, pause free / play behind the PIN, no autoplay, background pause, remote play blocked.
+5. **M4 – PIN setup & lockout,** service worker for offline, app icon.
+6. **M5 – Hardening:** the iPad manual checklist, plus a pass on the Mac covering headphones, lock screen, Control Center, media keys, app switching, and end of video.
+
+## Sources (storage research)
+- WebKit, *Updates to Storage Policy* (quotas, eviction, persist): https://webkit.org/blog/14403/updates-to-storage-policy/
+- MDN, *Storage quotas and eviction criteria*: https://developer.mozilla.org/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
+- Chrome for Developers, *Serving cached audio and video* (Workbox range requests): https://developer.chrome.com/docs/workbox/serving-cached-audio-and-video
+- Phil Nash, *Service workers: beware Safari's range request*: https://dev.to/philnash/service-workers-beware-safaris-range-request-38i7
+- Workbox issue #3004, large local videos crash iOS Safari: https://github.com/GoogleChrome/workbox/issues/3004
+- WebKit bug 232076 (blob URL video, missing Range header): https://bugs.webkit.org/show_bug.cgi?id=232076
+- Apple forums, blob URL memory leak (iOS 15): https://developer.apple.com/forums/thread/693447 · blob URLs broken on iOS 17.4.1: https://developer.apple.com/forums/thread/751063
+- MDN, `FileSystemWritableFileStream` (Safari 26+): https://developer.mozilla.org/en-US/docs/Web/API/FileSystemWritableFileStream
+- Chronos issue #28, large offline copies in a PWA: https://github.com/MatyasMayer/Chronos/issues/28
+- ffamilyfriendly/Video-Storage: https://github.com/ffamilyfriendly/Video-Storage
+- Shaka Player (offline storage): https://github.com/shaka-project/shaka-player
+- Shaka Player offline tutorial: https://shaka-project.github.io/shaka-player/docs/api/tutorial-offline.html
+- Shaka Player plugins tutorial (registerScheme): https://shaka-project.github.io/shaka-player/docs/api/tutorial-plugins.html
+- Shaka Player issue #2205, custom scheme for local content: https://github.com/google/shaka-player/issues/2205
+- Shaka Packager DASH tutorial (on-demand profile): https://shaka-project.github.io/shaka-packager/html/tutorials/dash.html
+- Shaka Packager releases: https://github.com/shaka-project/shaka-packager/releases
+- Playwright: Chrome for Testing vs Chromium codecs: https://qaskills.sh/blog/chrome-for-testing-vs-chromium-playwright
+- Chromium lacks H.264 for MSE by default: https://groups.google.com/a/chromium.org/g/chromium-dev/c/Qh49e3wcyKM
+- shaka-streamer-binaries (Packager + ffmpeg static builds incl. macOS arm64): https://pypi.org/project/shaka-streamer-binaries/
+- Chrome on iOS adds Home Screen web apps (iPadOS 16.4+): https://www.ghacks.net/?p=198976
