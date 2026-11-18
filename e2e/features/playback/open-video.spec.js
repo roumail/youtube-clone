@@ -2,7 +2,7 @@
 import { test, expect, goto, openVideo, expectNotPlaying, playerState } from '../../support.js';
 
 test.describe('Feature: Open a video', () => {
-  test.fixme('Scenario: tapping a video opens the player in the same app, not a new tab', async ({ page, context, pinSet, seedLibrary }) => {
+  test('Scenario: tapping a video opens the player in the same app, not a new tab', async ({ page, context, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -17,7 +17,7 @@ test.describe('Feature: Open a video', () => {
     });
   });
 
-  test.fixme('Scenario: an opened video is paused at the start', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: an opened video is paused at the start', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -32,7 +32,7 @@ test.describe('Feature: Open a video', () => {
     });
   });
 
-  test.fixme('Scenario: the video element cannot bypass the app controls', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the video element cannot bypass the app controls', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is open', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');

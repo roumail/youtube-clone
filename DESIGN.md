@@ -123,7 +123,7 @@ app/                                  published to GitHub Pages
   vendor/shaka-player-5.3.5.compiled.js   ✅ pinned
   manifest.webmanifest, sw.js, icons      ◻ installable + offline (sw: network-first, see M0 lesson 3)
   library.js, pin.js                ✅ M2: Shaka storage (own track picker, 0-track cleanup); PIN hash + verify
-  player.js                         ◻ M3
+  player.js                         ✅ M3: Shaka player on our <video>; PIN-gated play, free pause, safety net
   spike/                            ✅ M0 diagnostic page (remove when the owner decides)
 tools/
   get-packager.sh, prepare.sh       ✅ Mac: video → packaged folder for Google Drive

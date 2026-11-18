@@ -9,7 +9,7 @@ test.describe('Feature: Several videos', () => {
     await seedLibrary('tiny', 'medium', 'episode-like');
   });
 
-  test.fixme('Scenario: going back to the library stops the playing video', async ({ page }) => {
+  test('Scenario: going back to the library stops the playing video', async ({ page }) => {
     await test.step('Given "medium" is playing', async () => {
       await openVideo(page, 'medium');
       await startPlaying(page);
@@ -24,7 +24,7 @@ test.describe('Feature: Several videos', () => {
     });
   });
 
-  test.fixme('Scenario: opening another video after watching one starts paused and needs the PIN', async ({ page }) => {
+  test('Scenario: opening another video after watching one starts paused and needs the PIN', async ({ page }) => {
     await test.step('Given I watched "medium" and went back', async () => {
       await openVideo(page, 'medium');
       await startPlaying(page);
@@ -40,7 +40,7 @@ test.describe('Feature: Several videos', () => {
     });
   });
 
-  test.fixme('Scenario: reopening a video starts it from the beginning, paused', async ({ page }) => {
+  test('Scenario: reopening a video starts it from the beginning, paused', async ({ page }) => {
     await test.step('Given I watched part of "medium" and went back', async () => {
       await openVideo(page, 'medium');
       await startPlaying(page);
