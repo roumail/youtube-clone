@@ -97,9 +97,11 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 15
     steps:
+      # Tooling comes from main's own checkout; the deployed commit is only
+      # read as data (git show) for the comparison below.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.deploy.outputs.sha }}
+          fetch-depth: 0
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -133,13 +135,14 @@ jobs:
         env:
           SHA: ${{ needs.deploy.outputs.sha }}
         run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::bad sha"; exit 1; }
           fail=0
           while IFS= read -r -d '' f; do
             rel="${f#app/}"
-            want=$(shasum -a 256 "$f" | cut -d' ' -f1)
+            want=$(git show "$SHA:$f" | shasum -a 256 | cut -d' ' -f1)
             got=$(curl -fsS -H 'Cache-Control: no-cache' "${LIVE_URL}${rel// /%20}?v=$SHA" | shasum -a 256 | cut -d' ' -f1)
             if [ "$want" != "$got" ]; then echo "::error::MISMATCH $rel"; fail=1; fi
-          done < <(find app -type f ! -path 'app/spike/*' -print0)
+          done < <(git ls-tree -r -z --name-only "$SHA" -- app | grep -zv '^app/spike/')
           [ $fail -eq 0 ] && echo "all published files match $SHA"
           exit $fail
 
