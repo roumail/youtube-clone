@@ -4,7 +4,7 @@ import { test, expect, goto, openVideo, startPlaying } from '../../support.js';
 test.describe('Feature: Works offline', () => {
   // Playwright's offline switch cuts the page's network but not its service
   // worker's, so the server must be unreachable for both.
-  test.fixme('Scenario: the app and a stored video work with no network', async ({ page, context, pinSet, seedLibrary }) => {
+  test('Scenario: the app and a stored video work with no network', async ({ page, context, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is stored and the app has loaded once', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -21,7 +21,7 @@ test.describe('Feature: Works offline', () => {
     });
   });
 
-  test.fixme('Scenario: an app update deletes the old version\'s cached files, never the videos', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: an app update deletes the old version\'s cached files, never the videos', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is stored and an older app version left its files in the cache "app-v1"', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
