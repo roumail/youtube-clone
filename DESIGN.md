@@ -248,7 +248,9 @@ e2e/                                ✅ specs (section 7)
 - Every feature defaults to **off**.
 
 **First feature: watch-time limit (`watchTimeLimit`)** — scenarios in `e2e/features/parental-controls/watch-time-limit.spec.js`:
-- **Session:** a session starts when the parent sets a **budget** at the first play, right after the PIN (e.g. 20 / 30 / 45 min).
+- **Session:** a session starts when the parent sets a **budget** at the first play, right after the PIN: 20 / 30 / 45 min, or **Other…** (owner request 2026-11-19).
+  - **Other…** shows a minutes field and a Start button. Any whole number of minutes **from 5 to 180** is accepted; anything else is refused with a message, and nothing plays. The last custom value is remembered (`localStorage['watchTime.lastCustom']`, minutes) and offered next time.
+  - On a phone the budget prompt, like the PIN prompt, stays above the on-screen keyboard.
   - One budget covers **all videos**.
   - It is stored locally (`localStorage['watchTime.session']`: `{ budget, used }` in seconds), so **a refresh or relaunch keeps it**.
 - **Counting:** only **actual playing time** counts: not paused time, the library, or the app in the background. It's measured with the browser's monotonic clock, so changing the device time doesn't affect it.
@@ -363,7 +365,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
 - **Series (M7):** `series-item` (library tile, with `data-series`; shows "N episodes"), route `#/series/<name>`, `screen-series` (with its own `back-button` → library), `episode-item`. The player's Back returns to where the video was opened from (library or series list).
-- **Optional features (M6):** `feature-toggle-<id>` (Settings checkbox), `budget-prompt`, `budget-option-<minutes>` (20/30/45), `budget-cancel`, `session-bar`, `session-time` (with `data-seconds`), `session-remaining`, `clock`, `end-session-button`, and the player state `time-up`.
+- **Optional features (M6):** `feature-toggle-<id>` (Settings checkbox), `budget-prompt`, `budget-option-<minutes>` (20/30/45), `budget-option-other`, `budget-custom-input`, `budget-custom-start`, `budget-custom-error`, `budget-cancel`, `session-bar`, `session-time` (with `data-seconds`), `session-remaining`, `clock`, `end-session-button`, and the player state `time-up`.
 - `back-button` exists on both the player and settings screens, so tests scope it by screen, e.g. `getByTestId('screen-settings').getByTestId('back-button')`.
 
 **Persisted data the tests may seed:**
@@ -536,16 +538,17 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M8 – Seek** ✅ | `playback/seek` | **5** | M3. Released as a **minor** version. |
 | **M7 – Series** ✅ | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
 | **M9 – iPhone** ✅ | `devices/iphone` | **4** (each in portrait and landscape) | M2–M4. Released as a **patch** version (fixes the PIN prompt behind the keyboard). |
+| **M11 – Custom watch-time budget** | `parental-controls/watch-time-limit` ("Other…" scenarios) | **3** | M6. Released as a **minor** version. |
 | **M10 – Search** ✅ | `library/search` | **8** | M2–M4. Released as a **minor** version. |
-| **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
-| | | **67 in total** | |
+| **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** (+3 for "Other…", M11) | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
+| | | **70 in total** | |
 
 Also active: `smoke/` (5). The M0 spike and its tests were removed after the owner's iPad test (2026-11-18); `local-scheme.js` from it is part of the app.
 
 ## Open decisions (owner)
 1. **Per-device PIN:** same code on both devices for now (section 5); revisit later.
 2. ~~Watch-time sessions — automatic end~~ **decided 2026-11-19: never automatically.** Only the parent (Settings → End session) or a used-up budget ends a session.
-3. ~~Watch-time budget choices~~ **decided 2026-11-19: 20 / 30 / 45 minutes, no "no limit".** For unlimited, switch the feature off.
+3. ~~Watch-time budget choices~~ **decided 2026-11-19: 20 / 30 / 45 minutes, no "no limit".** For unlimited, switch the feature off. **Added 2026-11-19:** "Other…", 5–180 minutes, last value remembered.
 
 Closed on 2026-11-19:
 - **iPhone:** supported, in portrait and landscape (section 1, M9).

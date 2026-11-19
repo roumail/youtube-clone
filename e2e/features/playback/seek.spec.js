@@ -49,6 +49,9 @@ test.describe('Feature: Seek', () => {
   });
 
   test('Scenario: the arrow keys jump 10 seconds back and forward', async ({ page }) => {
+    await test.step('Given the player knows the video is 01:00 long', async () => {
+      await expect(page.getByTestId('time-total')).toHaveText('01:00');
+    });
     await test.step('When I press → twice while paused', async () => {
       await page.keyboard.press('ArrowRight');
       await page.keyboard.press('ArrowRight');
