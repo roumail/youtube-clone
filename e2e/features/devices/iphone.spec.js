@@ -25,7 +25,7 @@ async function expectAboveKeyboard(page, ids) {
 }
 
 test.describe('Feature: Works on iPhone', () => {
-  test.fixme('Scenario: the PIN prompt stays above the keyboard @iphone', async ({ page, pinSet }) => {
+  test('Scenario: the PIN prompt stays above the keyboard @iphone', async ({ page, pinSet }) => {
     await onScreenKeyboard(page);
     await test.step('Given the library is open', async () => {
       await goto(page, '#/library');
@@ -44,7 +44,7 @@ test.describe('Feature: Works on iPhone', () => {
     });
   });
 
-  test.fixme('Scenario: a wrong PIN message stays above the keyboard @iphone', async ({ page, pinSet }) => {
+  test('Scenario: a wrong PIN message stays above the keyboard @iphone', async ({ page, pinSet }) => {
     await onScreenKeyboard(page);
     await test.step('Given the PIN prompt is open from Settings', async () => {
       await goto(page, '#/library');
@@ -60,7 +60,7 @@ test.describe('Feature: Works on iPhone', () => {
     });
   });
 
-  test.fixme('Scenario: setting the PIN on first run stays above the keyboard @iphone', async ({ page }) => {
+  test('Scenario: setting the PIN on first run stays above the keyboard @iphone', async ({ page }) => {
     await onScreenKeyboard(page);
     await test.step('Given a fresh install with no PIN set', async () => {
       await goto(page, '#/library');
@@ -82,7 +82,7 @@ test.describe('Feature: Works on iPhone', () => {
     });
   });
 
-  test.fixme('Scenario: the library and settings fit the screen width @iphone', async ({ page, pinSet }) => {
+  test('Scenario: the library and settings fit the screen width @iphone', async ({ page, pinSet }) => {
     const sideways = () => page.evaluate(() => document.scrollingElement.scrollWidth > window.innerWidth);
     await test.step('Given the library is open', async () => {
       await goto(page, '#/library');
