@@ -181,6 +181,10 @@ function render(s) {
     const status = playerState.status;
     $('screen-player').dataset.state = status;
     renderControlsVisibility();
+    const fs = $('fullscreen-button');
+    fs.hidden = !fullScreenAllowed();
+    fs.dataset.state = fullScreenElement() ? 'on' : 'off';
+    fs.textContent = fullScreenElement() ? 'Exit full screen' : 'Full screen';
     show('play-button', ['paused', 'ended', 'pin-required', 'time-up'].includes(status));
     show('pause-button', status === 'playing');
   }
@@ -387,6 +391,29 @@ function initSearch() {
     update();
   });
 }
+// Real full screen (DESIGN.md §5, M14): the whole app, never the <video>
+// element (its native controls would get around the PIN), so prompts and our
+// own controls keep working. Hidden where the browser doesn't allow it (iPhone).
+const fullScreenAllowed = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+const fullScreenElement = () => document.fullscreenElement ?? document.webkitFullscreenElement ?? null;
+function enterFullScreen() {
+  const root = document.documentElement;
+  const request = root.requestFullscreen ?? root.webkitRequestFullscreen;
+  Promise.resolve(request?.call(root)).catch(() => {}).finally(update);
+}
+function exitFullScreen() {
+  if (!fullScreenElement()) return;
+  const exit = document.exitFullscreen ?? document.webkitExitFullscreen;
+  Promise.resolve(exit?.call(document)).catch(() => {}).finally(update);
+}
+function initFullScreen() {
+  $('fullscreen-button').addEventListener('click', () => {
+    if (fullScreenElement()) exitFullScreen();
+    else enterFullScreen();
+  });
+  for (const type of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(type, update);
+}
+
 // Controls hide while playing (DESIGN.md §5, M12): after 3 s without input,
 // Back / Pause / scrub bar fade out; any mouse movement, tap or key shows them
 // again. Never while paused or while a prompt is open. The watch-time clock is
@@ -537,6 +564,7 @@ function onRouteChange() {
   const leftPlayer = previous.name === 'player'
     && (state.route.name !== 'player' || state.route.videoId !== previous.videoId);
   if (leftPlayer) {
+    if (state.route.name !== 'player') exitFullScreen(); // Back to the library leaves full screen
     if (state.prompt?.purpose === 'play') state.prompt = null;
     closeVideo().then(update);
   }
@@ -591,6 +619,7 @@ async function boot() {
   initSeek();
   initVisibleArea();
   initControlsHide();
+  initFullScreen();
   // Leaving the app (switching apps, locking the screen) pauses; coming back
   // needs the PIN again.
   document.addEventListener('visibilitychange', () => {
