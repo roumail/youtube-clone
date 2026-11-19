@@ -85,4 +85,32 @@ test.describe('Feature: Playing needs the PIN', () => {
       await expect(page.getByTestId('pin-prompt')).toBeHidden();
     });
   });
+
+  test('Scenario: if the device refuses to start playback, Play shows again', async ({ page }) => {
+    await test.step('Given the device will refuse the next start of playback (as Safari can on iPad and iPhone)', async () => {
+      await page.evaluate(() => {
+        const play = HTMLMediaElement.prototype.play;
+        HTMLMediaElement.prototype.play = function () {
+          HTMLMediaElement.prototype.play = play;
+          return Promise.reject(new DOMException('The request is not allowed by the user agent.', 'NotAllowedError'));
+        };
+      });
+    });
+    await test.step('When I tap play and enter the PIN', async () => {
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
+    });
+    await test.step('Then the video is paused, with the play button showing', async () => {
+      await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
+      await expect(page.getByTestId('play-button')).toBeVisible();
+      await expectNotPlaying(page);
+    });
+    await test.step('When I tap play and enter the PIN again', async () => {
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
+    });
+    await test.step('Then it plays', async () => {
+      await expectPlaying(page);
+    });
+  });
 });

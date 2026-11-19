@@ -91,7 +91,7 @@ export function requestPlay() {
 }
 
 export function cancelPlay() {
-  if (playerState.status === 'pin-required') set('paused');
+  set('paused');
 }
 
 /** The correct PIN was entered: start (or resume) playback. */
@@ -118,7 +118,6 @@ export const seekBy = (delta) => video && seekTo(video.currentTime + delta);
 
 /** An optional feature (watch-time limit) says playing must stop now. */
 export function timeUp() {
-  if (playerState.status !== 'playing') return;
   authorized = false;
   set('time-up'); // set first, so the pause event doesn't turn it into 'paused'
   video.pause();

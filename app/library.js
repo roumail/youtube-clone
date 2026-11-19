@@ -56,7 +56,7 @@ function byLibraryOrder(a, b) {
   const byName = key(pa).localeCompare(key(pb));
   if (byName !== 0) return byName;
   if (pa.series && pb.series) return pa.season - pb.season || pa.episode - pb.episode;
-  return pa.series ? 1 : -1;
+  return Boolean(pa.series) - Boolean(pb.series);
 }
 
 /**

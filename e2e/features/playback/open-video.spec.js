@@ -93,4 +93,21 @@ test.describe('Feature: Open a video', () => {
       await expect(page.getByTestId('play-button')).toBeHidden();
     });
   });
+
+  test('Scenario: an old link to a video no longer in the library shows the error, and back returns to the library', async ({ page, pinSet }) => {
+    await test.step('When I open a link to a video that is not in the library', async () => {
+      await goto(page, '#/player/offline%3Amanifest%2Fv5%2F1%2F999');
+    });
+    await test.step('Then the player says so, with no play button', async () => {
+      await expect(playerState(page)).toHaveAttribute('data-state', 'error');
+      await expect(page.getByText("This video isn't in the library.")).toBeVisible();
+      await expect(page.getByTestId('play-button')).toBeHidden();
+    });
+    await test.step('When I tap back', async () => {
+      await page.getByTestId('screen-player').getByTestId('back-button').click();
+    });
+    await test.step('Then the library is shown', async () => {
+      await expect(page.getByTestId('screen-library')).toBeVisible();
+    });
+  });
 });

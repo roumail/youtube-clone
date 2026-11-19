@@ -3,7 +3,7 @@
 // parent sets a time budget for the session; only playing time counts, across
 // all videos; the session survives refreshes and relaunches.
 // Built in M6.
-import { test, expect, goto, enterPin, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState, PIN } from '../../support.js';
+import { test, expect, goto, enterPin, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState, setVisibility, PIN } from '../../support.js';
 
 // Seed the feature flag (normally switched on in Settings, behind the PIN).
 async function enableWatchTime(page) {
@@ -308,6 +308,30 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
     await test.step('Then the video is still at 0:30', async () => {
       await expect.poll(position).toBeCloseTo(30, 0);
+    });
+  });
+
+  test('Scenario: after leaving the app with the budget prompt open, choosing a budget does not start playback', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given I tapped play on "medium", entered the PIN, and the budget prompt is open', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('medium');
+      await openVideo(page, 'medium');
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
+      await expect(page.getByTestId('budget-prompt')).toBeVisible();
+    });
+    await test.step('When the app goes to the background and comes back', async () => {
+      await setVisibility(page, 'hidden');
+      await setVisibility(page, 'visible');
+    });
+    await test.step('And I choose 30 minutes', async () => {
+      await page.getByTestId('budget-option-30').click();
+    });
+    await test.step('Then nothing plays: the video is paused and play asks for the PIN again', async () => {
+      await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
+      await expectNotPlaying(page);
+      await page.getByTestId('play-button').click();
+      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'verify');
     });
   });
 });
