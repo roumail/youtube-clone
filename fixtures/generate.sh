@@ -69,6 +69,10 @@ for ep in "Show - S01E10 - Tenth" "Show - S01E02 - Second" "Show - S01E01 - Firs
   "$PREPARE" "$RAW/$ep.mp4" "$OUT" >/dev/null
 done
 
+# A standalone video named exactly like the series "Show", from a copy of "tiny".
+cp "$RAW/tiny.mp4" "$RAW/Show.mp4"
+"$PREPARE" "$RAW/Show.mp4" "$OUT" >/dev/null
+
 # The longest title pack.sh accepts (95 bytes), from a copy of "tiny".
 LONG_TITLE="The Longest Title Allowed - A Tale About Many Long Words That Keeps Going Until It Finally Ends"
 cp "$RAW/tiny.mp4" "$RAW/$LONG_TITLE.mp4"

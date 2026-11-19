@@ -289,4 +289,25 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       expect(await page.evaluate(() => localStorage.getItem('watchTime.session'))).toBeNull();
     });
   });
+
+  test('Scenario: the arrow keys in the budget\'s minutes field change the minutes, not the video', async ({ page, pinSet, seedLibrary }) => {
+    const position = () => page.getByTestId('player-video').evaluate((v) => v.currentTime);
+    await test.step('Given "medium" is open at 0:30 and the budget prompt\'s own minutes field is open', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('medium');
+      await openVideo(page, 'medium');
+      await page.getByTestId('seek-bar').fill('30');
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
+      await page.getByTestId('budget-option-other').click();
+      await page.getByTestId('budget-custom-input').focus();
+    });
+    await test.step('When I press → and ← in the minutes field', async () => {
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('ArrowLeft');
+    });
+    await test.step('Then the video is still at 0:30', async () => {
+      await expect.poll(position).toBeCloseTo(30, 0);
+    });
+  });
 });

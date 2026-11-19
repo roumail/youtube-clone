@@ -71,4 +71,18 @@ test.describe('Feature: Playing needs the PIN', () => {
       expect(await page.getByTestId('player-video').evaluate((v) => v.currentTime)).toBeLessThan(10);
     });
   });
+
+  test('Scenario: going back while the PIN prompt is open closes it with the player', async ({ page }) => {
+    await test.step('Given I tapped play and the PIN prompt is open', async () => {
+      await page.getByTestId('play-button').click();
+      await expect(page.getByTestId('pin-prompt')).toBeVisible();
+    });
+    await test.step('When I go back (the back gesture)', async () => {
+      await page.goBack();
+    });
+    await test.step('Then the library is shown, with no prompt', async () => {
+      await expect(page.getByTestId('screen-library')).toBeVisible();
+      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+    });
+  });
 });
