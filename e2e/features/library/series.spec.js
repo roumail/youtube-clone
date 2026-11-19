@@ -1,6 +1,5 @@
 // Feature: Series — the library shows one tile per series; tapping it lists
 // the episodes in order. Titles "Series - SxxEyy - Episode" (DESIGN.md §3).
-// Drafted for review; not built yet (test.fixme).
 import { test, expect, goto, startPlaying, expectNotPlaying } from '../../support.js';
 
 const EPISODES = ['Show - S01E10 - Tenth', 'Show - S01E01 - First', 'Show - S01E02 - Second'];
@@ -11,7 +10,7 @@ test.describe('Feature: Series', () => {
     await seedLibrary(...EPISODES, 'tiny');
   });
 
-  test.fixme('Scenario: the library shows one tile per series, next to standalone videos', async ({ page }) => {
+  test('Scenario: the library shows one tile per series, next to standalone videos', async ({ page }) => {
     await test.step('Then "Show" is one tile saying it has 3 episodes', async () => {
       const tile = page.getByTestId('series-item').filter({ hasText: 'Show' });
       await expect(tile).toHaveCount(1);
@@ -23,7 +22,7 @@ test.describe('Feature: Series', () => {
     });
   });
 
-  test.fixme('Scenario: tapping a series lists its episodes in order', async ({ page }) => {
+  test('Scenario: tapping a series lists its episodes in order', async ({ page }) => {
     await test.step('When I tap the "Show" tile', async () => {
       await page.getByTestId('series-item').filter({ hasText: 'Show' }).click();
     });
@@ -34,7 +33,7 @@ test.describe('Feature: Series', () => {
     });
   });
 
-  test.fixme('Scenario: an episode opens paused, and back returns to the series', async ({ page }) => {
+  test('Scenario: an episode opens paused, and back returns to the series', async ({ page }) => {
     await test.step('Given I opened the "Show" series and tapped E02', async () => {
       await page.getByTestId('series-item').filter({ hasText: 'Show' }).click();
       await page.getByTestId('episode-item').filter({ hasText: 'S01E02' }).click();
@@ -51,7 +50,7 @@ test.describe('Feature: Series', () => {
     });
   });
 
-  test.fixme('Scenario: the end of an episode never starts the next one', async ({ page }) => {
+  test('Scenario: the end of an episode never starts the next one', async ({ page }) => {
     await test.step('Given E01 of "Show" (3 s) is playing', async () => {
       await page.getByTestId('series-item').filter({ hasText: 'Show' }).click();
       await page.getByTestId('episode-item').filter({ hasText: 'S01E01' }).click();

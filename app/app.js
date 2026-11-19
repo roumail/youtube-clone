@@ -1,11 +1,11 @@
 // App: routing + one state object + render(state) (DESIGN.md §2, §7 contract).
 // M2 library/import, M3 player + PIN gate, M4 first-run PIN, lockout, change
 // PIN, offline (service worker) and installability.
-import { installLocalScheme } from './local-scheme.js';
+import { installLocalScheme, CONTAINER_EXT } from './local-scheme.js';
 import {
   hasPin, verifyPinSync, savePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
 } from './pin.js';
-import { listVideos, importVideo, removeVideo } from './library.js';
+import { listVideos, importVideo, removeVideo, parseTitle } from './library.js';
 import {
   playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
   timeUp, seekTo, seekBy,
@@ -25,6 +25,7 @@ const state = {
   //              mode: 'setup' | 'confirm' | 'verify' | 'change', status: 'entry' | 'wrong', error }
   prompt: null,
   newPin: null, // first entry of a new PIN, until it is confirmed
+  returnTo: '#/library', // where the player's Back goes (the library or a series list)
   features: {}, // running optional features, by id (features.js)
   importStatus: { phase: 'idle', progress: 0, message: '' },
 };
@@ -33,6 +34,7 @@ function parseRoute(hash) {
   const [, name = 'library', arg] = /^#\/([^/]*)\/?(.*)$/.exec(hash) ?? [];
   if (name === 'player') return { name, videoId: decodeURIComponent(arg) };
   if (name === 'settings') return { name };
+  if (name === 'series') return { name, series: decodeURIComponent(arg) };
   return { name: 'library' };
 }
 
@@ -54,19 +56,69 @@ function pinPromptFor(s) {
   };
 }
 
-function videoTile(c) {
+function tile(testid, poster, ...texts) {
   const li = document.createElement('li');
-  li.dataset.testid = 'library-item';
-  li.dataset.videoId = c.offlineUri;
+  li.dataset.testid = testid;
   li.tabIndex = 0;
   const img = document.createElement('img');
-  img.src = c.appMetadata?.poster ?? '';
+  img.src = poster ?? '';
   img.alt = '';
-  const title = document.createElement('span');
-  title.textContent = c.appMetadata?.title ?? 'Untitled';
-  li.append(img, title);
-  li.addEventListener('click', () => go(`#/player/${encodeURIComponent(c.offlineUri)}`));
+  li.append(img);
+  for (const [i, text] of texts.entries()) {
+    const span = document.createElement('span');
+    span.textContent = text;
+    if (i > 0) span.className = 'tile-note';
+    li.append(span);
+  }
   return li;
+}
+
+// Opening a video remembers where Back should return to.
+function openFrom(c, from) {
+  state.returnTo = from;
+  go(`#/player/${encodeURIComponent(c.offlineUri)}`);
+}
+
+function videoTile(c) {
+  const li = tile('library-item', c.appMetadata?.poster, c.appMetadata?.title ?? 'Untitled');
+  li.dataset.videoId = c.offlineUri;
+  li.addEventListener('click', () => openFrom(c, '#/library'));
+  return li;
+}
+
+function seriesTile(name, episodes) {
+  const count = `${episodes.length} episode${episodes.length === 1 ? '' : 's'}`;
+  const li = tile('series-item', episodes[0].appMetadata?.poster, name, count);
+  li.dataset.series = name;
+  li.addEventListener('click', () => go(`#/series/${encodeURIComponent(name)}`));
+  return li;
+}
+
+
+function episodeTile(c, hash) {
+  const p = parseTitle(c.appMetadata?.title);
+  const label = `S${pad2(p.season)}E${pad2(p.episode)}${p.episodeTitle ? ` · ${p.episodeTitle}` : ''}`;
+  const li = tile('episode-item', c.appMetadata?.poster, label);
+  li.dataset.videoId = c.offlineUri;
+  li.addEventListener('click', () => openFrom(c, hash));
+  return li;
+}
+
+// The library: one tile per series, next to standalone videos (DESIGN.md §3).
+// The list is already in library order, so a series' first episode marks its place.
+function libraryTiles(library) {
+  const bySeries = new Map();
+  for (const c of library) {
+    const { series } = parseTitle(c.appMetadata?.title);
+    if (series) bySeries.set(series, [...(bySeries.get(series) ?? []), c]);
+  }
+  const tiles = [];
+  for (const c of library) {
+    const { series } = parseTitle(c.appMetadata?.title);
+    if (!series) tiles.push(videoTile(c));
+    else if (bySeries.get(series)[0] === c) tiles.push(seriesTile(series, bySeries.get(series)));
+  }
+  return tiles;
 }
 
 function settingsRow(c) {
@@ -93,7 +145,10 @@ function render(s) {
   const shown = query
     ? s.library.filter((c) => (c.appMetadata?.title ?? '').toLowerCase().includes(query))
     : s.library;
-  document.querySelector('[data-role="library-grid"]').replaceChildren(...shown.map(videoTile));
+  // While searching, matching episodes are listed one by one.
+  document.querySelector('[data-role="library-grid"]').replaceChildren(
+    ...(query ? shown.map(videoTile) : libraryTiles(s.library)),
+  );
   const search = $('search-input');
   search.dataset.state = s.searchUnlocked ? 'unlocked' : 'locked';
   search.readOnly = !s.searchUnlocked;
@@ -108,6 +163,17 @@ function render(s) {
   const bar = $('import-progress');
   bar.hidden = s.importStatus.phase !== 'storing';
   bar.value = s.importStatus.progress;
+
+  // Series: its episodes, in season/episode order
+  show('screen-series', s.route.name === 'series');
+  if (s.route.name === 'series') {
+    const hash = `#/series/${encodeURIComponent(s.route.series)}`;
+    document.querySelector('[data-role="series-title"]').textContent = s.route.series;
+    document.querySelector('[data-role="episode-grid"]').replaceChildren(
+      ...s.library.filter((c) => parseTitle(c.appMetadata?.title).series === s.route.series)
+        .map((c) => episodeTile(c, hash)),
+    );
+  }
 
   // Player
   show('screen-player', s.route.name === 'player');
@@ -337,6 +403,39 @@ function initSeek() {
   });
 }
 
+// Several files picked at once: imported one after another; a bad file doesn't
+// stop the rest, and the summary names what failed (DESIGN.md §4).
+async function importSeveral(files) {
+  const total = files.length;
+  let added = 0;
+  const failed = [];
+  for (const [i, file] of files.entries()) {
+    if (!file.name.toLowerCase().endsWith(CONTAINER_EXT)) {
+      failed.push(`${file.name} (not a ${CONTAINER_EXT} file)`);
+      continue;
+    }
+    const name = file.name.slice(0, -CONTAINER_EXT.length);
+    state.importStatus = { phase: 'storing', progress: 0, message: `Adding ${i + 1} of ${total}: ${name}…` };
+    update();
+    try {
+      await importVideo([file], (p) => {
+        state.importStatus.progress = p;
+        update();
+      });
+      added += 1;
+    } catch (e) {
+      failed.push(`${name} (${e.message ?? e})`);
+    }
+    await refreshLibrary();
+    update();
+  }
+  const summary = `Added ${added} of ${total} videos.`;
+  state.importStatus = failed.length
+    ? { phase: 'error', progress: 0, message: `${summary} Couldn't add: ${failed.join('; ')}.` }
+    : { phase: 'done', progress: 1, message: summary };
+  update();
+}
+
 // Play (button or OS command): the PIN comes first, every time.
 function onPlayRequested() {
   if (state.route.name !== 'player' || state.prompt) return;
@@ -363,6 +462,7 @@ async function onFilesPicked(event) {
   const files = [...event.target.files];
   event.target.value = '';
   if (!files.length) return;
+  if (files.length > 1) return importSeveral(files);
   state.importStatus = { phase: 'storing', progress: 0, message: 'Adding video…' };
   update();
   try {
@@ -427,9 +527,10 @@ async function boot() {
 
   $('add-video-button').addEventListener('click', () => askPin('import'));
   $('settings-button').addEventListener('click', () => go('#/settings'));
-  for (const back of document.querySelectorAll('[data-testid="back-button"]')) {
-    back.addEventListener('click', () => go('#/library'));
+  for (const screen of ['screen-settings', 'screen-series']) {
+    $('back-button', $(screen)).addEventListener('click', () => go('#/library'));
   }
+  $('back-button', $('screen-player')).addEventListener('click', () => go(state.returnTo));
   $('pin-prompt').querySelector('form').addEventListener('submit', onPinSubmit);
   $('pin-cancel').addEventListener('click', onPinCancel);
   $('import-input').addEventListener('change', onFilesPicked);

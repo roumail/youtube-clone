@@ -38,6 +38,14 @@
       <div data-testid="import-status" data-import="idle" role="status"></div>
     </section>
 
+    <section data-testid="screen-series" hidden>
+      <header>
+        <button type="button" data-testid="back-button">Back</button>
+        <h1 data-role="series-title"></h1>
+      </header>
+      <ul class="grid" data-role="episode-grid"></ul>
+    </section>
+
     <section data-testid="screen-player" data-state="loading" hidden>
       <header><button type="button" data-testid="back-button">Back</button></header>
       <video data-testid="player-video" playsinline disablepictureinpicture disableremoteplayback></video>
