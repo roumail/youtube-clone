@@ -268,6 +268,7 @@ Explicitly **out of scope unless asked for**:
 - ~~search~~: **added on request (2026-11-19)**, see section 3 "Search"
 - playlists, recommendations, history
 - playback speed, subtitles, volume UI (hardware buttons only)
+- **next / previous buttons** in the player: **not wanted (owner decision 2026-11-19)**. Another video is opened from the library (or series list), paused, and needs the PIN to play.
 - ~~seek bar~~: **added on request (2026-11-19)**, see section 5 "Seek"
 - accounts, sync, cloud, multiple profiles
 - PiP, AirPlay, downloading from the internet, comments, likes
