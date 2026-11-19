@@ -17,7 +17,7 @@ async function enableWatchTime(page) {
 test.use({ features: null });
 
 test.describe('Feature: Watch-time limit (optional)', () => {
-  test.fixme('Scenario: on by default — the first play asks for a budget', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: on by default — the first play asks for a budget', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given a fresh install where nobody touched the setting, and "medium" is open', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
@@ -32,7 +32,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: switching it off is in Settings, behind the PIN, and sticks', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: switching it off is in Settings, behind the PIN, and sticks', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given settings is unlocked with the PIN', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
