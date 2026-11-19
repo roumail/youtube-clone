@@ -35,6 +35,9 @@ self.addEventListener('fetch', (e) => {
       }
       return fresh;
     } catch {
+      // Run by "the app and a stored video work with no network"; Chrome reports
+      // no block coverage inside an installed service worker (owner OK).
+      // v8 ignore next
       return (await caches.match(request, { ignoreSearch: true })) ?? Response.error();
     }
   })());
