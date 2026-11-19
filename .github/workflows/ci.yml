@@ -115,8 +115,22 @@ jobs:
           name: fixtures
           path: fixtures/out
 
-      - name: Run e2e
+      - name: Run e2e (with line/branch coverage of app/)
+        env:
+          COVERAGE: '1'
         run: npx playwright test
+
+      - name: Coverage table in the job summary
+        if: always()
+        run: if [ -f coverage-report/coverage-details.md ]; then cat coverage-report/coverage-details.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-report
+          path: coverage-report/
+          retention-days: 14
 
       - name: Upload report and traces
         if: failure()

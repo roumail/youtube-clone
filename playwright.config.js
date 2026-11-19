@@ -17,6 +17,9 @@ export default defineConfig({
   forbidOnly: true,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
+  // Line/branch coverage of app/ when COVERAGE is set (CI): e2e/coverage.js.
+  globalSetup: './e2e/coverage.js',
+  globalTeardown: './e2e/coverage-teardown.js',
   use: {
     baseURL: LIVE ?? `http://127.0.0.1:${PORT}/app/`,
     // PW_HEADED=1 shows the browser window (e.g. when run on a Mac).
