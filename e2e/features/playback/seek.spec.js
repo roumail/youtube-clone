@@ -77,7 +77,7 @@ test.describe('Feature: Seek', () => {
     });
   });
 
-  test.fixme('Scenario: a video an hour or longer shows hours in its times', async ({ page, seedLibrary }) => {
+  test('Scenario: a video an hour or longer shows hours in its times', async ({ page, seedLibrary }) => {
     await test.step('Given "long" (1 hour 5 seconds) is open', async () => {
       await goto(page, '#/library');
       await seedLibrary('long');
@@ -94,7 +94,7 @@ test.describe('Feature: Seek', () => {
     });
   });
 
-  test.fixme('Scenario: seeking back from the end makes the video paused again', async ({ page }) => {
+  test('Scenario: seeking back from the end makes the video paused again', async ({ page }) => {
     await test.step('Given "medium" has played to its end', async () => {
       await page.getByTestId('seek-bar').fill('58');
       await startPlaying(page);

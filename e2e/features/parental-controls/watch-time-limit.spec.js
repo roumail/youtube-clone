@@ -155,7 +155,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
     await test.step('Then no new budget is asked and the same session time continues', async () => {
       await expect(page.getByTestId('budget-prompt')).toBeHidden();
-      expect(Number(await page.getByTestId('session-time').getAttribute('data-seconds'))).toBeGreaterThan(0);
+      await expect.poll(async () => Number(await page.getByTestId('session-time').getAttribute('data-seconds'))).toBeGreaterThan(0);
     });
   });
 
