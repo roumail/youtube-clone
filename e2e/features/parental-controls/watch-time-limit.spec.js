@@ -189,7 +189,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     await expect(page.getByTestId('budget-prompt')).toBeVisible();
   }
 
-  test.fixme('Scenario: "Other…" sets a budget of my own', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: "Other…" sets a budget of my own', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given the feature is on and the budget prompt is open', async () => {
       await openBudgetPrompt(page, seedLibrary);
@@ -206,7 +206,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: a custom budget must be 5 to 180 minutes', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a custom budget must be 5 to 180 minutes', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given the feature is on and "Other…" is open in the budget prompt', async () => {
       await openBudgetPrompt(page, seedLibrary);
@@ -224,7 +224,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     }
   });
 
-  test.fixme('Scenario: the last custom budget is offered next time', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the last custom budget is offered next time', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await page.addInitScript(() => localStorage.setItem('watchTime.lastCustom', '25'));
     await test.step('Given a custom budget of 25 minutes was used before, and the budget prompt is open', async () => {
