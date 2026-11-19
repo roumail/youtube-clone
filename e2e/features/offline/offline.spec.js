@@ -17,12 +17,14 @@ test.describe('Feature: Works offline', () => {
         await seedLibrary('tiny');
         await page.evaluate(() => navigator.serviceWorker.ready);
       });
+      let reopened;
       await test.step('When the server goes away and I reopen the app', async () => {
         server.kill();
         await new Promise((resolve) => { server.once('exit', resolve); });
-        await page.reload();
+        reopened = await page.reload();
       });
       await test.step('Then the app opens from its offline copy, "tiny" is listed and plays after the PIN', async () => {
+        expect(reopened.fromServiceWorker()).toBe(true);
         await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toBeVisible();
         await openVideo(page, 'tiny');
         await startPlaying(page);
