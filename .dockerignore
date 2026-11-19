@@ -1,0 +1,5 @@
+*
+!tools/run_prepare.sh
+!tools/prepare.sh
+!tools/pack.sh
+!tools/get-packager.sh

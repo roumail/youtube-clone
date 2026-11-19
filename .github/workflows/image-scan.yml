@@ -1,0 +1,38 @@
+name: Image scan
+
+on:
+  pull_request:
+    branches: [main]
+    paths: [Dockerfile, .dockerignore, 'tools/*.sh', .github/workflows/image-scan.yml]
+  push:
+    branches: [main]
+    paths: [Dockerfile, .dockerignore, 'tools/*.sh', .github/workflows/image-scan.yml]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - run: docker build -t kids-prepare . && docker save kids-prepare -o image.tar
+
+      # anchore/grype v0.121.1, pinned by digest.
+      - run: >-
+          docker run --rm -v "$PWD:/w"
+          anchore/grype@sha256:6b06708b036f74b2cd70e94b706b4586af96d1932e6ac46255940b2e39dd44a9
+          docker-archive:/w/image.tar -o sarif --file /w/grype.sarif
+
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: grype.sarif
+          category: preparation-image

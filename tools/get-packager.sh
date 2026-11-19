@@ -7,6 +7,7 @@ VERSION=v3.9.3
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) ASSET=packager-osx-arm64 SHA=b3049e743451aab5c2cd7b1316a4ce055682c41effe06a49e2e6c95a9243d351 ;;
   Linux-x86_64) ASSET=packager-linux-x64 SHA=7a3cf35ad146fd7810b4ededab363c8a3e6121d1b2c8391f53863126186f9ee6 ;;
+  Linux-aarch64) ASSET=packager-linux-arm64 SHA=d3a50cecc139b54435be1bbbfba5c0ea822d9e1e7edc3531f7821fba65ceebb0 ;;
   *) echo "unsupported platform: $(uname -s)-$(uname -m)" >&2; exit 1 ;;
 esac
 

@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Media fixtures need no browser: generated on the plain runner with pinned
-  # static ffmpeg + Shaka Packager binaries, cached, and handed to e2e as an artifact.
+  # Media fixtures need no browser: generated in the preparation image
+  # (Dockerfile, the same one users run), cached, and handed to e2e as an artifact.
   fixtures:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -28,30 +28,23 @@ jobs:
             ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$f" || { echo "::error file=$f::invalid YAML"; exit 1; }
           done
 
-      - name: Restore fixtures (keyed on generator, prepare script, packager pin)
+      - name: Restore fixtures (keyed on generator, preparation image and scripts)
         id: fx-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: fixtures/out
-          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'tools/prepare.sh', 'tools/pack.sh', 'tools/get-packager.sh', '.github/workflows/ci.yml') }}
+          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'Dockerfile', '.dockerignore', 'tools/run_prepare.sh', 'tools/prepare.sh', 'tools/pack.sh', 'tools/get-packager.sh', '.github/workflows/ci.yml') }}
 
-      - name: Install pinned ffmpeg + Shaka Packager (static binaries, no apt)
+      - name: Build the preparation image
         if: steps.fx-cache.outputs.cache-hit != 'true'
-        timeout-minutes: 3
-        run: |
-          # mwader/static-ffmpeg:9.0.2-1-amd64 (same ffmpeg version as the Mac), pinned by digest.
-          IMG=mwader/static-ffmpeg@sha256:da43484f777f077a11f03f36a24ba56cb7b713d0f153dc488d434dab23d3d00c
-          mkdir -p tools/bin
-          docker create --name ff "$IMG" /ffmpeg >/dev/null
-          docker cp ff:/ffmpeg tools/bin/ffmpeg
-          docker cp ff:/ffprobe tools/bin/ffprobe
-          docker rm ff >/dev/null
-          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
-          tools/get-packager.sh
+        timeout-minutes: 5
+        run: docker build -t kids-prepare .
 
-      - name: Generate fixtures (via tools/prepare.sh)
+      - name: Generate fixtures (via tools/prepare.sh, in the preparation image)
         if: steps.fx-cache.outputs.cache-hit != 'true'
-        run: fixtures/generate.sh
+        run: >-
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo
+          -e PACKAGER=/tools/bin/packager --entrypoint /repo/fixtures/generate.sh kids-prepare
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
