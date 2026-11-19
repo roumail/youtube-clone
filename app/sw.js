@@ -1,10 +1,10 @@
 // App service worker (DESIGN.md §1, M0 lesson 3). Online: network first, so a
 // deploy shows up on the next open. Offline: the cached app shell. Videos are
 // not here; they live in Shaka's IndexedDB storage.
-const CACHE = 'app-v1';
+const CACHE = 'app-v2';
 const SHELL = [
   './', './index.html', './styles.css', './app.js', './library.js', './pin.js', './player.js',
-  './local-scheme.js', './vendor/shaka-player-5.3.5.compiled.js',
+  './local-scheme.js', './features.js', './features/watch-time.js', './vendor/shaka-player-5.3.5.compiled.js',
   './manifest.webmanifest', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
 ];
 

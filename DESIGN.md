@@ -219,7 +219,7 @@ e2e/                                ✅ specs (section 7)
   - Same code on both devices for now; revisit later.
 - Tip, no code involved: turn on iPad **Guided Access** to keep a child inside the app.
 
-### Optional parental features (feature flags) — drafted 2026-11-19, not built
+### Optional parental features (feature flags) — built in M6 (2026-11-19)
 **Mechanism** (owner: "modular, toggled on for a behaviour, behind the PIN"):
 - Each optional feature is **its own module**, `app/features/<id>.js`, exporting `{ id, title, init(ctx) }`.
   - `ctx` gives it what it needs: player events (play, pause, ended, tick), the PIN prompt, and a place to render.
@@ -338,7 +338,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
 - **Proposed for series (M7, not built yet):** `series-item` (library tile, with `data-series`), route `#/series/<name>`, `screen-series`, `episode-item`.
-- **Proposed for optional features (not built yet):** `feature-toggle-<id>` (Settings checkbox), `budget-prompt`, `budget-option-<minutes>`, `session-time` (with `data-seconds`), `session-remaining`, `clock`, `end-session-button`, and the player state `time-up`.
+- **Optional features (M6):** `feature-toggle-<id>` (Settings checkbox), `budget-prompt`, `budget-option-<minutes>` (20/30/45), `budget-cancel`, `session-bar`, `session-time` (with `data-seconds`), `session-remaining`, `clock`, `end-session-button`, and the player state `time-up`.
 - `back-button` exists on both the player and settings screens, so tests scope it by screen, e.g. `getByTestId('screen-settings').getByTestId('back-button')`.
 
 **Persisted data the tests may seed:**
@@ -386,7 +386,7 @@ e2e/
     playback/no-autoplay            Feature: No autoplay (end of video: nothing else starts)
     parental-controls/no-way-around-the-pin   Feature: backgrounding, OS "play", script play
     parental-controls/pin-lockout   Feature: PIN lockout (5 wrong → 60 s, survives reload)
-    parental-controls/watch-time-limit   Feature: Watch-time limit (optional, flag; drafted, fixme)
+    parental-controls/watch-time-limit   Feature: Watch-time limit (optional, behind a flag)
     settings/settings               Feature: Settings (PIN-gated; change PIN needs current)
     offline/offline                 Feature: Works offline
 ```
@@ -506,15 +506,15 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M4 – First run, lockout, settings, offline** ✅ | `first-run/set-pin`, `parental-controls/pin-lockout`, `settings/settings`, `offline/offline` | 3 + 2 + 2 + 1 = **8** | M2, M3. Also adds `manifest.webmanifest`, icons, `sw.js` (network-first) and the startup `persist()` call |
 | **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
 | **M7 – Series** | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
-| **M6 – Optional features + watch-time limit** | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
+| **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
 | | | **34 in total** (M2 done: 10) | |
 
 Also active: `smoke/` (5). The M0 spike and its tests were removed after the owner's iPad test (2026-11-18); `local-scheme.js` from it is part of the app.
 
 ## Open decisions (owner)
 1. **Per-device PIN:** same code on both devices for now (section 5); revisit later.
-2. **Watch-time sessions — automatic end:** a session survives refreshes and relaunches. Should it also end on its own, e.g. at midnight, or after N hours without playing? Until decided: only the parent (Settings) or a used-up budget ends it.
-3. **Watch-time budget choices:** which options the prompt offers (draft: 20 / 30 / 45 minutes), and whether "no limit" is one of them.
+2. ~~Watch-time sessions — automatic end~~ **decided 2026-11-19: never automatically.** Only the parent (Settings → End session) or a used-up budget ends a session.
+3. ~~Watch-time budget choices~~ **decided 2026-11-19: 20 / 30 / 45 minutes, no "no limit".** For unlimited, switch the feature off.
 
 Closed on 2026-11-18:
 - **7-day persistence:** not a gate. Prepared videos stay in Google Drive, so a cleared library is simply re-added.
