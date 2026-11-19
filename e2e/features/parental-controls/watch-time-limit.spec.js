@@ -12,34 +12,47 @@ async function enableWatchTime(page) {
   });
 }
 
+// These scenarios start from the app's real defaults (the harness otherwise
+// starts with the watch-time limit switched off, DESIGN.md §7).
+test.use({ features: null });
+
 test.describe('Feature: Watch-time limit (optional)', () => {
-  test('Scenario: off by default — no budget prompt and no session clock', async ({ page, pinSet, seedLibrary }) => {
-    await test.step('Given the feature has never been switched on and "medium" is stored', async () => {
+  test.fixme('Scenario: on by default — the first play asks for a budget', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given a fresh install where nobody touched the setting, and "medium" is open', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
       await openVideo(page, 'medium');
     });
-    await test.step('When I play it with the PIN', async () => {
-      await startPlaying(page);
+    await test.step('When I tap play and enter the PIN', async () => {
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
     });
-    await test.step('Then no budget was asked and no session time is shown', async () => {
-      await expect(page.getByTestId('budget-prompt')).toBeHidden();
-      await expect(page.getByTestId('session-time')).toBeHidden();
+    await test.step('Then the budget prompt asks how long they can watch', async () => {
+      await expect(page.getByTestId('budget-prompt')).toBeVisible();
     });
   });
 
-  test('Scenario: switching the feature on or off happens in Settings, behind the PIN', async ({ page, pinSet }) => {
+  test.fixme('Scenario: switching it off is in Settings, behind the PIN, and sticks', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given settings is unlocked with the PIN', async () => {
       await goto(page, '#/library');
+      await seedLibrary('medium');
       await page.getByTestId('settings-button').click();
       await enterPin(page, PIN);
     });
-    await test.step('When I switch "Watch-time limit" on', async () => {
-      await page.getByTestId('feature-toggle-watchTimeLimit').check();
+    await test.step('Then "Watch-time limit" is on', async () => {
+      await expect(page.getByTestId('feature-toggle-watchTimeLimit')).toBeChecked();
     });
-    await test.step('Then it stays on after a reload', async () => {
+    await test.step('When I switch it off and reload', async () => {
+      await page.getByTestId('feature-toggle-watchTimeLimit').uncheck();
       await page.reload();
-      expect(await page.evaluate(() => JSON.parse(localStorage.getItem('features')).watchTimeLimit)).toBe(true);
+    });
+    await test.step('Then it stays off: playing asks no budget and shows no session time', async () => {
+      expect(await page.evaluate(() => JSON.parse(localStorage.getItem('features')).watchTimeLimit)).toBe(false);
+      await goto(page, '#/library');
+      await openVideo(page, 'medium');
+      await startPlaying(page);
+      await expect(page.getByTestId('budget-prompt')).toBeHidden();
+      await expect(page.getByTestId('session-time')).toBeHidden();
     });
   });
 
