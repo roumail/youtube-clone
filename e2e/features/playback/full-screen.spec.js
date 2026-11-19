@@ -14,7 +14,7 @@ test.describe('Feature: Real full screen', () => {
     await openVideo(page, 'medium');
   });
 
-  test.fixme('Scenario: the Full screen button hides the browser, and tapping it again brings it back', async ({ page }) => {
+  test('Scenario: the Full screen button hides the browser, and tapping it again brings it back', async ({ page }) => {
     await test.step('When I tap "Full screen"', async () => {
       await expect(button(page)).toHaveAttribute('data-state', 'off');
       await button(page).click();
@@ -30,7 +30,7 @@ test.describe('Feature: Real full screen', () => {
     });
   });
 
-  test.fixme('Scenario: full screen never starts playback, and the PIN prompt still shows in it', async ({ page }) => {
+  test('Scenario: full screen never starts playback, and the PIN prompt still shows in it', async ({ page }) => {
     await test.step('Given the paused video is full screen', async () => {
       await button(page).click();
       await expect.poll(() => fullScreenElement(page)).toBe('HTML');
@@ -47,7 +47,7 @@ test.describe('Feature: Real full screen', () => {
     });
   });
 
-  test.fixme('Scenario: going back to the library leaves full screen', async ({ page }) => {
+  test('Scenario: going back to the library leaves full screen', async ({ page }) => {
     await test.step('Given the video is full screen', async () => {
       await button(page).click();
       await expect.poll(() => fullScreenElement(page)).toBe('HTML');
