@@ -175,12 +175,12 @@ for f in "${FILES[@]}"; do
     ln -sf "$(cd "$(dirname "$f")" && pwd)/$base" "$src"
   fi
   echo "== $title"
-  if [[ -f "$dest/$title/$title.mpd" ]]; then
+  if [[ -f "$dest/$title.kidsvideo" || -f "$dest/$title/$title.mpd" ]]; then
     echo "   already prepared, skipping"; skip_n=$((skip_n + 1)); continue
   fi
   mkdir -p "$dest"
   if "$HERE/prepare.sh" "$src" "$dest" 2>&1 | sed 's/^/   /'; then
-    if [[ -f "$dest/$title/$title.mpd" ]]; then done_n=$((done_n + 1)); else fail_n=$((fail_n + 1)); FAILED+=("$f"); fi
+    if [[ -f "$dest/$title.kidsvideo" ]]; then done_n=$((done_n + 1)); else fail_n=$((fail_n + 1)); FAILED+=("$f"); fi
   else
     fail_n=$((fail_n + 1)); FAILED+=("$f")
   fi

@@ -2,7 +2,8 @@
 // using the locally installed Google Chrome in a visible window (so it runs on
 // the real display, e.g. a P3 MacBook screen) — the same flow as on the iPad.
 //
-//   node tools/real-episode-check.mjs "prepared/The Snowy Day" [app-url]
+//   node tools/real-episode-check.mjs "<Kids Library>/The Snowy Day.kidsvideo" [app-url]
+//   node tools/real-episode-check.mjs "<old prepared folder>" [app-url]
 //
 // Uses a fresh throwaway browser profile with a throwaway PIN. Nothing is
 // uploaded: files go from disk straight into that profile's storage.
@@ -14,10 +15,12 @@ import os from 'node:os';
 const folder = process.argv[2];
 const url = process.argv[3] ?? 'https://www.rohailtaimour.com/youtube-clone/';
 if (!folder || !fs.existsSync(folder)) {
-  console.error('usage: node tools/real-episode-check.mjs <prepared-episode-folder> [app-url]');
+  console.error('usage: node tools/real-episode-check.mjs <file.kidsvideo | prepared-folder> [app-url]');
   process.exit(2);
 }
-const files = fs.readdirSync(folder).filter((f) => !f.startsWith('.')).map((f) => path.join(folder, f));
+const files = fs.statSync(folder).isDirectory()
+  ? fs.readdirSync(folder).filter((f) => !f.startsWith('.')).map((f) => path.join(folder, f))
+  : [folder];
 const PIN = '2580';
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'episode-check-'));
@@ -70,7 +73,7 @@ try {
 } catch (e) {
   console.error(`FAILED: ${e.message}`);
 } finally {
-  const shot = path.join(path.dirname(path.resolve(folder)), 'real-episode-check.png');
+  const shot = path.join(os.tmpdir(), 'real-episode-check.png'); // never inside the library
   await page.screenshot({ path: shot }).catch(() => {});
   console.log(`screenshot: ${shot}`);
   if (problems.length) console.log(`problems:\n  ${problems.join('\n  ')}`);

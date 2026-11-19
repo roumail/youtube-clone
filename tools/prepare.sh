@@ -3,7 +3,7 @@
 #
 #   tools/prepare.sh "My Video.mp4" "<Google Drive>/Kids Library"
 #
-# Writes "<output-root>/My Video/" containing:
+# Writes "<output-root>/My Video.kidsvideo": one file (an uncompressed tar) holding:
 #   My Video.mpd   DASH manifest; its file name is the title shown in the app
 #   video.mp4      video track (H.264, single file, byte-range segments)
 #   audio.mp4      audio track (AAC)
@@ -31,7 +31,7 @@ FFPROBE="${FFPROBE:-ffprobe}"
 
 NAME="$(basename "$INPUT")"; TITLE="${NAME%.*}"
 DEST="$ROOT/$TITLE"
-if [[ -f "$DEST/$TITLE.mpd" ]]; then echo "already prepared: $DEST"; exit 0; fi
+if [[ -f "$ROOT/$TITLE.kidsvideo" || -f "$DEST/$TITLE.mpd" ]]; then echo "already prepared: $TITLE"; exit 0; fi
 
 probe() { "$FFPROBE" -v error -select_streams "$1" -show_entries stream=codec_name -of csv=p=0 "$INPUT" | head -1; }
 
@@ -111,5 +111,9 @@ AT="$(awk -v d="$DUR" 'BEGIN { printf "%.2f", d * 0.1 }')"
 
 mkdir -p "$ROOT"
 mv "$WORK/out" "$DEST"
-echo "prepared: $DEST"
-ls -lh "$DEST"
+# One file per video: "<Title>.kidsvideo" (the app adds it in a single pick).
+# PREPARE_KEEP_FOLDER=1 also keeps the loose folder (test fixtures use both).
+"$HERE/pack.sh" "$DEST" >/dev/null
+[[ "${PREPARE_KEEP_FOLDER:-0}" == 1 ]] || rm -rf "$DEST"
+echo "prepared: $ROOT/$TITLE.kidsvideo"
+ls -lh "$ROOT/$TITLE.kidsvideo"

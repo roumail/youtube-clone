@@ -154,7 +154,7 @@ e2e/                                ✅ specs (section 7)
   - reads paths from stdin too (`ls *.mp4 | run_prepare`), and works through a symlink on the PATH;
   - skips videos already prepared and keeps going if one fails, printing a summary;
   - writes to `--dest`, or by default to `KIDS_LIBRARY` from a **gitignored `.env`** (so the owner's local path is never public; `.env.example` is committed).
-- `tools/prepare.sh "My Video.mp4" <dest>` prepares one video and writes a folder into the Google Drive for desktop folder:
+- `tools/prepare.sh "My Video.mp4" <dest>` prepares one video. **Since v1.1.0 the output is one file per video, `My Video.kidsvideo`** (owner decision 2026-11-19: "the unit is the container"). It's a plain, uncompressed `tar` of the 4 parts below, made with the system `tar` by `tools/pack.sh`. Older folders can be converted with `tools/pack.sh --remove-folder "<folder>"`. What's inside:
   ```
   Google Drive/Kids Library/My Video/
     My Video.mpd      // DASH manifest; its file name is the title
@@ -171,7 +171,8 @@ e2e/                                ✅ specs (section 7)
 **Step 2, on any device:**
 - **"Add video"** button, behind the PIN. A short note on the library screen says what to pick: all 4 files of one prepared folder (`.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). After the correct PIN, the file picker opens straight away, within the same tap on "OK".
   - **iPad risk to check (Appendix A, item 2):** Safari may refuse to open the picker after the asynchronous PIN check. If it does, the fallback is a second "Choose files" tap. That would change the add-video scenario, so it goes back to the owner first.
-- Pick the 4 files of one video folder. On iPad: Files → Google Drive → folder → Select all. On the Mac: Finder.
+- Pick **the video's `.kidsvideo` file** (one tap). Older prepared folders still work: pick their 4 files together.
+  - The app reads the container's tar headers and hands each part to Shaka as a **lazy slice** of the picked file, so nothing is copied or unpacked. The 4 parts are checked as before.
 - The app:
   - registers the picked files under the `local:` scheme;
   - calls `storage.store('local://My Video.mpd', {title, poster})`, where the title is taken from the `.mpd` file name;
@@ -281,6 +282,7 @@ Any new feature gets proposed first and added only after it's approved.
 | `episode-like` (10 s, 1080p H.264 High, BT.709, audio: Chinese first + English second) | Mirrors a real web-download episode: the P3/SDR track-picker case, and `prepare.sh` choosing English. |
 | `unplayable` (`tiny` with a codec no browser supports) | Import of a video the device can't play: must be an error, with no empty entry left behind. |
 | `Show - S01E01 - First`, `… S01E02 - Second`, `… S01E10 - Tenth` | Series episodes (copies of `tiny`), for the library order of a series. |
+| `<name>.kidsvideo` for every packaged fixture, plus `broken-missing-audio.kidsvideo` (no audio part) | Single-file container imports and their error case. Fixtures keep the loose folders too (`PREPARE_KEEP_FOLDER=1`). |
 
 ### Avoiding races in user-action tests
 The principle: **tests wait on observable state, never on time.**
@@ -508,7 +510,7 @@ Closed on 2026-11-18:
 Run on the real iPad, in the app **installed from the home screen**, after each milestone that changes behaviour (and fully at M5). The Mac equivalent runs in CI.
 
 1. **Install / update:** open the site in Safari → Share → Add to Home Screen. After a deploy, open the app online, close it and reopen it; the new version shows.
-2. **Add a video:** "Add video" → PIN → Files → Google Drive → Kids Library → a video's folder → select all 4 files. Progress shows; the video appears with its title and poster. Keep the app open while it stores.
+2. **Add a video:** "Add video" → PIN → Files → Google Drive → Kids Library → tap the video's **`.kidsvideo`** file. Progress shows; the video appears with its title and poster. Keep the app open while it stores.
 3. **Play / pause / resume:** play asks for the PIN; pause is instant with no PIN; resume asks for the PIN again and continues where it stopped.
 4. **No autoplay:** at the end of a video nothing else starts.
 5. **Loopholes:** while paused, press play from the lock screen, Control Center and headphones → it stays paused (or shows the PIN prompt). Switch apps while playing → it pauses; coming back needs the PIN.
