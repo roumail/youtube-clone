@@ -19,7 +19,9 @@ const state = {
   pinSet: false,
   library: [], // usable Shaka StoredContent
   settingsUnlocked: false,
-  // PIN prompt: { purpose: 'setup' | 'import' | 'settings' | 'play' | 'change',
+  search: '', // library search text (not saved); typing needs the PIN
+  searchUnlocked: false, // until the search field loses focus
+  // PIN prompt: { purpose: 'setup' | 'import' | 'settings' | 'play' | 'change' | 'search',
   //              mode: 'setup' | 'confirm' | 'verify' | 'change', status: 'entry' | 'wrong', error }
   prompt: null,
   newPin: null, // first entry of a new PIN, until it is confirmed
@@ -87,7 +89,17 @@ function render(s) {
   // Library
   show('screen-library', s.route.name === 'library');
   $('screen-library').dataset.state = s.library.length ? 'ready' : 'empty';
-  document.querySelector('[data-role="library-grid"]').replaceChildren(...s.library.map(videoTile));
+  const query = s.search.trim().toLowerCase();
+  const shown = query
+    ? s.library.filter((c) => (c.appMetadata?.title ?? '').toLowerCase().includes(query))
+    : s.library;
+  document.querySelector('[data-role="library-grid"]').replaceChildren(...shown.map(videoTile));
+  const search = $('search-input');
+  search.dataset.state = s.searchUnlocked ? 'unlocked' : 'locked';
+  search.readOnly = !s.searchUnlocked;
+  if (search.value !== s.search) search.value = s.search;
+  show('search-clear', s.search !== '');
+  show('search-empty', query !== '' && shown.length === 0);
 
   // Import status
   const st = $('import-status');
@@ -208,6 +220,12 @@ async function onPinSubmit(event) {
     $('import-input').click();
   } else if (purpose === 'settings') {
     state.settingsUnlocked = true;
+  } else if (purpose === 'search') {
+    // Focus within the tap on "OK", so the iPad/iPhone keyboard comes up.
+    state.searchUnlocked = true;
+    update();
+    $('search-input').focus();
+    return;
   } else if (purpose === 'play') {
     update();
     // Optional features may step in first (e.g. ask for a watch-time budget);
@@ -281,6 +299,26 @@ function initVisibleArea() {
   vv.addEventListener('resize', apply);
   vv.addEventListener('scroll', apply);
   apply();
+}
+// Library search (DESIGN.md §3 "Search"): locked until the PIN, unlocked until
+// the field loses focus; clearing needs no PIN.
+function initSearch() {
+  const input = $('search-input');
+  input.addEventListener('click', () => { if (!state.searchUnlocked) askPin('search'); });
+  input.addEventListener('input', () => {
+    if (!state.searchUnlocked) return update(); // puts the old text back
+    state.search = input.value;
+    update();
+  });
+  input.addEventListener('blur', () => {
+    if (!state.searchUnlocked) return;
+    state.searchUnlocked = false;
+    update();
+  });
+  $('search-clear').addEventListener('click', () => {
+    state.search = '';
+    update();
+  });
 }
 function initSeek() {
   const v = $('player-video');
@@ -398,6 +436,7 @@ async function boot() {
   $('play-button').addEventListener('click', onPlayRequested);
   $('pause-button').addEventListener('click', onPause);
   $('change-pin-button').addEventListener('click', () => askPin('change'));
+  initSearch();
   window.addEventListener('hashchange', onRouteChange);
 
   initPlayer($('player-video'), update);

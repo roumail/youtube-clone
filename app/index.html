@@ -25,7 +25,13 @@
         <button type="button" data-testid="settings-button">Settings</button>
       </header>
       <p class="import-help" data-testid="import-help">Adding a video? Pick its <strong>.kidsvideo</strong> file. Videos are prepared on the Mac first.</p>
+      <!-- Search (M10): typing needs the PIN; clearing is free. -->
+      <div class="search">
+        <input type="search" data-testid="search-input" data-state="locked" readonly autocomplete="off" placeholder="Search (needs PIN)" aria-label="Search the library">
+        <button type="button" data-testid="search-clear" aria-label="Clear search" hidden>✕</button>
+      </div>
       <p class="empty-note">No videos yet.</p>
+      <p class="search-empty" data-testid="search-empty" hidden>No videos match.</p>
       <ul class="grid" data-role="library-grid"></ul>
       <input type="file" data-testid="import-input" multiple hidden>
       <progress data-testid="import-progress" max="1" value="0" hidden></progress>

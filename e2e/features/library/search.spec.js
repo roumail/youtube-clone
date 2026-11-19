@@ -12,7 +12,7 @@ async function unlockSearch(page) {
 }
 
 test.describe('Feature: Search the library', () => {
-  test.fixme('Scenario: typing into search needs the PIN', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: typing into search needs the PIN', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" and "medium" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium');
@@ -29,7 +29,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: after the PIN, typing narrows the library by title', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: after the PIN, typing narrows the library by title', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny", "medium" and "episode-like" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium', 'episode-like');
@@ -44,7 +44,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: a series is found by its name, episodes in order', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a series is found by its name, episodes in order', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given three episodes of "Show" and "tiny" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('Show - S01E10 - Tenth', 'tiny', 'Show - S01E02 - Second', 'Show - S01E01 - First');
@@ -58,7 +58,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: a wrong or cancelled PIN leaves search locked', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a wrong or cancelled PIN leaves search locked', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" and "medium" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium');
@@ -77,7 +77,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: leaving the field locks it again, and the results stay', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: leaving the field locks it again, and the results stay', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given I searched for "tiny"', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium');
@@ -100,7 +100,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: clearing the search needs no PIN', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: clearing the search needs no PIN', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given I searched for "tiny" and search is locked again', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium');
@@ -119,7 +119,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: no matches says so', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: no matches says so', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -134,7 +134,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: on iPad the keyboard comes up right after the PIN @ipad', async ({ page, pinSet }) => {
+  test('Scenario: on iPad the keyboard comes up right after the PIN @ipad', async ({ page, pinSet }) => {
     await test.step('Given the library is open', async () => {
       await goto(page, '#/library');
     });
