@@ -1,8 +1,9 @@
 # Working on this repo (for any coding agent / LLM)
 
 An offline, PIN-gated kids video library: an installable web app (PWA) for one
-family's Mac and iPad. **Read `DESIGN.md` first — it is the spec and the source
-of truth.** This file only says *how* to work here.
+family's Mac and iPad. **The behaviour specs in `e2e/features/` are the source of
+truth.** `DESIGN.md` keeps the reasons behind decisions, the tooling and the
+manual device checklist. This file only says *how* to work here.
 
 ## The owner decides
 - The owner sets the order of work and approves every PR merge, unless they
@@ -10,7 +11,7 @@ of truth.** This file only says *how* to work here.
 - **Nothing gets added without asking** (DESIGN.md §6). If a feature, setting,
   dependency or behaviour isn't in the spec, propose it and wait.
 - **Don't deviate from the spec.** If you learn something that contradicts it,
-  stop, raise it, update `DESIGN.md` in a PR, then continue.
+  stop, raise it, update the spec in a PR, then continue.
 - Open questions that need the owner are listed in DESIGN.md → "Open decisions".
   Ask; don't guess.
 
@@ -51,9 +52,9 @@ of truth.** This file only says *how* to work here.
 - Behaviour specs live in `e2e/features/<area>/*.spec.js`: one file per
   `Feature:`, one `test('Scenario: …')` per scenario, Given/When/Then as
   `test.step` labels (DESIGN.md §7).
-- Unbuilt scenarios are `test.fixme`. To build a milestone, take its feature
-  files from the **milestone ↔ feature map** in DESIGN.md, switch those
-  scenarios from `test.fixme` to `test`, and implement until CI is green.
+- Unbuilt scenarios are `test.fixme`. A new feature starts as a feature file of
+  `test.fixme` scenarios, reviewed by the owner; building it means switching
+  them to `test` and implementing until CI is green.
 - Tests wait on app state (`data-state`, `data-import`, …), never on time;
   `waitForTimeout` is banned by lint. The app ↔ test contract (routes, test ids,
   states, persisted keys) is in DESIGN.md §7 — change the spec before changing it.

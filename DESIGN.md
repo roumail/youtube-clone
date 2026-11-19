@@ -2,20 +2,11 @@
 
 ## Working agreement (read first)
 
-**Order of work: the owner sets it.**
-- **Done:** T0 (specs drafted, GitHub + CI, CI failing, then the smoke test passing), the GitHub Pages deploy, and CI on Ubuntu in the digest-pinned Playwright image (it ran on macOS for a while; the owner moved it back on 2026-11-18, see section 7).
-- **M0 (Shaka offline spike): core question answered yes.** See "M0 results" under Milestones for exactly what is and isn't verified.
-- **Built and released as v1.0.0:** M2 (library + import), M3 (player + PIN gate), M4 (first-run PIN, lockout, settings, offline, installable), series groundwork, release gates. **M5: the owner's iPad UI test passed (2026-11-18).** Changes from here on are released as versions (section 7, "Releases").
-- **Before that:** the product features went milestone by milestone, using the **milestone ↔ feature map** under Milestones. The owner picks the order. Open questions for the owner are under **Open decisions**.
-- **How to work in this repo** (PRs, CI-only testing, safety rules) is in `AGENTS.md`. `CLAUDE.md` points to it.
+**The behaviour specs in `e2e/features/` are the source of truth.** This file keeps the
+reasons behind decisions, the tooling, and what the specs can't test (Appendix A).
+How to work in this repo is in `AGENTS.md`.
 
-**Rules while working:**
-- Ask for design clarifications along the way whenever they're needed.
-- **Don't deviate from this spec.** If something learned during the work contradicts it, stop and raise it so the spec gets updated first. Then continue.
-- Tests are never run locally by the LLM. CI is the source of truth (see section 7).
-
-
-Specs: (spend more time on the ones on top - 60% top two bullets and 40% divided b/w remaining tasks)
+Original brief:
 * Biggest constraint we need to consider - Ideally installable on mac and ipad. Each device points to it's own storage
 * stack needs to be chosen based on maximum reuse of existing functionality. Python might be easy with more projects but we have to also consider dependencies since mac and ipad are already big constraints.
 * Fixed library that is available for rendering
@@ -27,11 +18,7 @@ Specs: (spend more time on the ones on top - 60% top two bullets and 40% divided
 
 # Plan
 
-**Typical media:** 5–20 minute episodes, not films. Sizes are in the low hundreds of MB.
-
-Effort split mirrors the specs: sections 1–2 (platform + stack) are the bulk of the thinking; sections 3–6 are deliberately short.
-
-## 1. Platform & installation: Mac, iPad and iPhone, storage on each device (~30%)
+## 1. Platform & installation: Mac, iPad and iPhone, storage on each device
 
 ### Decision: an installable web app (PWA), not a native app
 A native iPad app runs into Apple's signing paywall. A free Apple ID install stops launching after 7 days; a lasting install needs the $99/yr developer program. A browser is already on every device, so we use that instead:
@@ -56,11 +43,11 @@ Research summary, sources at the bottom of this doc:
 | Question | Status | Evidence |
 |---|---|---|
 | Is there enough space? | **Solved** | Since WebKit 17 (iPadOS 17 / macOS 14), a browser app gets up to **60% of disk per origin**. Installed web apps get the same quota. Chrome on Mac has similarly large quotas. |
-| Will the iPad delete it after 7 days unused? | **Solved** | Home-screen web apps are exempt from the 7-day cap on script-writable storage. Eviction only happens under disk pressure, least-recently-used first, and persistent origins are excluded. **Kept simple (one user):** the app calls `navigator.storage.persist()` once at startup, with no UI and no test. The installed iPad app was granted it in M0. |
+| Will the iPad delete it after 7 days unused? | **Solved** | Home-screen web apps are exempt from the 7-day cap on script-writable storage. Eviction only happens under disk pressure, least-recently-used first, and persistent origins are excluded. **Kept simple (one user):** the app calls `navigator.storage.persist()` once at startup, with no UI and no test. |
 | Can the iPad play one big stored file? | **Avoid** | Turning a large stored file into a playable link (`URL.createObjectURL`) has a history of problems on iOS:<br>• memory blow-up (iOS 15);<br>• broken playback (iOS 17.4.1);<br>• crashes with 100–500 MB files in a Workbox issue that was never resolved. |
 | How do we store and play big videos offline? | **Solved: use Shaka Player offline** | Google's open-source player (Apache-2.0) with built-in offline storage:<br>• stores each video as **many small segments** (a few seconds each) in IndexedDB;<br>• plays them back through Media Source Extensions (`ManagedMediaSource` on iPadOS 17+);<br>• no single huge file is ever handed to the video element, so the big-file bugs above don't apply. |
 
-**Shaka gotcha found in M0 (must keep):** Shaka's default offline track picker uses `hdrLevel: 'AUTO'`.
+**Shaka gotcha (must keep):** Shaka's default offline track picker uses `hdrLevel: 'AUTO'`.
 - On P3 screens (MacBooks, iPads) that means "prefer PQ", so it **drops every SDR variant**.
 - Real episodes declare BT.709, which Shaka reads as SDR. The default picker therefore stored **0 tracks without any error** ("0 MB in 0.0 s"), and playback failed with 4036.
 - **Rule:** the app always passes its own `offline.trackSelectionCallback` that stores the single variant `prepare.sh` produces.
@@ -70,8 +57,6 @@ Research summary, sources at the bottom of this doc:
 **Why Shaka:** it's the tried-and-tested option. Offline storage is a first-class, documented feature with `store()`, `list()`, `remove()`, progress callbacks and app metadata, and it's used in production. We hand-roll nothing on the storage side.
 
 **The cost: videos are prepared on the Mac once.** Shaka stores DASH/HLS content (a manifest plus segmented media), not plain `.mp4` files. Each video is packaged once on the Mac (section 4), and the packaged output is shared through **Google Drive**, so the iPad never does any processing. At home-library scale this is a one-off step per video, not a burden.
-
-**Fallback (only if Shaka on iPad fails M0):** keep the videos as plain files in OPFS and have the service worker feed them to the player a few MB at a time as `206` range responses (the Workbox range-requests pattern, read from OPFS). It's more hand-written code and less proven on iPad, which is why it's no longer the main plan.
 
 ### Prior art: what we reuse vs. skip
 | Project | What it does | Use? |
@@ -96,7 +81,7 @@ Deleting the home-screen icon (or clearing that app's data) deletes its library.
 | AltStore/SideStore (auto re-sign) | Free, but needs a helper running on the Mac, 3-app limit, and breaks often | Rejected: fragile |
 | Python (Kivy/BeeWare) | Same signing problem as native, plus an interpreter | Rejected |
 
-## 2. Stack: maximum reuse, minimum dependencies (~30%)
+## 2. Stack: maximum reuse, minimum dependencies
 
 **Plain HTML + CSS + vanilla JavaScript (ES modules), plus one vendored library: Shaka Player.** The app has no framework, no build step and no npm dependencies. npm is only used for the CI test tooling (Playwright, ESLint). Shaka's pre-compiled build is copied into `app/vendor/` at a pinned version (5.3.5).
 
@@ -119,25 +104,7 @@ Deleting the home-screen icon (or clearing that app's data) deletes its library.
 
 **Toolchain:** a text editor, a browser, a git push to the static host, and the two Mac tools above.
 
-Code layout (small on purpose). ✅ = exists today, ◻ = to build:
-```
-app/                                  published to GitHub Pages
-  index.html, styles.css            ✅ shell with the 4 screens and the data-state contract
-  app.js                            ✅ routing + render(state); behaviour to build
-  local-scheme.js                   ✅ Shaka "local:" scheme for picked files (from M0, kept)
-  vendor/shaka-player-5.3.5.compiled.js   ✅ pinned
-  manifest.webmanifest, sw.js, icons/    ✅ M4: installable + offline (sw: network-first, see M0 lesson 3)
-  library.js, pin.js                ✅ M2/M4: Shaka storage (own track picker, 0-track cleanup); PIN hash, set/change, 5-strike 60 s lockout
-  player.js                         ✅ M3: Shaka player on our <video>; PIN-gated play, free pause, safety net
-tools/
-  get-packager.sh, prepare.sh, pack.sh   ✅ Mac: video → one .kidsvideo file for Google Drive
-  run_prepare.sh, README.md         ✅ Mac wrapper: single file or batch → KIDS_LIBRARY (.env)
-  real-episode-check.mjs            ✅ manual check with a real episode in local Chrome
-fixtures/generate.sh                ✅ synthetic fixtures (CI)
-e2e/                                ✅ specs (section 7)
-```
-
-## 3. Fixed library for rendering (~10%)
+## 3. Fixed library for rendering
 - The library is `storage.list()` from Shaka, shown as a thumbnail grid.
 - Title and poster thumbnail come from `appMetadata`, which is saved at import time. The title is the manifest's file name without `.mpd`: the iPad picker gives the app file names only, not the folder name.
 - **Series (groundwork, owner decision 2026-11-18):**
@@ -165,7 +132,7 @@ e2e/                                ✅ specs (section 7)
   Scenarios: `e2e/features/library/search.spec.js`.
 - The app never fetches video content from the internet.
 
-## 4. Adding media (~10%)
+## 4. Adding media
 **Step 1, on the Mac, once per video** (usage and examples: `tools/README.md`):
 - `tools/run_prepare.sh` is the everyday command. It's a wrapper around `prepare.sh` for the owner's Mac:
   - takes single files or whole folders (batch mode);
@@ -176,7 +143,7 @@ e2e/                                ✅ specs (section 7)
   - writes to `--dest`, or by default to `KIDS_LIBRARY` from a **gitignored `.env`** (so the owner's local path is never public; `.env.example` is committed).
 - `tools/prepare.sh "My Video.mp4" <dest>` prepares one video. **The output is one file per video, `My Video.kidsvideo`** (owner decision 2026-11-19: "the unit is the container"; since v2.0.0 it's the **only** format, and loose folders aren't accepted). It's a plain, uncompressed `tar` of the 4 parts below, made with the system `tar` by `tools/pack.sh`. What's inside:
   ```
-  Google Drive/Kids Library/My Video/
+  My Video.kidsvideo   (tar)
     My Video.mpd      // DASH manifest; its file name is the title
     video.mp4         // fragmented video track (single file, byte-range segments)
     audio.mp4         // fragmented audio track
@@ -190,7 +157,6 @@ e2e/                                ✅ specs (section 7)
 
 **Step 2, on any device:**
 - **"Add video"** button, behind the PIN. A short note on the library screen says what to pick: the video's `.kidsvideo` file. After the correct PIN, the file picker opens straight away, within the same tap on "OK".
-  - **iPad risk to check (Appendix A, item 2):** Safari may refuse to open the picker after the asynchronous PIN check. If it does, the fallback is a second "Choose files" tap. That would change the add-video scenario, so it goes back to the owner first.
 - Pick **the video's `.kidsvideo` file** (one tap). Anything else (e.g. loose parts) is refused, with a message saying to pick the `.kidsvideo`.
 - **No duplicates** (owner decision 2026-11-19): a video whose title is already in the library (case-insensitive) is refused before anything is stored: "<title>" is already in the library. To replace one, remove it in Settings first.
 - **Several at once (M7, built 2026-11-19):**
@@ -199,11 +165,11 @@ e2e/                                ✅ specs (section 7)
   - anything that isn't a `.kidsvideo` is refused by name, and the rest are still added.
 
   Scenarios: `e2e/features/library/add-several.spec.js`.
-  - The app reads the container's tar headers and hands each part to Shaka as a **lazy slice** of the picked file, so nothing is copied or unpacked. The 4 parts are checked as before.
+  - The app reads the container's tar headers and hands each part to Shaka as a **lazy slice** of the picked file, so nothing is copied or unpacked. The 4 parts are checked.
 - The app:
   - registers the picked files under the `local:` scheme;
-  - calls `storage.store('local://My Video.mpd', {title, poster})`, where the title is taken from the `.mpd` file name;
-  - shows Shaka's progress callback as a progress bar (confirmed working by the owner in M0);
+  - calls `storage.store('local://pick/My%20Video.mpd', {title, poster})`, where the title is taken from the `.mpd` file name;
+  - shows Shaka's progress callback as a progress bar;
   - **uses its own single-variant track picker** (section 1);
   - if the stored entry has **0 tracks** (the device can't play it), it reports an import error and **removes the empty entry**, so no "0 MB" item is ever listed.
 - Once stored, the picked files and the Drive copy aren't needed by the app any more; it plays fully offline.
@@ -212,8 +178,8 @@ e2e/                                ✅ specs (section 7)
 - **"Remove video,"** behind the PIN: `storage.remove(offlineUri)`.
 - iPad note: when you pick from Google Drive, the iPad downloads the files to a temporary location first. So it briefly needs about 2× the video's size free.
 
-## 5. Parental controls & playback rules (~10%)
-- **Custom controls only.** Shaka is used without its UI layer. The `<video>` element has no `controls` attribute and is never put into native fullscreen (`playsinline`, and no `webkitEnterFullscreen`), because the native controls would bypass the PIN. The app's own full-screen layout is done in CSS: the player covers the whole screen (letterboxed with `object-fit: contain`, in landscape and portrait), with Back / Play / Pause floating over it, clear of the safe areas. A scenario checks the video area equals the viewport at iPad landscape and portrait sizes. Fixed in v2.0.0; before that the video was capped at 70% of the height.
+## 5. Parental controls & playback rules
+- **Custom controls only.** Shaka is used without its UI layer. The `<video>` element has no `controls` attribute and is never put into native fullscreen (`playsinline`, and no `webkitEnterFullscreen`), because the native controls would bypass the PIN. The app's own full-screen layout is done in CSS: the player covers the whole screen (letterboxed with `object-fit: contain`, in landscape and portrait), with Back / Play / Pause floating over it, clear of the safe areas. A scenario checks the video area equals the viewport at iPad landscape and portrait sizes.
 - Opening a video shows it **paused** on the first frame.
 - **Pause:** free, no code.
 - **Play / resume:** always asks for the PIN, every time.
@@ -278,18 +244,16 @@ e2e/                                ✅ specs (section 7)
 - **Ending a session:** the parent can end it in Settings (PIN); the next play then asks for a new budget.
 - **Honest limit:** it's enforced in the browser, like the PIN. It stops a child, but an adult who clears the browser data resets it.
 
-## 6. Feature-minimal guardrail (~10%)
+## 6. Feature-minimal guardrail
 **Users are the parents (mum and dad) plus a child watching.**
 - The **PIN prompt is the only access control.**
 - There's no login, accounts, roles or other authentication or authorization, and none is planned.
 - The PIN keeps a child from starting playback. It is not meant to stop a determined adult.
 
 Explicitly **out of scope unless asked for**:
-- ~~search~~: **added on request (2026-11-19)**, see section 3 "Search"
 - playlists, recommendations, history
 - playback speed, subtitles, volume UI (hardware buttons only)
 - **next / previous buttons** in the player: **not wanted (owner decision 2026-11-19)**. Another video is opened from the library (or series list), paused, and needs the PIN to play.
-- ~~seek bar~~: **added on request (2026-11-19)**, see section 5 "Seek"
 - accounts, sync, cloud, multiple profiles
 - PiP, AirPlay, downloading from the internet, comments, likes
 
@@ -311,7 +275,7 @@ Any new feature gets proposed first and added only after it's approved.
 ### Layers
 | Layer | Tool | What it covers |
 |---|---|---|
-| End-to-end (user actions) | **Playwright**, Chromium project only | The real app in a real browser: import, library grid, PIN gate, pause/play rules, no autoplay, offline. |
+| End-to-end (user actions) | **Playwright**, Chromium (plus WebKit for `@ipad` / `@iphone` scenarios) | The real app in a real browser: import, library grid, PIN gate, pause/play rules, no autoplay, offline. |
 | iPad | Manual checklist (Appendix A) | Install, Drive picking, offline, lock-screen/headphone behaviour, persistence. |
 | iPhone | Playwright WebKit iPhone profiles (`@iphone`), plus Appendix A | Layout on a phone screen with the on-screen keyboard, in portrait and landscape. |
 
@@ -365,7 +329,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 | `#/series/<name>` | A series' episodes (M7), where `name` = URL-encoded series name |
 | `#/settings` | Settings (PIN-gated) |
 
-**The 4 screens and their states** (`data-testid` → `data-state`):
+**Screens and their states** (`data-testid` → `data-state`):
 
 | Element | States / attributes |
 |---|---|
@@ -395,7 +359,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 - Visibility is simulated by overriding `document.visibilityState`.
 - The iPhone's on-screen keyboard is modelled by an init script (`onScreenKeyboard` in `e2e/support.js`): while a text field has focus, `window.visualViewport` is shorter by the keyboard's height (300 px in portrait, 200 px in landscape), as iPhone Safari reports it, and fires `resize`. Like the real keyboard, it slides away about 300 ms after the field loses focus, so a tap on OK lands before the layout changes.
 
-**Drafted-but-not-built specs** are marked `test.fixme`. They show as skipped in the report and are switched on in the milestone that implements them, so CI stays green on what exists.
+**Drafted-but-not-built specs** are marked `test.fixme`. They show as skipped in the report and are switched on in the PR that builds them, so CI stays green on what exists.
 
 **Browser profile:**
 - the pinned Chromium build at an iPad-sized viewport (1180×820), with touch enabled;
@@ -412,33 +376,9 @@ No Gherkin or Cucumber layer, and no extra dependency. The structure mirrors `.f
 | `Scenario:` | `test('Scenario: …')` |
 | `Given / When / Then` | `test.step('Given …')` labels, shown in the HTML report and CI traces |
 
-A scenario that isn't built yet is `test.fixme`: it shows as skipped and is switched on in the milestone that builds it. A new feature starts as a new file of `fixme` scenarios, reviewed before any code.
+A scenario that isn't built yet is `test.fixme`: it shows as skipped and is switched on in the PR that builds it. A new feature starts as a new file of `fixme` scenarios, reviewed before any code.
 
-```
-e2e/
-  support.js, server.js             shared fixtures/helpers, test server
-  smoke/smoke.spec.js               the 4 screens load + codec canary (active)
-  features/
-    first-run/set-pin               Feature: Set a PIN on first run
-    library/browse                  Feature: Browse the library (empty, several videos, reload, series tile in name order)
-    library/add-video               Feature: Add a video (PIN, one .kidsvideo, second video, wrong PIN, loose parts refused, missing part, unplayable, duplicate refused, @ipad picker timing)
-    library/remove-video            Feature: Remove a video
-    library/add-several             Feature: Add several videos in one go
-    library/series                  Feature: Series (tile per series, ordered episodes, back to the list, no autoplay)
-    playback/open-video             Feature: Open a video (same app, never a new tab; paused at 0:00; locked-down <video>)
-    playback/play-requires-pin      Feature: Playing needs the PIN (correct, wrong, cancel)
-    playback/pause-and-resume       Feature: Pause and resume (pause never shows a PIN window; resume needs it; resumes in place)
-    playback/multiple-videos        Feature: Several videos (back stops playback; switching starts paused; reopen from 0:00)
-    playback/no-autoplay            Feature: No autoplay (end of video: nothing else starts)
-    playback/seek                   Feature: Seek (scrub bar, elapsed/total, ← / → 10 s)
-    playback/controls-hide          Feature: Controls hide while playing (3 s; mouse/tap/key shows them; clock stays)
-    playback/full-screen            Feature: Real full screen (whole app, PIN prompt still shows, Back leaves it)
-    parental-controls/no-way-around-the-pin   Feature: backgrounding, OS "play", script play
-    parental-controls/pin-lockout   Feature: PIN lockout (5 wrong → 60 s, survives reload)
-    parental-controls/watch-time-limit   Feature: Watch-time limit (optional, behind a flag)
-    settings/settings               Feature: Settings (PIN-gated; change PIN needs current)
-    offline/offline                 Feature: Works offline
-```
+The feature files themselves are the list: `e2e/features/<area>/*.spec.js`, plus `e2e/smoke/`.
 
 **Decided by these scenarios:**
 - Opening a video stays **in the same app** (the `#/player/…` route), never a new tab or window.
@@ -482,7 +422,6 @@ e2e/
   - **major** for big or incompatible changes (e.g. a new storage format that needs re-adding videos);
   - **minor** for new features;
   - **patch** for fixes only.
-- **The first release is v1.0.0:** the feature set above, as tested by the owner on the iPad.
 - **The owner cuts releases** with `tools/release.sh major|minor|patch` (or an explicit version), using their own GitHub login. The script:
   - only runs from a clean, up-to-date `main`;
   - refuses unless that commit passed CI on `main` and comes after the previous release;
@@ -496,94 +435,15 @@ e2e/
 - Only published releases deploy. After a deploy, the live site is checked automatically, and the previous release is restored if that check fails.
 - Security measures are **not documented in this repo**. The owner keeps private notes; ask the owner before changing workflows, permissions, deploy steps or page security headers.
 
-## Milestones
-0. **T0 – Test foundation (before any feature code):**
-   - public repo `roumail/youtube-clone` with protected `main` (squash only, required checks);
-   - GitHub Actions PR gates;
-   - fixture generation;
-   - Playwright on the pinned Chrome, with the codec canary;
-   - an empty app shell with its `data-state` contract;
-   - the smoke test (4 screens load) plus the codec canary passing in CI;
-   - all other specs drafted as `test.fixme`.
-1. **M0 – Shaka offline spike (riskiest feature work, right after T0):**
-   - Built as a **diagnostic page**, `app/spike/` (with its own service worker and manifest), installable as its own PWA. It shows each check as pass/fail and reuses real modules the app keeps (e.g. `local-scheme.js`). It has one active CI test that stores a fixture via the `local:` scheme. The main app is untouched.
-   - Package one **typical episode (5–20 min)** on the Mac and put it in Google Drive. Then on the actual iPad confirm:
-   - the 4 files can be picked from Google Drive in the Files picker;
-   - `storage.store()` through the `local:` scheme completes;
-   - the video plays smoothly offline (airplane mode);
-   - it survives closing the app, rebooting, and 7+ days;
-   - `navigator.storage.persist()` is granted and the quota estimate covers the planned library;
-   - the Media Session `play` handler is honoured.
-
-   If Shaka fails on iPad, switch to the OPFS + range-response fallback (section 1).
-
-   **M0 results (2026-11-18), stated honestly:**
-
-   | Check | Mac (Chrome 157, P3 screen) | iPad (installed from home screen) |
-   |---|---|---|
-   | Pick the 4 files (Finder / Google Drive in Files) | ✅ | ✅ |
-   | Store a real episode via the `local:` scheme | ✅ "The Snowy Day": 39 min, 1080p, 1,289 MB in 3 s | ✅ stored (size not reported back) |
-   | Play it | ✅ | ✅ played |
-   | Pause | n/a | ❌ **spike limitation:** the spike has no pause button (native controls are off by design). The real player has one. |
-   | Plays offline (airplane mode, after a force-close) | not tested | **not yet reported** |
-   | Lock-screen / headphone "play" is ignored | ✅ in CI (emulated) | **not yet reported** |
-   | `persist()` granted | ❌ in a plain tab (expected) | ✅ granted in the installed app |
-   | Survives 7+ days | — | open; owner hasn't decided whether it's a gate |
-
-   **The spike's UI is a diagnostic page, not the product.** Its list sits among log text and it has no pause button. The owner noted this as detail, not a blocker.
-
-   **What M0 taught us (each now a rule elsewhere in this spec):**
-   1. **Shaka on P3 screens drops SDR video by default.** Its default offline track picker uses `hdrLevel: 'AUTO'`, which on P3 screens means "prefer PQ"; it dropped the only SDR (BT.709) track and stored **0 tracks without any error** ("0 MB in 0.0 s", then 4036 on play). This hit the Mac and the iPad alike. Fix: our own track picker, and storing 0 tracks counts as a failure (section 1).
-   2. **CI didn't catch it, because it didn't look like the family's devices:** headless Linux, no P3, and synthetic fixtures without colour info. Fix: every CI test emulates a P3 screen, plus an `episode-like` fixture (1080p, BT.709, two audio languages). See section 7.
-   3. **A cache-first service worker kept showing stale versions** after deploys. Fix: network-first when online, `cache: 'reload'` on install, and a visible version marker.
-   4. **`apt-get install ffmpeg` hung CI for 10 minutes.** Fix: pinned static binaries only.
-   5. **Real downloads have several audio tracks** (the episode's first was Chinese). Fix: `prepare.sh` prefers English.
-   6. **The 2 GB+ stress size was wrong for this family.** Typical media is 5–20 min episodes; the largest so far is 39 min / 1.3 GB, and it stored fine.
-2. **M1 – Mac prepare script: done** (pulled into M0): `tools/get-packager.sh`, `tools/prepare.sh` (English audio preferred, re-encode only if needed, poster), CI fixtures built through it.
-3. **M2 – Library + import.**
-4. **M3 – Player + PIN gate.**
-5. **M4 – First run, lockout, settings, offline + installable.**
-6. **M5 – Hardening:** the iPad checklist (Appendix A) and a pass on the Mac.
-
-### Milestone ↔ feature map
-To build a milestone: switch **all** its scenarios from `test.fixme` to `test` in one PR (or a few), implement until CI is green, then the owner tries it on the devices. Order is the owner's call; dependencies are noted.
-
-| Milestone | Feature files (`e2e/features/…`) | Scenarios | Needs first |
-|---|---|---|---|
-| **M2 – Library + import** ✅ | `library/browse`, `library/add-video`, `library/remove-video` | 4 + 5 + 1 = **10** (incl. series order) | — (the shell + `local-scheme.js` exist). `remove-video` needs the settings screen to unlock with the PIN, so `pin.js` verify mode comes with it. |
-| **M3 – Player + PIN gate** ✅ | `playback/open-video`, `playback/play-requires-pin`, `playback/pause-and-resume`, `playback/multiple-videos`, `playback/no-autoplay`, `parental-controls/no-way-around-the-pin` | 3 + 3 + 3 + 3 + 1 + 3 = **16** | M2 (videos must be in the library) |
-| **M4 – First run, lockout, settings, offline** ✅ | `first-run/set-pin`, `parental-controls/pin-lockout`, `settings/settings`, `offline/offline` | 3 + 2 + 2 + 1 = **8** | M2, M3. Also adds `manifest.webmanifest`, icons, `sw.js` (network-first) and the startup `persist()` call |
-| **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
-| **M8 – Seek** ✅ | `playback/seek` | **5** | M3. Released as a **minor** version. |
-| **M7 – Series** ✅ | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
-| **M9 – iPhone** ✅ | `devices/iphone` | **4** (each in portrait and landscape) | M2–M4. Released as a **patch** version (fixes the PIN prompt behind the keyboard). |
-| **M14 – Real full screen** ✅ | `playback/full-screen` | **3** | M3. Released as a **minor** version. |
-| **M13 – Watch-time limit on by default** ✅ | `parental-controls/watch-time-limit` (2 scenarios rewritten: on by default; switching off in Settings) | **2** | M6. Released as a **minor** version. |
-| **M12 – Controls hide while playing** ✅ | `playback/controls-hide` | **5** | M3. Released as a **minor** version (with M11 in v2.5.0). |
-| **M11 – Custom watch-time budget** ✅ | `parental-controls/watch-time-limit` ("Other…" scenarios) | **3** | M6. Released as a **minor** version. |
-| **M10 – Search** ✅ | `library/search` | **8** | M2–M4. Released as a **minor** version. |
-| **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** (+3 for "Other…", M11) | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
-| | | **78 in total** | |
-
-Also active: `smoke/` (5). The M0 spike and its tests were removed after the owner's iPad test (2026-11-18); `local-scheme.js` from it is part of the app.
+## Building a new feature
+A new feature starts as a new feature file of `test.fixme` scenarios, reviewed by the owner before any code. Building it means switching those scenarios to `test` and implementing until CI is green; then the owner tries it on the devices.
 
 ## Open decisions (owner)
 1. **Per-device PIN:** same code on both devices for now (section 5); revisit later.
-2. ~~Watch-time sessions — automatic end~~ **decided 2026-11-19: never automatically.** Only the parent (Settings → End session) or a used-up budget ends a session.
-3. ~~Watch-time budget choices~~ **decided 2026-11-19: 20 / 30 / 45 minutes, no "no limit".** For unlimited, switch the feature off. **Added 2026-11-19:** "Other…", 5–180 minutes, last value remembered.
-
-Closed on 2026-11-19:
-- **iPhone:** supported, in portrait and landscape (section 1, M9).
-
-Closed on 2026-11-18:
-- **7-day persistence:** not a gate. Prepared videos stay in Google Drive, so a cleared library is simply re-added.
-- **Poster frame:** not important; it stays at 10% into the video.
-- **M0 spike:** deleted from the repo.
-- **Release management:** see section 7, "Releases".
 
 ## Appendix A – iPad manual checklist
 Also run it on the **iPhone**, in portrait and landscape, plus: every PIN prompt (first run, Play, Settings, a wrong PIN) is fully above the keyboard without scrolling, and the page never zooms in when a field is tapped.
-Run on the real iPad, in the app **installed from the home screen**, after each milestone that changes behaviour (and fully at M5). The Mac equivalent runs in CI.
+Run on the real iPad, in the app **installed from the home screen**, after each release that changes behaviour. The Mac equivalent runs in CI.
 
 1. **Install / update:** open the site in Safari → Share → Add to Home Screen. After a deploy, open the app online, close it and reopen it; the new version shows.
 2. **Add a video:** "Add video" → PIN → Files → Google Drive → Kids Library → tap the video's **`.kidsvideo`** file. Progress shows; the video appears with its title and poster. Keep the app open while it stores.
