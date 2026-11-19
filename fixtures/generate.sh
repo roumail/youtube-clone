@@ -86,6 +86,17 @@ grep -q 'codecs="xyz1.000000"' "$OUT/unplayable/unplayable.mpd" \
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/unplayable.kidsvideo" \
   -C "$OUT/unplayable" unplayable.mpd poster.jpg audio.mp4 video.mp4
 
+# A film-like manifest: "tiny" whose declared (peak) bitrate is 100x its real
+# one, as with real films. Shaka's own size guess (bitrate x duration) is then
+# far bigger than the video, so a space check must use the real size.
+cp -R "$OUT/tiny" "$OUT/high-peak"
+mv "$OUT/high-peak/tiny.mpd" "$OUT/high-peak/high-peak.mpd"
+perl -pi -e 's/bandwidth="(\d+)"/"bandwidth=\"" . ($1 * 100) . "\""/ge' "$OUT/high-peak/high-peak.mpd"
+cmp -s "$OUT/tiny/tiny.mpd" "$OUT/high-peak/high-peak.mpd" \
+  && { echo "high-peak fixture: bandwidth not changed" >&2; exit 1; }
+COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/high-peak.kidsvideo" \
+  -C "$OUT/high-peak" high-peak.mpd poster.jpg audio.mp4 video.mp4
+
 grep -q 'lang="en"' "$OUT/episode-like/episode-like.mpd" \
   || { echo "prepare.sh did not pick the English audio track" >&2; exit 1; }
 
