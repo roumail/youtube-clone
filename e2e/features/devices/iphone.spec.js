@@ -70,6 +70,14 @@ test.describe('Feature: Works on iPhone', () => {
       await page.getByTestId('pin-input').focus();
       await expectAboveKeyboard(page, ['pin-input', 'pin-submit']);
     });
+    await test.step('And the PIN card fits the screen width, and the page is not zoomed', async () => {
+      const fit = await page.evaluate(() => {
+        const r = document.querySelector('.pin-card').getBoundingClientRect();
+        return { inside: r.left >= 0 && r.right <= window.innerWidth, scale: window.visualViewport.scale };
+      });
+      expect(fit).toEqual({ inside: true, scale: 1 });
+      await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /maximum-scale=1/);
+    });
     await test.step('When I enter a PIN, the confirm step is fully above the keyboard too', async () => {
       await enterPin(page, '2468');
       await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'confirm');
