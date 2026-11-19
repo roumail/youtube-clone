@@ -68,8 +68,8 @@ test.describe('Feature: Open a video', () => {
     }
   });
 
-  test('Scenario: a video whose stored parts are gone shows an error instead of playing', async ({ page, pinSet, seedLibrary }) => {
-    await test.step('Given "tiny" is listed, but the browser has since deleted its stored video and audio', async () => {
+  test('Scenario: a video whose stored data is gone shows an error instead of playing', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given "tiny" is listed, but the browser has since deleted it from storage while the app was open', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
       await page.evaluate(() => new Promise((resolve, reject) => {
@@ -77,7 +77,7 @@ test.describe('Feature: Open a video', () => {
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
           const db = open.result;
-          const stores = [...db.objectStoreNames].filter((name) => name.startsWith('segment'));
+          const stores = [...db.objectStoreNames].filter((name) => name.startsWith('manifest'));
           const tx = db.transaction(stores, 'readwrite');
           for (const name of stores) tx.objectStore(name).clear();
           tx.oncomplete = () => { db.close(); resolve(); };
