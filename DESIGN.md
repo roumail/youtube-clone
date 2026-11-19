@@ -534,7 +534,7 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M8 – Seek** ✅ | `playback/seek` | **5** | M3. Released as a **minor** version. |
 | **M7 – Series** | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
 | **M9 – iPhone** ✅ | `devices/iphone` | **4** (each in portrait and landscape) | M2–M4. Released as a **patch** version (fixes the PIN prompt behind the keyboard). |
-| **M10 – Search** | `library/search` | **8** | M2–M4. Released as a **minor** version. |
+| **M10 – Search** ✅ | `library/search` | **8** | M2–M4. Released as a **minor** version. |
 | **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
 | | | **67 in total** | |
 
