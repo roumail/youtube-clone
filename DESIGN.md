@@ -361,7 +361,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 **No test hooks in the app.** Tests use only browser-level techniques:
 - Media Session handlers are captured by an init script that wraps `navigator.mediaSession.setActionHandler`.
 - Visibility is simulated by overriding `document.visibilityState`.
-- The iPhone's on-screen keyboard is modelled by an init script (`onScreenKeyboard` in `e2e/support.js`): while a text field has focus, `window.visualViewport` is shorter by the keyboard's height (300 px in portrait, 200 px in landscape), as iPhone Safari reports it, and fires `resize`.
+- The iPhone's on-screen keyboard is modelled by an init script (`onScreenKeyboard` in `e2e/support.js`): while a text field has focus, `window.visualViewport` is shorter by the keyboard's height (300 px in portrait, 200 px in landscape), as iPhone Safari reports it, and fires `resize`. Like the real keyboard, it slides away about 300 ms after the field loses focus, so a tap on OK lands before the layout changes.
 
 **Drafted-but-not-built specs** are marked `test.fixme`. They show as skipped in the report and are switched on in the milestone that implements them, so CI stays green on what exists.
 

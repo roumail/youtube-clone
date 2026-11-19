@@ -156,7 +156,7 @@ export async function setVisibility(page, state) {
 
 // Model the iPhone's on-screen keyboard (DESIGN.md §7): while a text field has
 // focus, window.visualViewport is shorter by the keyboard's height, as iPhone
-// Safari reports it. The page itself doesn't move. Call before goto().
+// Safari reports it; it closes ≈300 ms after the field loses focus. The page itself doesn't move. Call before goto().
 export async function onScreenKeyboard(page) {
   await page.addInitScript(() => {
     const fake = new EventTarget();
@@ -175,7 +175,11 @@ export async function onScreenKeyboard(page) {
     const typing = (el) => el instanceof HTMLInputElement && !['range', 'file', 'checkbox', 'radio', 'button', 'submit'].includes(el.type);
     const set = (h) => { if (h !== keyboard) { keyboard = h; fake.dispatchEvent(new Event('resize')); } };
     document.addEventListener('focusin', (e) => { if (typing(e.target)) set(keyboardHeight()); });
-    document.addEventListener('focusout', (e) => { if (typing(e.target)) set(0); });
+    // Like the real keyboard, it slides away after the tap that took focus
+    // away has landed (≈300 ms), not in the middle of it.
+    document.addEventListener('focusout', (e) => {
+      if (typing(e.target)) setTimeout(() => { if (!typing(document.activeElement)) set(0); }, 300);
+    });
     window.addEventListener('resize', () => fake.dispatchEvent(new Event('resize')));
   });
 }
