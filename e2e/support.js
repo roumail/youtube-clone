@@ -3,6 +3,7 @@
 import { test as base, expect } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { readFileSync, statSync } from 'node:fs';
 
 export { expect };
 
@@ -173,6 +174,27 @@ export async function setVisibility(page, state) {
 // Model the iPhone's on-screen keyboard (DESIGN.md §7): while a text field has
 // focus, window.visualViewport is shorter by the keyboard's height, as iPhone
 // Safari reports it; it closes ≈300 ms after the field loses focus. The page itself doesn't move. Call before goto().
+// The device's storage as the browser reports it (navigator.storage.estimate):
+// `free` bytes left for the app. Call before the app loads.
+export async function freeSpace(page, free) {
+  await page.addInitScript((bytes) => {
+    Object.defineProperty(navigator.storage, 'estimate', {
+      configurable: true,
+      value: async () => ({ usage: 0, quota: bytes }),
+    });
+  }, free);
+}
+
+// Shaka's own size guess for a fixture: declared bitrates x duration.
+export function declaredSize(name) {
+  const mpd = readFileSync(path.join(FIXTURES_DIR, name, `${name}.mpd`), 'utf8');
+  const seconds = Number(/mediaPresentationDuration="PT([\d.]+)S"/.exec(mpd)[1]);
+  const bitrate = [...mpd.matchAll(/bandwidth="(\d+)"/g)].reduce((sum, m) => sum + Number(m[1]), 0);
+  return (bitrate * seconds) / 8;
+}
+
+export const containerSize = (name) => statSync(fixtureContainer(name)).size;
+
 export async function onScreenKeyboard(page) {
   await page.addInitScript(() => {
     const fake = new EventTarget();

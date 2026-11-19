@@ -16,6 +16,21 @@ async function withStorage(fn) {
 
 const isUsable = (c) => c.size > 0 && !c.isIncomplete;
 
+const sizeText = (bytes) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${(bytes / 1e6).toFixed(1)} MB`);
+
+// Space is checked against the video's real size (its parts). Shaka's own check
+// guesses the size from the manifest's peak bitrate, which for films is several
+// times too big, and refuses videos that would fit.
+async function checkSpace(title, files) {
+  const estimate = await navigator.storage?.estimate?.().catch(() => null);
+  if (!estimate?.quota) return;
+  const needed = files.reduce((sum, f) => sum + f.size, 0);
+  const free = Math.max(0, estimate.quota - (estimate.usage ?? 0));
+  if (needed > free) {
+    throw new Error(`not enough space on this device ("${title}" needs ${sizeText(needed)}, ${sizeText(free)} is free)`);
+  }
+}
+
 /** Stored videos that can actually be played, as Shaka StoredContent. */
 export async function listVideos() {
   if (!shaka.offline.Storage.support()) return [];
@@ -61,12 +76,14 @@ export async function importVideo(picked, onProgress) {
   if (existing.some((c) => (c.appMetadata?.title ?? '').toLocaleLowerCase() === title.toLocaleLowerCase())) {
     throw new Error(`"${title}" is already in the library`);
   }
+  await checkSpace(title, files);
   const uri = registerPickedFiles(files);
   const posterUrl = await fileToDataUrl(poster);
   return withStorage(async (storage) => {
     storage.configure({
       offline: {
         trackSelectionCallback: pickSingleVariant,
+        downloadSizeCallback: async () => true, // checked by checkSpace, with the real size
         progressCallback: (_content, progress) => onProgress?.(progress),
       },
     });
