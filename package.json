@@ -11,6 +11,7 @@
   "devDependencies": {
     "@playwright/test": "1.65.1",
     "eslint": "10.15.0",
-    "eslint-plugin-playwright": "2.12.2"
+    "eslint-plugin-playwright": "2.12.2",
+    "monocart-coverage-reports": "3.2.0"
   }
 }

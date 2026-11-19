@@ -3,6 +3,7 @@
 import { test as base, expect } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { COVERAGE, coverageReport } from './coverage.js';
 import { readFileSync, statSync } from 'node:fs';
 
 export { expect };
@@ -32,7 +33,10 @@ export const test = base.extend({
   // "play" as if from headphones / lock screen. No hooks needed in the app.
   // Every test sees a wide-gamut (P3) screen, like the family's MacBook and
   // iPad. Shaka changes its track choices on such screens.
-  page: async ({ page, features }, use) => {
+  page: async ({ page, features, browserName }, use) => {
+    // Coverage of app/ (CI sets COVERAGE): Chromium only, whole test incl. reloads.
+    const collect = COVERAGE && browserName === 'chromium';
+    if (collect) await page.coverage.startJSCoverage({ resetOnNavigation: false });
     if (features) {
       await page.addInitScript((f) => {
         try {
@@ -67,6 +71,7 @@ export const test = base.extend({
     });
     page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
     await use(page);
+    if (collect) await coverageReport().add(await page.coverage.stopJSCoverage());
     expect(problems, 'CSP violations / uncaught page errors').toEqual([]);
   },
 

@@ -6,3 +6,4 @@ test-results/
 tools/bin/
 prepared/
 .env
+coverage-report/
