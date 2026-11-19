@@ -141,7 +141,13 @@ e2e/                                ✅ specs (section 7)
   - `run_prepare.sh --series "Name"` produces these titles and files them under `Kids Library/Name/` in Drive.
   - The app reads series, season and episode **from the title when listing** (`parseTitle` in `library.js`). No extra stored data is needed, so nothing has to be re-imported later.
   - **Now:** the library lists a series' episodes together, in season/episode order (E10 after E02); everything else is alphabetical, with a series sorting by its name.
-  - **Later (its own feature, with scenarios first):** a series screen with one tile per series, then its episodes. Never autoplay the next episode.
+  - **Series screen (drafted 2026-11-19, M7, not built):**
+    - the library shows **one tile per series** (series name, "N episodes", poster of its first episode) next to standalone videos;
+    - tapping it opens `#/series/<name>`, listing the episodes in season/episode order;
+    - an episode opens paused (play still needs the PIN), and **back returns to the series list**;
+    - **never** autoplay the next episode.
+
+    Scenarios: `e2e/features/library/series.spec.js`.
 - Library grid only: no search, categories, or recommendations.
 - The app never fetches video content from the internet.
 
@@ -172,6 +178,12 @@ e2e/                                ✅ specs (section 7)
 - **"Add video"** button, behind the PIN. A short note on the library screen says what to pick: the video's `.kidsvideo` file. After the correct PIN, the file picker opens straight away, within the same tap on "OK".
   - **iPad risk to check (Appendix A, item 2):** Safari may refuse to open the picker after the asynchronous PIN check. If it does, the fallback is a second "Choose files" tap. That would change the add-video scenario, so it goes back to the owner first.
 - Pick **the video's `.kidsvideo` file** (one tap). Anything else (e.g. loose parts) is refused, with a message saying to pick the `.kidsvideo`.
+- **Several at once (drafted 2026-11-19, M7, not built):**
+  - pick several `.kidsvideo` files together (e.g. a whole season); they're imported **one after another**, and progress says "Adding 2 of 5: <title>";
+  - a bad file doesn't stop the rest, and the summary names what failed;
+  - anything that isn't a `.kidsvideo` is refused by name, and the rest are still added.
+
+  Scenarios: `e2e/features/library/add-several.spec.js`.
   - The app reads the container's tar headers and hands each part to Shaka as a **lazy slice** of the picked file, so nothing is copied or unpacked. The 4 parts are checked as before.
 - The app:
   - registers the picked files under the `local:` scheme;
@@ -325,6 +337,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 - Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`.
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
+- **Proposed for series (M7, not built yet):** `series-item` (library tile, with `data-series`), route `#/series/<name>`, `screen-series`, `episode-item`.
 - **Proposed for optional features (not built yet):** `feature-toggle-<id>` (Settings checkbox), `budget-prompt`, `budget-option-<minutes>`, `session-time` (with `data-seconds`), `session-remaining`, `clock`, `end-session-button`, and the player state `time-up`.
 - `back-button` exists on both the player and settings screens, so tests scope it by screen, e.g. `getByTestId('screen-settings').getByTestId('back-button')`.
 
@@ -364,6 +377,8 @@ e2e/
     library/browse                  Feature: Browse the library (empty, several videos, reload, series order)
     library/add-video               Feature: Add a video (PIN, one .kidsvideo, second video, wrong PIN, loose parts refused, missing part, unplayable, @ipad picker timing)
     library/remove-video            Feature: Remove a video
+    library/add-several             Feature: Add several videos in one go (drafted, fixme)
+    library/series                  Feature: Series (tile per series, ordered episodes; drafted, fixme)
     playback/open-video             Feature: Open a video (same app, never a new tab; paused at 0:00; locked-down <video>)
     playback/play-requires-pin      Feature: Playing needs the PIN (correct, wrong, cancel)
     playback/pause-and-resume       Feature: Pause and resume (pause never shows a PIN window; resume needs it; resumes in place)
@@ -490,6 +505,7 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M3 – Player + PIN gate** ✅ | `playback/open-video`, `playback/play-requires-pin`, `playback/pause-and-resume`, `playback/multiple-videos`, `playback/no-autoplay`, `parental-controls/no-way-around-the-pin` | 3 + 3 + 3 + 3 + 1 + 3 = **16** | M2 (videos must be in the library) |
 | **M4 – First run, lockout, settings, offline** ✅ | `first-run/set-pin`, `parental-controls/pin-lockout`, `settings/settings`, `offline/offline` | 3 + 2 + 2 + 1 = **8** | M2, M3. Also adds `manifest.webmanifest`, icons, `sw.js` (network-first) and the startup `persist()` call |
 | **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
+| **M7 – Series** | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
 | **M6 – Optional features + watch-time limit** | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
 | | | **34 in total** (M2 done: 10) | |
 
