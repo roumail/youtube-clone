@@ -267,6 +267,21 @@ function showPosition() {
   $('time-elapsed').textContent = clock(dragging ? Number(bar.value) : v.currentTime);
   $('time-total').textContent = clock(total);
 }
+// Phones: the on-screen keyboard covers part of the screen, and Safari doesn't
+// shrink full-screen layers for it. Keep the PIN prompt inside the area that is
+// still visible, so the field and buttons stay above the keyboard (DESIGN.md §1).
+function initVisibleArea() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const root = document.documentElement.style;
+  const apply = () => {
+    root.setProperty('--visible-top', `${vv.offsetTop}px`);
+    root.setProperty('--visible-height', `${vv.height}px`);
+  };
+  vv.addEventListener('resize', apply);
+  vv.addEventListener('scroll', apply);
+  apply();
+}
 function initSeek() {
   const v = $('player-video');
   const bar = $('seek-bar');
@@ -387,6 +402,7 @@ async function boot() {
 
   initPlayer($('player-video'), update);
   initSeek();
+  initVisibleArea();
   // Leaving the app (switching apps, locking the screen) pauses; coming back
   // needs the PIN again.
   document.addEventListener('visibilitychange', () => {
