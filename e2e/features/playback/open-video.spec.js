@@ -48,4 +48,23 @@ test.describe('Feature: Open a video', () => {
       });
     });
   });
+
+  test('Scenario: the player fills the whole screen, in landscape and portrait', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given "tiny" is open', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('tiny');
+      await openVideo(page, 'tiny');
+    });
+    for (const [orientation, size] of [['landscape', { width: 1180, height: 820 }], ['portrait', { width: 820, height: 1180 }]]) {
+      await test.step(`Then in ${orientation} the video area covers the full screen, with the controls on it`, async () => {
+        await page.setViewportSize(size);
+        const box = await page.getByTestId('player-video').boundingBox();
+        expect(box).toEqual({ x: 0, y: 0, width: size.width, height: size.height });
+        for (const id of ['play-button', 'back-button']) {
+          const button = page.getByTestId('screen-player').getByTestId(id);
+          await expect(button).toBeInViewport();
+        }
+      });
+    }
+  });
 });
