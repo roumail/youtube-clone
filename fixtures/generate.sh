@@ -12,7 +12,7 @@ OUT="$HERE/out"
 RAW="$OUT/raw"
 FFMPEG="${FFMPEG:-ffmpeg}"
 
-"$FFMPEG" -hide_banner -version | head -1
+"$FFMPEG" -hide_banner -version | sed -n 1p
 rm -rf "$OUT"
 mkdir -p "$RAW"
 
