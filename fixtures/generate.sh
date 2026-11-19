@@ -48,7 +48,16 @@ make_episode_like episode-like 10
 make_raw medium 60
 make_raw broken-missing-audio 3
 
-for name in tiny medium broken-missing-audio episode-like; do
+# "long": 1 hour 5 seconds, for times with hours. A tiny picture at one frame
+# per second and silent audio keep it small.
+"$FFMPEG" -hide_banner -loglevel error -y \
+  -f lavfi -i "testsrc=size=160x90:rate=1:duration=3605" \
+  -f lavfi -i "anullsrc=channel_layout=mono:sample_rate=48000" \
+  -vf "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=range=tv:color_primaries=bt709:color_trc=bt709:colorspace=bt709" \
+  -c:v libx264 -profile:v main -g 10 -c:a aac -b:a 16k -t 3605 \
+  "$RAW/long.mp4"
+
+for name in tiny medium broken-missing-audio episode-like long; do
   "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 
