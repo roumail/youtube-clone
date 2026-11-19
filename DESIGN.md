@@ -186,6 +186,8 @@ e2e/                                ✅ specs (section 7)
   - then runs Shaka Packager in **on-demand profile**, which writes one file per track plus the manifest, so there are no thousands of tiny files.
 - Videos already prepared (a `<Title>.kidsvideo` exists) are skipped. Nothing is processed twice.
 
+**Getting the files to the iPad/iPhone:** through Google Drive (the Files app's Drive location), or, more reliably, from the Mac over home Wi-Fi: `tools/share_library.sh` keeps a local copy of the library in a shared folder, and the device connects to it once in Files (Connect to Server). Usage: `tools/README.md`.
+
 **Step 2, on any device:**
 - **"Add video"** button, behind the PIN. A short note on the library screen says what to pick: the video's `.kidsvideo` file. After the correct PIN, the file picker opens straight away, within the same tap on "OK".
   - **iPad risk to check (Appendix A, item 2):** Safari may refuse to open the picker after the asynchronous PIN check. If it does, the fallback is a second "Choose files" tap. That would change the add-video scenario, so it goes back to the owner first.
@@ -559,7 +561,7 @@ Also run it on the **iPhone**, in portrait and landscape, plus: every PIN prompt
 Run on the real iPad, in the app **installed from the home screen**, after each milestone that changes behaviour (and fully at M5). The Mac equivalent runs in CI.
 
 1. **Install / update:** open the site in Safari → Share → Add to Home Screen. After a deploy, open the app online, close it and reopen it; the new version shows.
-2. **Add a video:** "Add video" → PIN → Files → Google Drive → Kids Library → tap the video's **`.kidsvideo`** file. Progress shows; the video appears with its title and poster. Keep the app open while it stores.
+2. **Add a video:** "Add video" → PIN → Files → the Mac's shared Kids Library (or Google Drive → Kids Library) → tap the video's **`.kidsvideo`** file (or several). Progress shows; the video appears with its title and poster. Keep the app open while it stores.
 3. **Play / pause / resume:** play asks for the PIN; pause is instant with no PIN; resume asks for the PIN again and continues where it stopped.
 4. **No autoplay:** at the end of a video nothing else starts.
 5. **Loopholes:** while paused, press play from the lock screen, Control Center and headphones → it stays paused (or shows the PIN prompt). Switch apps while playing → it pauses; coming back needs the PIN.

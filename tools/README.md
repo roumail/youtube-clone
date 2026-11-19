@@ -150,6 +150,29 @@ Kids Library/
 Batch titles come from the file names, tidied: dots/underscores become spaces and release tags are cut (`Frozen.2.2019.1080p.BluRay.x264-GRP` → `Frozen 2 2019`). For nicer titles in a batch, rename the
 files first, or prepare those one at a time with `--title`.
 
+## `tools/share_library.sh` — get videos to the iPad over home Wi-Fi
+
+The iPad's Files ↔ Google Drive link can be unreliable (sign-in prompts, taps
+that open the Drive app). Instead, the Mac shares a local copy of the library
+on the home network, and the iPad picks files from it directly.
+
+```bash
+tools/share_library.sh --setup   # once: share the folder (admin password), turn on File Sharing
+tools/share_library.sh           # after preparing videos: copy new ones, remove deleted ones
+tools/share_library.sh --dry-run # show what would change
+```
+
+- It copies only `.kidsvideo` files from `KIDS_LIBRARY` into `SHARE_DIR`
+  (default `~/Kids Library Share`), keeping series folders. The copy uses the
+  disk space once more; files only in the cloud are downloaded first.
+- Optional in `.env`: `SHARE_DIR`, `SHARE_NAME` (the name the iPad sees,
+  default "Kids Library").
+- **On the iPad, once:** Files → ⋯ (top of the sidebar) → **Connect to Server**
+  → `smb://<your-mac>.local` (the script prints the exact address) → Registered
+  User, your Mac user name and password. The Mac then shows under **Shared**.
+- **Adding a video:** in the app, Add video → PIN → the Mac (under Shared) →
+  Kids Library → pick the file(s). The Mac must be awake and on the same Wi-Fi.
+
 ## Commit hygiene (once per clone)
 ```bash
 git config core.hooksPath tools/hooks
