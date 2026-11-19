@@ -58,7 +58,7 @@ function byLibraryOrder(a, b) {
   const byName = key(pa).localeCompare(key(pb));
   if (byName !== 0) return byName;
   if (pa.series && pb.series) return pa.season - pb.season || pa.episode - pb.episode;
-  return pa.series ? 1 : pb.series ? -1 : 0;
+  return pa.series ? 1 : -1;
 }
 
 /**
@@ -73,7 +73,7 @@ export async function importVideo(picked, onProgress) {
   // No duplicates: a title already in the library is refused before anything
   // is stored (owner decision 2026-11-19).
   const existing = await listVideos();
-  if (existing.some((c) => (c.appMetadata?.title ?? '').toLocaleLowerCase() === title.toLocaleLowerCase())) {
+  if (existing.some((c) => c.appMetadata.title.toLocaleLowerCase() === title.toLocaleLowerCase())) {
     throw new Error(`"${title}" is already in the library`);
   }
   await checkSpace(title, files);
@@ -94,7 +94,7 @@ export async function importVideo(picked, onProgress) {
       await removeLeftovers(storage, uri);
       throw e;
     }
-    const kept = (stored.tracks ?? []).filter((t) => t.type === 'variant').length;
+    const kept = stored.tracks.filter((t) => t.type === 'variant').length;
     if (!kept || !stored.size) {
       await storage.remove(stored.offlineUri);
       throw new Error(`"${title}" can't be played on this device (no playable tracks).`);

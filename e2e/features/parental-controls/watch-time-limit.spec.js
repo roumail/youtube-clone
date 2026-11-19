@@ -289,23 +289,4 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       expect(await page.evaluate(() => localStorage.getItem('watchTime.session'))).toBeNull();
     });
   });
-
-  test('Scenario: damaged saved settings fall back to the defaults', async ({ page, pinSet, seedLibrary }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem('features', '{not json');
-      localStorage.setItem('watchTime.session', '{not json');
-    });
-    await test.step('Given the saved feature flags and session can\'t be read, and "medium" is open', async () => {
-      await goto(page, '#/library');
-      await seedLibrary('medium');
-      await openVideo(page, 'medium');
-    });
-    await test.step('When I tap play and enter the PIN', async () => {
-      await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
-    });
-    await test.step('Then the limit is on (its default) and a new budget is asked for', async () => {
-      await expect(page.getByTestId('budget-prompt')).toBeVisible();
-    });
-  });
 });

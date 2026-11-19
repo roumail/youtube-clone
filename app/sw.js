@@ -26,7 +26,6 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const { request } = e;
-  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
   e.respondWith((async () => {
     try {
       const fresh = await fetch(request, { cache: 'no-cache' });

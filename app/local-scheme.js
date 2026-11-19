@@ -92,37 +92,25 @@ export function registerPickedFiles(files) {
 }
 
 function plugin(uri, request) {
-  const { Error: ShakaError, AbortableOperation } = shaka.util;
-  const name = decodeURIComponent(uri.startsWith(HOST) ? uri.slice(HOST.length) : uri.split('/').pop());
-  const file = picked.get(name);
-  if (!file) {
-    return AbortableOperation.failed(new ShakaError(
-      ShakaError.Severity.CRITICAL, ShakaError.Category.NETWORK, ShakaError.Code.BAD_HTTP_STATUS,
-      uri, 404, `not among picked files: ${name}`, {}, request.type ?? null, uri,
-    ));
-  }
+  const file = picked.get(decodeURIComponent(uri.slice(HOST.length)));
   const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers?.Range ?? request.headers?.range ?? '');
   const part = range ? file.slice(Number(range[1]), range[2] ? Number(range[2]) + 1 : undefined) : file;
   const op = part.arrayBuffer().then((data) => ({
     uri, originalUri: uri, data, headers: {}, status: range ? 206 : 200, fromCache: false,
   }));
-  return AbortableOperation.notAbortable(op);
+  return shaka.util.AbortableOperation.notAbortable(op);
 }
 
-let registered = false;
 export function installLocalScheme() {
-  if (registered) return;
   shaka.net.NetworkingEngine.registerScheme('local', plugin,
     shaka.net.NetworkingEngine.PluginPriority.APPLICATION);
-  registered = true;
 }
 
 /** Read a picked image as a data: URL (stored in appMetadata.poster). */
 export function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
     r.readAsDataURL(file);
   });
 }

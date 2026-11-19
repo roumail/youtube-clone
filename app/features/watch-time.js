@@ -9,9 +9,7 @@ const CUSTOM_KEY = 'watchTime.lastCustom';
 const CUSTOM_MIN = 5;
 const CUSTOM_MAX = 180;
 
-const read = () => {
-  try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; }
-};
+const read = () => JSON.parse(localStorage.getItem(KEY));
 const write = (s) => localStorage.setItem(KEY, JSON.stringify(s));
 const pad = (n) => String(n).padStart(2, '0');
 const mmss = (sec) => `${pad(Math.floor(sec / 60))}:${pad(Math.floor(sec % 60))}`;

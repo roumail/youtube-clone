@@ -61,7 +61,7 @@ function tile(testid, poster, ...texts) {
   li.dataset.testid = testid;
   li.tabIndex = 0;
   const img = document.createElement('img');
-  img.src = poster ?? '';
+  img.src = poster;
   img.alt = '';
   li.append(img);
   for (const [i, text] of texts.entries()) {
@@ -80,7 +80,7 @@ function openFrom(c, from) {
 }
 
 function videoTile(c) {
-  const li = tile('library-item', c.appMetadata?.poster, c.appMetadata?.title ?? 'Untitled');
+  const li = tile('library-item', c.appMetadata.poster, c.appMetadata.title);
   li.dataset.videoId = c.offlineUri;
   li.addEventListener('click', () => openFrom(c, '#/library'));
   return li;
@@ -125,7 +125,7 @@ function settingsRow(c) {
   const li = document.createElement('li');
   li.dataset.testid = 'settings-video-item';
   const title = document.createElement('span');
-  title.textContent = c.appMetadata?.title ?? 'Untitled';
+  title.textContent = c.appMetadata.title;
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.dataset.testid = 'remove-video-button';
@@ -143,7 +143,7 @@ function render(s) {
   $('screen-library').dataset.state = s.library.length ? 'ready' : 'empty';
   const query = s.search.trim().toLowerCase();
   const shown = query
-    ? s.library.filter((c) => (c.appMetadata?.title ?? '').toLowerCase().includes(query))
+    ? s.library.filter((c) => c.appMetadata.title.toLowerCase().includes(query))
     : s.library;
   // While searching, matching episodes are listed one by one.
   document.querySelector('[data-role="library-grid"]').replaceChildren(
@@ -209,7 +209,7 @@ function render(s) {
     $('pin-prompt').querySelector('[data-role="pin-title"]').textContent = prompt.title;
     show('pin-cancel', prompt.cancellable);
     show('pin-error', !!prompt.error);
-    $('pin-error').textContent = prompt.error ?? '';
+    $('pin-error').textContent = prompt.error;
     $('pin-submit').disabled = prompt.status === 'locked-out';
     $('pin-input').disabled = prompt.status === 'locked-out';
   }
@@ -239,7 +239,6 @@ function askPin(purpose) {
 async function onPinSubmit(event) {
   event.preventDefault();
   const prompt = state.prompt;
-  if (!prompt) return;
   const input = $('pin-input');
   const value = input.value;
   input.value = '';
@@ -498,7 +497,7 @@ async function importSeveral(files) {
       });
       added += 1;
     } catch (e) {
-      failed.push(`${name} (${e.message ?? e})`);
+      failed.push(`${name} (${e.message})`);
     }
     await refreshLibrary();
     update();
@@ -546,7 +545,7 @@ async function onFilesPicked(event) {
     });
     state.importStatus = { phase: 'done', progress: 1, message: `Added "${stored.appMetadata.title}".` };
   } catch (e) {
-    state.importStatus = { phase: 'error', progress: 0, message: `Couldn't add the video: ${e.message ?? e}` };
+    state.importStatus = { phase: 'error', progress: 0, message: `Couldn't add the video: ${e.message}` };
   }
   await refreshLibrary();
   update();
@@ -633,9 +632,9 @@ async function boot() {
   }
 
   // Offline + installable: cache the app shell (network-first, sw.js).
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js');
   // One user, no UI: just ask the browser to keep the library.
-  navigator.storage?.persist?.().catch(() => {});
+  navigator.storage.persist();
 
   state.features = await loadEnabled(featureContext());
 

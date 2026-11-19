@@ -13,13 +13,7 @@ const defaults = () => Object.fromEntries(FEATURES.map((f) => [f.id, !!f.default
 
 /** Every feature's on/off: the stored choice, else the feature's default. */
 export function flags() {
-  let stored = {};
-  try {
-    stored = JSON.parse(localStorage.getItem(FLAGS_KEY)) ?? {};
-  } catch {
-    // unreadable: fall back to the defaults
-  }
-  return { ...defaults(), ...stored };
+  return { ...defaults(), ...JSON.parse(localStorage.getItem(FLAGS_KEY)) };
 }
 
 export function setFlag(id, on) {
