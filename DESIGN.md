@@ -198,7 +198,7 @@ e2e/                                ✅ specs (section 7)
 - iPad note: when you pick from Google Drive, the iPad downloads the files to a temporary location first. So it briefly needs about 2× the video's size free.
 
 ## 5. Parental controls & playback rules (~10%)
-- **Custom controls only.** Shaka is used without its UI layer. The `<video>` element has no `controls` attribute and is never put into native fullscreen (`playsinline`, and no `webkitEnterFullscreen`), because the native controls would bypass the PIN. The app's own full-screen layout is done in CSS.
+- **Custom controls only.** Shaka is used without its UI layer. The `<video>` element has no `controls` attribute and is never put into native fullscreen (`playsinline`, and no `webkitEnterFullscreen`), because the native controls would bypass the PIN. The app's own full-screen layout is done in CSS: the player covers the whole screen (letterboxed with `object-fit: contain`, in landscape and portrait), with Back / Play / Pause floating over it, clear of the safe areas. A scenario checks the video area equals the viewport at iPad landscape and portrait sizes. Fixed in v2.0.0; before that the video was capped at 70% of the height.
 - Opening a video shows it **paused** on the first frame.
 - **Pause:** free, no code.
 - **Play / resume:** always asks for the PIN, every time.
