@@ -94,7 +94,6 @@ function seriesTile(name, episodes) {
   return li;
 }
 
-const pad2 = (n) => String(n).padStart(2, '0');
 
 function episodeTile(c, hash) {
   const p = parseTitle(c.appMetadata?.title);
