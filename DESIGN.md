@@ -43,6 +43,7 @@ A native iPad app runs into Apple's signing paywall. A free Apple ID install sto
 - **iPhone (supported since owner decision 2026-11-19):** installed the same way as on the iPad, with its own storage. Everything said about the iPad below applies to it too. What's different is the small screen, in portrait and landscape:
   - **The on-screen keyboard covers about half the screen** (less of it in portrait, most of it in landscape). Safari doesn't shrink full-screen layers for it, so a centred PIN prompt ended up behind the keyboard and the page had to be scrolled to type the PIN (seen on v2.1.0). Rule: **the PIN prompt follows the part of the screen the keyboard leaves visible** (`window.visualViewport`), so its field, message and buttons are always above the keyboard and the page never scrolls. On short screens (phone landscape) the prompt is compact, with the title, field and buttons on one row.
   - Screens fit the phone's width, with no sideways scrolling.
+  - **The page never zooms by itself** (seen on v2.7.0 in the home-screen app: the first-run PIN prompt came up zoomed in and cut off at both sides, and had to be pinched back out). Rule: the viewport is fixed at scale 1 (`maximum-scale=1`, which stops iOS zooming into a focused field; pinch-to-zoom stays available, iOS keeps it for accessibility), and the PIN card is never wider than the screen.
 - **Works offline:** a service worker caches the app's code, so the URL only has to be reachable to install and update.
 
 ### Hosting
@@ -581,7 +582,7 @@ Closed on 2026-11-18:
 - **Release management:** see section 7, "Releases".
 
 ## Appendix A – iPad manual checklist
-Also run it on the **iPhone**, in portrait and landscape, plus: every PIN prompt (first run, Play, Settings, a wrong PIN) is fully above the keyboard without scrolling.
+Also run it on the **iPhone**, in portrait and landscape, plus: every PIN prompt (first run, Play, Settings, a wrong PIN) is fully above the keyboard without scrolling, and the page never zooms in when a field is tapped.
 Run on the real iPad, in the app **installed from the home screen**, after each milestone that changes behaviour (and fully at M5). The Mac equivalent runs in CI.
 
 1. **Install / update:** open the site in Safari → Share → Add to Home Screen. After a deploy, open the app online, close it and reopen it; the new version shows.
