@@ -53,7 +53,7 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test.fixme('Scenario: opening the app at its plain address shows the library', async ({ page, pinSet }) => {
+  test('Scenario: opening the app at its plain address shows the library', async ({ page, pinSet }) => {
     await test.step('When I open the app with no route (the home-screen icon, the bare URL)', async () => {
       await goto(page, '');
     });
@@ -62,9 +62,9 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test.fixme('Scenario: the library shows the released version', async ({ page, pinSet }) => {
+  test('Scenario: the library shows the released version', async ({ page, context, pinSet }) => {
     await test.step('Given the site runs release "v2.7.2"', async () => {
-      await page.route('**/version.json', (route) => route.fulfill({ json: { version: 'v2.7.2', commit: '0123abc' } }));
+      await context.route('**/version.json', (route) => route.fulfill({ json: { version: 'v2.7.2', commit: '0123abc' } }));
     });
     await test.step('When I open the library', async () => {
       await goto(page, '#/library');

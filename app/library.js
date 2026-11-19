@@ -16,7 +16,7 @@ async function withStorage(fn) {
 
 const isUsable = (c) => c.size > 0 && !c.isIncomplete;
 
-const sizeText = (bytes) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${(bytes / 1e6).toFixed(1)} MB`);
+const sizeText = (bytes) => `${(bytes / 1e6).toFixed(1)} MB`;
 
 // Space is checked against the video's real size (its parts). Shaka's own check
 // guesses the size from the manifest's peak bitrate, which for films is several
