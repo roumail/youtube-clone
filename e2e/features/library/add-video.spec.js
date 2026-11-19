@@ -1,9 +1,9 @@
-// Feature: Add a video — behind the PIN; pick one prepared folder's 4 files.
+// Feature: Add a video — behind the PIN; pick the video's one .kidsvideo file.
 // The title is the .mpd file name.
-import { test, expect, goto, enterPin, fixtureFiles, fixtureContainer, PIN, WRONG_PIN } from '../../support.js';
+import { test, expect, goto, enterPin, fixtureContainer, fixtureParts, PIN, WRONG_PIN } from '../../support.js';
 
 test.describe('Feature: Add a video', () => {
-  test('Scenario: PIN, pick the 4 files, it appears in the library', async ({ page, pinSet }) => {
+  test('Scenario: PIN, pick the .kidsvideo, it appears in the library', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
@@ -15,9 +15,9 @@ test.describe('Feature: Add a video', () => {
       await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'verify');
     });
     const chooser = page.waitForEvent('filechooser');
-    await test.step('When I enter the PIN and pick the 4 files of "tiny"', async () => {
+    await test.step('When I enter the PIN and pick "tiny.kidsvideo"', async () => {
       await enterPin(page, PIN);
-      await (await chooser).setFiles(fixtureFiles('tiny'));
+      await (await chooser).setFiles([fixtureContainer('tiny')]);
     });
     await test.step('Then the import completes and "tiny" is listed', async () => {
       await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
@@ -34,7 +34,7 @@ test.describe('Feature: Add a video', () => {
     await test.step('When I add "episode-like"', async () => {
       await page.getByTestId('add-video-button').click();
       await enterPin(page, PIN);
-      await (await chooser).setFiles(fixtureFiles('episode-like'));
+      await (await chooser).setFiles([fixtureContainer('episode-like')]);
       await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
     });
     await test.step('Then both are listed', async () => {
@@ -58,18 +58,19 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  test('Scenario: a folder with a missing file is rejected', async ({ page, pinSet }) => {
+  test('Scenario: loose parts instead of the .kidsvideo file are refused', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
     });
     const chooser = page.waitForEvent('filechooser');
-    await test.step('When I add "broken-missing-audio" (no audio.mp4)', async () => {
+    await test.step('When I pick the 4 loose parts of "tiny" instead of its .kidsvideo', async () => {
       await page.getByTestId('add-video-button').click();
       await enterPin(page, PIN);
-      await (await chooser).setFiles(fixtureFiles('broken-missing-audio').filter((f) => !f.endsWith('audio.mp4')));
+      await (await chooser).setFiles(fixtureParts('tiny'));
     });
-    await test.step('Then the import reports an error and nothing is added', async () => {
+    await test.step('Then the import says to pick the .kidsvideo file, and nothing is added', async () => {
       await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'error');
+      await expect(page.getByTestId('import-status')).toContainText('.kidsvideo');
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
     });
   });
@@ -82,7 +83,7 @@ test.describe('Feature: Add a video', () => {
     await test.step('When I add "unplayable" (a codec no browser supports)', async () => {
       await page.getByTestId('add-video-button').click();
       await enterPin(page, PIN);
-      await (await chooser).setFiles(fixtureFiles('unplayable'));
+      await (await chooser).setFiles([fixtureContainer('unplayable')]);
     });
     await test.step('Then the import reports an error, not success', async () => {
       await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'error');
@@ -98,10 +99,10 @@ test.describe('Feature: Add a video', () => {
     await test.step('Given the library is shown', async () => {
       await goto(page, '#/library');
     });
-    await test.step('Then it says to pick the .kidsvideo file (or, for old folders, all 4 files)', async () => {
+    await test.step('Then it says to pick the .kidsvideo file', async () => {
       const help = page.getByTestId('import-help');
       await expect(help).toBeVisible();
-      for (const name of ['.kidsvideo', 'all 4 files']) {
+      for (const name of ['.kidsvideo']) {
         await expect(help).toContainText(name);
       }
     });
@@ -127,22 +128,6 @@ test.describe('Feature: Add a video', () => {
     });
     await test.step('Then the file picker opens straight away', async () => {
       await chooser;
-    });
-  });
-
-  test('Scenario: add a video by picking its single .kidsvideo file', async ({ page, pinSet }) => {
-    await test.step('Given the library is empty', async () => {
-      await goto(page, '#/library');
-    });
-    const chooser = page.waitForEvent('filechooser');
-    await test.step('When I add "tiny" by picking just "tiny.kidsvideo"', async () => {
-      await page.getByTestId('add-video-button').click();
-      await enterPin(page, PIN);
-      await (await chooser).setFiles([fixtureContainer('tiny')]);
-    });
-    await test.step('Then it is stored under its title and plays like any other video', async () => {
-      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
-      await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toBeVisible();
     });
   });
 

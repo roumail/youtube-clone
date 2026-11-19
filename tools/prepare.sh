@@ -31,7 +31,7 @@ FFPROBE="${FFPROBE:-ffprobe}"
 
 NAME="$(basename "$INPUT")"; TITLE="${NAME%.*}"
 DEST="$ROOT/$TITLE"
-if [[ -f "$ROOT/$TITLE.kidsvideo" || -f "$DEST/$TITLE.mpd" ]]; then echo "already prepared: $TITLE"; exit 0; fi
+if [[ -f "$ROOT/$TITLE.kidsvideo" ]]; then echo "already prepared: $TITLE"; exit 0; fi
 
 probe() { "$FFPROBE" -v error -select_streams "$1" -show_entries stream=codec_name -of csv=p=0 "$INPUT" | head -1; }
 
@@ -112,8 +112,7 @@ AT="$(awk -v d="$DUR" 'BEGIN { printf "%.2f", d * 0.1 }')"
 mkdir -p "$ROOT"
 mv "$WORK/out" "$DEST"
 # One file per video: "<Title>.kidsvideo" (the app adds it in a single pick).
-# PREPARE_KEEP_FOLDER=1 also keeps the loose folder (test fixtures use both).
 "$HERE/pack.sh" "$DEST" >/dev/null
-[[ "${PREPARE_KEEP_FOLDER:-0}" == 1 ]] || rm -rf "$DEST"
+rm -rf "$DEST"
 echo "prepared: $ROOT/$TITLE.kidsvideo"
 ls -lh "$ROOT/$TITLE.kidsvideo"

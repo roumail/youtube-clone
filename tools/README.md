@@ -11,8 +11,7 @@ Kids Library/
 
 A `.kidsvideo` is a plain, uncompressed `tar` of the 4 parts the app needs
 (`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). On the iPad you pick
-just that one file. Folders prepared before v1.1.0 still work, or convert them:
-`tools/pack.sh --remove-folder "<Kids Library>/Frozen 2"`.
+just that one file. It's the only format the app accepts.
 
 ## One-time setup
 
@@ -52,7 +51,7 @@ echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 | Option | Meaning |
 |---|---|
 | `INPUT...` | Video files and/or folders. Folders are searched recursively for `.mp4 .m4v .mov .mkv .webm .avi`. With no `INPUT`, paths are read from stdin, one per line (`ls *.mp4 \| run_prepare`). |
-| `--dest DIR` | Where prepared folders go. Default: `KIDS_LIBRARY` from the environment or `.env`. |
+| `--dest DIR` | Where the `.kidsvideo` files go. Default: `KIDS_LIBRARY` from the environment or `.env`. |
 | `--title "…"` | Clean title for a **single** file (instead of its file name). With `--series`, the episode title. |
 | `--series "Name"` | The inputs are episodes of a series (see below). |
 
@@ -135,14 +134,14 @@ Kids Library/
   into spaces and release tags (`1080p`, `WEB-DL`, `x264`, …) cut off:
   `Bluey.S01E03.Keepy.Uppy.1080p.WEB-DL.mkv` → `Bluey - S01E03 - Keepy Uppy`.
 - In the app, episodes of a series are listed together, in episode order.
-  On the iPad, pick the 4 files from inside the episode's folder, as usual.
+  On the iPad, pick the episode's `.kidsvideo` file.
 
 ### What it does
 - For each video, runs `tools/prepare.sh`, which:
   - picks the **English** audio track if there are several (otherwise the first);
   - re-encodes only when needed (not H.264 + AAC, or not MP4/MOV), otherwise
     just repackages, which is fast;
-  - writes the 4-file folder named after the title.
+  - writes one `<Title>.kidsvideo` file (via `tools/pack.sh`).
 - **Skips** videos already prepared in the destination, so re-running a batch
   is safe.
 - Keeps going if one video fails, and prints a summary at the end
@@ -164,7 +163,7 @@ over 2 MB. If `gitleaks` is installed (`brew install gitleaks`) it runs too.
   (default output: `./prepared`, gitignored). `run_prepare.sh` calls this.
 - `tools/get-packager.sh` — downloads the pinned Shaka Packager into
   `tools/bin/` (gitignored).
-- `node tools/real-episode-check.mjs "<prepared folder>"` — adds and plays a
+- `node tools/real-episode-check.mjs "<Kids Library>/<Title>.kidsvideo"` — adds and plays a
   prepared video in the live app, in your installed Chrome, with a throwaway
   profile and PIN (manual; needs `npm ci --ignore-scripts` once).
 

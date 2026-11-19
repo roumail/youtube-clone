@@ -8,8 +8,6 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PREPARE="$HERE/../tools/prepare.sh"
-# Fixtures need both forms: the .kidsvideo container and the loose folder.
-export PREPARE_KEEP_FOLDER=1
 OUT="$HERE/out"
 RAW="$OUT/raw"
 FFMPEG="${FFMPEG:-ffmpeg}"
@@ -53,11 +51,6 @@ make_raw broken-missing-audio 3
 for name in tiny medium broken-missing-audio episode-like; do
   "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
 done
-rm "$OUT/broken-missing-audio/audio.mp4"   # the "broken" part
-# ...and a container with the same part missing.
-rm "$OUT/broken-missing-audio.kidsvideo"
-COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/broken-missing-audio.kidsvideo" \
-  -C "$OUT/broken-missing-audio" broken-missing-audio.mpd poster.jpg video.mp4
 
 # Series episodes (DESIGN.md §3): titles "Series - SxxEyy - Episode". Prepared
 # from copies of "tiny" named like real episodes, out of order on purpose.
@@ -65,6 +58,18 @@ for ep in "Show - S01E10 - Tenth" "Show - S01E02 - Second" "Show - S01E01 - Firs
   cp "$RAW/tiny.mp4" "$RAW/$ep.mp4"
   "$PREPARE" "$RAW/$ep.mp4" "$OUT" >/dev/null
 done
+
+# Unpack every container into a same-named folder: tests that seed the library
+# directly (not through the picker) load the parts over HTTP. Test-only; the
+# real output is just the .kidsvideo file.
+for c in "$OUT"/*.kidsvideo; do
+  d="${c%.kidsvideo}"; mkdir -p "$d"; tar -xf "$c" -C "$d"
+done
+
+# A container with a part missing (no audio.mp4).
+rm "$OUT/broken-missing-audio.kidsvideo"
+COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/broken-missing-audio.kidsvideo" \
+  -C "$OUT/broken-missing-audio" broken-missing-audio.mpd poster.jpg video.mp4
 
 # Real episodes declare SDR colour (BT.709). Shaka marks such video hdr=SDR,
 # which its default offline track picker drops on P3 screens. Fixtures must
@@ -78,6 +83,8 @@ mv "$OUT/unplayable/tiny.mpd" "$OUT/unplayable/unplayable.mpd"
 sed -i.bak 's/codecs="avc1\.[0-9A-Fa-f]*"/codecs="xyz1.000000"/' "$OUT/unplayable/unplayable.mpd" && rm "$OUT/unplayable/unplayable.mpd.bak"
 grep -q 'codecs="xyz1.000000"' "$OUT/unplayable/unplayable.mpd" \
   || { echo "unplayable fixture: codec not replaced" >&2; exit 1; }
+COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/unplayable.kidsvideo" \
+  -C "$OUT/unplayable" unplayable.mpd poster.jpg audio.mp4 video.mp4
 
 grep -q 'lang="en"' "$OUT/episode-like/episode-like.mpd" \
   || { echo "prepare.sh did not pick the English audio track" >&2; exit 1; }
@@ -89,7 +96,7 @@ cp "$RAW/tiny.mp4" "$OUT/raw-h264.mp4"
 
 # Exercise the re-encode path of prepare.sh too.
 "$PREPARE" "$OUT/raw-vp9.webm" "$OUT/prepared-from-vp9" >/dev/null
-test -f "$OUT/prepared-from-vp9/raw-vp9/raw-vp9.mpd"
+test -f "$OUT/prepared-from-vp9/raw-vp9.kidsvideo"
 
 rm -rf "$RAW"
 echo "fixtures:"; find "$OUT" -type f | sort

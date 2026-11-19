@@ -52,7 +52,7 @@ function byLibraryOrder(a, b) {
  * behind: an entry that kept 0 tracks is removed.
  */
 export async function importVideo(picked, onProgress) {
-  // One .kidsvideo file, or (as before) the 4 loose files of one video.
+  // Exactly one .kidsvideo file per video.
   const files = await expandPick(picked);
   const { title, poster } = describePick(files);
   const uri = registerPickedFiles(files);

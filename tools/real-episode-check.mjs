@@ -3,7 +3,6 @@
 // the real display, e.g. a P3 MacBook screen) — the same flow as on the iPad.
 //
 //   node tools/real-episode-check.mjs "<Kids Library>/The Snowy Day.kidsvideo" [app-url]
-//   node tools/real-episode-check.mjs "<old prepared folder>" [app-url]
 //
 // Uses a fresh throwaway browser profile with a throwaway PIN. Nothing is
 // uploaded: files go from disk straight into that profile's storage.
@@ -15,12 +14,10 @@ import os from 'node:os';
 const folder = process.argv[2];
 const url = process.argv[3] ?? 'https://www.rohailtaimour.com/youtube-clone/';
 if (!folder || !fs.existsSync(folder)) {
-  console.error('usage: node tools/real-episode-check.mjs <file.kidsvideo | prepared-folder> [app-url]');
+  console.error('usage: node tools/real-episode-check.mjs <file.kidsvideo> [app-url]');
   process.exit(2);
 }
-const files = fs.statSync(folder).isDirectory()
-  ? fs.readdirSync(folder).filter((f) => !f.startsWith('.')).map((f) => path.join(folder, f))
-  : [folder];
+const files = [folder];
 const PIN = '2580';
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'episode-check-'));
