@@ -15,7 +15,8 @@ export const sha256Hex = (s) => createHash('sha256').update(s).digest('hex');
 export const FIXTURES_DIR = path.resolve(import.meta.dirname, '..', 'fixtures', 'out');
 export const fixtureUrl = (name) => `/fixtures/out/${name}/${name}.mpd`;
 export const fixtureContainer = (name) => path.join(FIXTURES_DIR, `${name}.kidsvideo`);
-export const fixtureFiles = (name) =>
+// Loose parts of a fixture, only for a test that checks loose files are refused.
+export const fixtureParts = (name) =>
   [`${name}.mpd`, 'video.mp4', 'audio.mp4', 'poster.jpg'].map((f) => path.join(FIXTURES_DIR, name, f));
 
 export const test = base.extend({

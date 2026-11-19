@@ -59,12 +59,13 @@ async function readContainer(file) {
   return parts;
 }
 
-/** One .kidsvideo becomes its 4 parts; loose files are returned unchanged. */
+/** The pick must be exactly one .kidsvideo; it becomes its 4 parts. */
 export async function expandPick(files) {
   const list = [...files];
-  if (list.length === 1 && isContainer(list[0])) return readContainer(list[0]);
-  if (list.some(isContainer)) throw new Error(`pick one ${CONTAINER_EXT} file at a time`);
-  return list;
+  if (list.length !== 1 || !isContainer(list[0])) {
+    throw new Error(`pick the video's ${CONTAINER_EXT} file (one file per video)`);
+  }
+  return readContainer(list[0]);
 }
 
 /** Check the picked files form one prepared video. Returns {manifest, poster, title} or throws. */

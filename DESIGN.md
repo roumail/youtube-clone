@@ -126,7 +126,7 @@ app/                                  published to GitHub Pages
   library.js, pin.js                ✅ M2/M4: Shaka storage (own track picker, 0-track cleanup); PIN hash, set/change, 5-strike 60 s lockout
   player.js                         ✅ M3: Shaka player on our <video>; PIN-gated play, free pause, safety net
 tools/
-  get-packager.sh, prepare.sh       ✅ Mac: video → packaged folder for Google Drive
+  get-packager.sh, prepare.sh, pack.sh   ✅ Mac: video → one .kidsvideo file for Google Drive
   run_prepare.sh, README.md         ✅ Mac wrapper: single file or batch → KIDS_LIBRARY (.env)
   real-episode-check.mjs            ✅ manual check with a real episode in local Chrome
 fixtures/generate.sh                ✅ synthetic fixtures (CI)
@@ -154,7 +154,7 @@ e2e/                                ✅ specs (section 7)
   - reads paths from stdin too (`ls *.mp4 | run_prepare`), and works through a symlink on the PATH;
   - skips videos already prepared and keeps going if one fails, printing a summary;
   - writes to `--dest`, or by default to `KIDS_LIBRARY` from a **gitignored `.env`** (so the owner's local path is never public; `.env.example` is committed).
-- `tools/prepare.sh "My Video.mp4" <dest>` prepares one video. **Since v1.1.0 the output is one file per video, `My Video.kidsvideo`** (owner decision 2026-11-19: "the unit is the container"). It's a plain, uncompressed `tar` of the 4 parts below, made with the system `tar` by `tools/pack.sh`. Older folders can be converted with `tools/pack.sh --remove-folder "<folder>"`. What's inside:
+- `tools/prepare.sh "My Video.mp4" <dest>` prepares one video. **The output is one file per video, `My Video.kidsvideo`** (owner decision 2026-11-19: "the unit is the container"; since v2.0.0 it's the **only** format, and loose folders aren't accepted). It's a plain, uncompressed `tar` of the 4 parts below, made with the system `tar` by `tools/pack.sh`. What's inside:
   ```
   Google Drive/Kids Library/My Video/
     My Video.mpd      // DASH manifest; its file name is the title
@@ -166,12 +166,12 @@ e2e/                                ✅ specs (section 7)
   - uses the **first English audio track** when there are several (language tag `en`/`eng`/`english`), otherwise the first audio track;
   - runs ffmpeg first only if the input isn't already H.264/AAC (and always to grab the poster);
   - then runs Shaka Packager in **on-demand profile**, which writes one file per track plus the manifest, so there are no thousands of tiny files.
-- Already-packaged folders in Drive are reused as they are. Nothing is processed twice.
+- Videos already prepared (a `<Title>.kidsvideo` exists) are skipped. Nothing is processed twice.
 
 **Step 2, on any device:**
-- **"Add video"** button, behind the PIN. A short note on the library screen says what to pick: all 4 files of one prepared folder (`.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). After the correct PIN, the file picker opens straight away, within the same tap on "OK".
+- **"Add video"** button, behind the PIN. A short note on the library screen says what to pick: the video's `.kidsvideo` file. After the correct PIN, the file picker opens straight away, within the same tap on "OK".
   - **iPad risk to check (Appendix A, item 2):** Safari may refuse to open the picker after the asynchronous PIN check. If it does, the fallback is a second "Choose files" tap. That would change the add-video scenario, so it goes back to the owner first.
-- Pick **the video's `.kidsvideo` file** (one tap). Older prepared folders still work: pick their 4 files together.
+- Pick **the video's `.kidsvideo` file** (one tap). Anything else (e.g. loose parts) is refused, with a message saying to pick the `.kidsvideo`.
   - The app reads the container's tar headers and hands each part to Shaka as a **lazy slice** of the picked file, so nothing is copied or unpacked. The 4 parts are checked as before.
 - The app:
   - registers the picked files under the `local:` scheme;
@@ -278,11 +278,11 @@ Any new feature gets proposed first and added only after it's approved.
 | `tiny` (3 s, H.264/AAC, packaged) | Most e2e tests. Short enough to reach the end quickly for the "no autoplay" test. |
 | `medium` (60 s, packaged) | Pause/resume mid-video, background-pause tests. |
 | `raw-h264.mp4`, `raw-vp9.webm` (unpackaged) | Raw inputs. `prepare.sh` packages them in CI, which covers its repackage and re-encode paths. |
-| `broken-missing-audio/` | Import error handling (a file is missing from the folder). |
+| `broken-missing-audio.kidsvideo` | Import error handling (a part is missing from the container). |
 | `episode-like` (10 s, 1080p H.264 High, BT.709, audio: Chinese first + English second) | Mirrors a real web-download episode: the P3/SDR track-picker case, and `prepare.sh` choosing English. |
 | `unplayable` (`tiny` with a codec no browser supports) | Import of a video the device can't play: must be an error, with no empty entry left behind. |
 | `Show - S01E01 - First`, `… S01E02 - Second`, `… S01E10 - Tenth` | Series episodes (copies of `tiny`), for the library order of a series. |
-| `<name>.kidsvideo` for every packaged fixture, plus `broken-missing-audio.kidsvideo` (no audio part) | Single-file container imports and their error case. Fixtures keep the loose folders too (`PREPARE_KEEP_FOLDER=1`). |
+| `<name>.kidsvideo` for every packaged fixture | What the picker is given. The generator also unpacks each into a `<name>/` folder **for tests only**: library seeding loads the parts over HTTP, and one scenario checks that loose parts are refused. |
 
 ### Avoiding races in user-action tests
 The principle: **tests wait on observable state, never on time.**
@@ -321,7 +321,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 | `import-status` | `data-import`: `idle` · `storing` · `done` · `error` |
 
 **Controls** (`data-testid`):
-- Library: `app-version` (the released version from `version.json`, or `dev`), `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`, `import-help` (always-visible note on which 4 files to pick).
+- Library: `app-version` (the released version from `version.json`, or `dev`), `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`, `import-help` (always-visible note: pick the `.kidsvideo` file).
 - Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`.
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
@@ -362,7 +362,7 @@ e2e/
   features/
     first-run/set-pin               Feature: Set a PIN on first run
     library/browse                  Feature: Browse the library (empty, several videos, reload, series order)
-    library/add-video               Feature: Add a video (PIN, 4 files, second video, wrong PIN, missing file, unplayable video)
+    library/add-video               Feature: Add a video (PIN, one .kidsvideo, second video, wrong PIN, loose parts refused, missing part, unplayable, @ipad picker timing)
     library/remove-video            Feature: Remove a video
     playback/open-video             Feature: Open a video (same app, never a new tab; paused at 0:00; locked-down <video>)
     playback/play-requires-pin      Feature: Playing needs the PIN (correct, wrong, cancel)

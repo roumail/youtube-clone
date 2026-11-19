@@ -175,7 +175,7 @@ for f in "${FILES[@]}"; do
     ln -sf "$(cd "$(dirname "$f")" && pwd)/$base" "$src"
   fi
   echo "== $title"
-  if [[ -f "$dest/$title.kidsvideo" || -f "$dest/$title/$title.mpd" ]]; then
+  if [[ -f "$dest/$title.kidsvideo" ]]; then
     echo "   already prepared, skipping"; skip_n=$((skip_n + 1)); continue
   fi
   mkdir -p "$dest"
