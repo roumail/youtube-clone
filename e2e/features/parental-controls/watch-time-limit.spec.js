@@ -179,4 +179,62 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       expect(await page.evaluate(() => localStorage.getItem('watchTime.session'))).toBeNull();
     });
   });
+  // Custom budget ("Other…"), owner request 2026-11-19.
+  async function openBudgetPrompt(page, seedLibrary) {
+    await goto(page, '#/library');
+    await seedLibrary('medium');
+    await openVideo(page, 'medium');
+    await page.getByTestId('play-button').click();
+    await enterPin(page, PIN);
+    await expect(page.getByTestId('budget-prompt')).toBeVisible();
+  }
+
+  test.fixme('Scenario: "Other…" sets a budget of my own', async ({ page, pinSet, seedLibrary }) => {
+    await enableWatchTime(page);
+    await test.step('Given the feature is on and the budget prompt is open', async () => {
+      await openBudgetPrompt(page, seedLibrary);
+    });
+    await test.step('When I tap "Other…", type 25 and tap Start', async () => {
+      await page.getByTestId('budget-option-other').click();
+      await page.getByTestId('budget-custom-input').fill('25');
+      await page.getByTestId('budget-custom-start').click();
+    });
+    await test.step('Then it plays with a 25-minute budget, and 25 is remembered', async () => {
+      await expectPlaying(page);
+      expect(await page.evaluate(() => JSON.parse(localStorage.getItem('watchTime.session')).budget)).toBe(25 * 60);
+      expect(await page.evaluate(() => localStorage.getItem('watchTime.lastCustom'))).toBe('25');
+    });
+  });
+
+  test.fixme('Scenario: a custom budget must be 5 to 180 minutes', async ({ page, pinSet, seedLibrary }) => {
+    await enableWatchTime(page);
+    await test.step('Given the feature is on and "Other…" is open in the budget prompt', async () => {
+      await openBudgetPrompt(page, seedLibrary);
+      await page.getByTestId('budget-option-other').click();
+    });
+    for (const value of ['3', '200', '']) {
+      await test.step(`When I enter "${value}" and tap Start, it is refused and nothing plays`, async () => {
+        await page.getByTestId('budget-custom-input').fill(value);
+        await page.getByTestId('budget-custom-start').click();
+        await expect(page.getByTestId('budget-custom-error')).toContainText('5 to 180');
+        await expect(page.getByTestId('budget-prompt')).toBeVisible();
+        await expectNotPlaying(page);
+        expect(await page.evaluate(() => localStorage.getItem('watchTime.session'))).toBeNull();
+      });
+    }
+  });
+
+  test.fixme('Scenario: the last custom budget is offered next time', async ({ page, pinSet, seedLibrary }) => {
+    await enableWatchTime(page);
+    await page.addInitScript(() => localStorage.setItem('watchTime.lastCustom', '25'));
+    await test.step('Given a custom budget of 25 minutes was used before, and the budget prompt is open', async () => {
+      await openBudgetPrompt(page, seedLibrary);
+    });
+    await test.step('When I tap "Other…"', async () => {
+      await page.getByTestId('budget-option-other').click();
+    });
+    await test.step('Then the field already says 25', async () => {
+      await expect(page.getByTestId('budget-custom-input')).toHaveValue('25');
+    });
+  });
 });
