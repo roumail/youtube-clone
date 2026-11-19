@@ -250,4 +250,62 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await expect(page.getByTestId('budget-custom-input')).toHaveValue('25');
     });
   });
+
+  test('Scenario: switching it back on in Settings takes effect at once, without a reload', async ({ page, pinSet, seedLibrary }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('features')) localStorage.setItem('features', JSON.stringify({ watchTimeLimit: false }));
+    });
+    await test.step('Given the limit was switched off and settings is unlocked', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('medium');
+      await page.getByTestId('settings-button').click();
+      await enterPin(page, PIN);
+      await expect(page.getByTestId('feature-toggle-watchTimeLimit')).not.toBeChecked();
+    });
+    await test.step('When I switch it on and open "medium" without reloading', async () => {
+      await page.getByTestId('feature-toggle-watchTimeLimit').check();
+      await page.getByTestId('screen-settings').getByTestId('back-button').click();
+      await openVideo(page, 'medium');
+    });
+    await test.step('Then play with the PIN asks for a budget', async () => {
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
+      await expect(page.getByTestId('budget-prompt')).toBeVisible();
+    });
+  });
+
+  test('Scenario: cancelling the budget prompt leaves the video paused', async ({ page, pinSet, seedLibrary }) => {
+    await enableWatchTime(page);
+    await test.step('Given the budget prompt is open after play and the PIN', async () => {
+      await openBudgetPrompt(page, seedLibrary);
+    });
+    await test.step('When I tap Cancel', async () => {
+      await page.getByTestId('budget-cancel').click();
+    });
+    await test.step('Then the prompt closes, nothing plays and no session starts', async () => {
+      await expect(page.getByTestId('budget-prompt')).toBeHidden();
+      await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
+      await expectNotPlaying(page);
+      expect(await page.evaluate(() => localStorage.getItem('watchTime.session'))).toBeNull();
+    });
+  });
+
+  test('Scenario: damaged saved settings fall back to the defaults', async ({ page, pinSet, seedLibrary }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('features', '{not json');
+      localStorage.setItem('watchTime.session', '{not json');
+    });
+    await test.step('Given the saved feature flags and session can\'t be read, and "medium" is open', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('medium');
+      await openVideo(page, 'medium');
+    });
+    await test.step('When I tap play and enter the PIN', async () => {
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
+    });
+    await test.step('Then the limit is on (its default) and a new budget is asked for', async () => {
+      await expect(page.getByTestId('budget-prompt')).toBeVisible();
+    });
+  });
 });
