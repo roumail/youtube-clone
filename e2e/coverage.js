@@ -56,6 +56,7 @@ export async function recordServiceWorkers(port) {
     const { sessionId, targetInfo, waitingForDebugger } = msg.params;
     try {
       if (targetInfo.type === 'service_worker') {
+        console.log(`[swdiag] attached ${targetInfo.url} session=${sessionId}`);
         await send('Profiler.enable', {}, sessionId);
         await send('Profiler.startPreciseCoverage', { callCount: true, detailed: true }, sessionId);
         await send('Debugger.enable', {}, sessionId);
@@ -75,12 +76,16 @@ export async function recordServiceWorkers(port) {
       for (const sessionId of workers) {
         try {
           const { result } = await send('Profiler.takePreciseCoverage', {}, sessionId);
+          console.log(`[swdiag] stop session=${sessionId} scripts=${result.map((s) => s.url).join(',')}`);
           for (const script of result.filter((s) => s.url.endsWith('/sw.js'))) {
             const { scriptSource } = await send('Debugger.getScriptSource', { scriptId: script.scriptId }, sessionId);
+            const at = scriptSource.indexOf('caches.match');
+            const hits = script.functions.flatMap((f) => f.ranges).filter((r) => r.startOffset <= at && at < r.endOffset).map((r) => `${r.startOffset}-${r.endOffset}:${r.count}`);
+            console.log(`[swdiag] ${script.url} caches.match ranges ${hits.join(' ')}`);
             entries.push({ url: script.url, source: scriptSource, functions: script.functions });
           }
-        } catch {
-          // the worker already stopped: its coverage is gone
+        } catch (e) {
+          console.log(`[swdiag] stop session=${sessionId} failed: ${e.message}`);
         }
       }
       await send('Target.setAutoAttach', { autoAttach: false, waitForDebuggerOnStart: false, flatten: true }).catch(() => {});
