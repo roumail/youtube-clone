@@ -21,6 +21,7 @@ export function init(ctx) {
   let onCancel = null;
 
   function render() {
+    account();
     const s = read();
     bar.hidden = false;
     const used = s?.used ?? 0;
@@ -31,19 +32,21 @@ export function init(ctx) {
     $('clock').textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
   }
 
-  // Count only real playing time, with the monotonic clock.
-  const timer = setInterval(() => {
+  // Count only real playing time, with the monotonic clock. Time is booked on
+  // every tick AND whenever playback stops, so even a short play counts exactly.
+  function account() {
     const now = performance.now();
     const playing = playerState.status === 'playing';
     const s = read();
-    if (playing && s && last !== null) {
+    if (s && last !== null) {
       s.used = Math.min(s.budget, s.used + (now - last) / 1000);
       write(s);
-      if (s.used >= s.budget) timeUp();
+      if (playing && s.used >= s.budget) timeUp();
     }
     last = playing ? now : null;
-    render();
-  }, 250);
+  }
+
+  const timer = setInterval(() => { account(); render(); }, 250);
 
   for (const minutes of BUDGETS) {
     $(`budget-option-${minutes}`).addEventListener('click', () => {
