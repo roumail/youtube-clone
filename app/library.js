@@ -85,13 +85,7 @@ export async function importVideo(picked, onProgress) {
         progressCallback: (_content, progress) => onProgress?.(progress),
       },
     });
-    let stored;
-    try {
-      stored = await storage.store(uri, { title, poster: posterUrl }).promise;
-    } catch (e) {
-      await removeLeftovers(storage, uri);
-      throw e;
-    }
+    const stored = await storage.store(uri, { title, poster: posterUrl }).promise;
     const kept = stored.tracks.filter((t) => t.type === 'variant').length;
     if (!kept || !stored.size) {
       await storage.remove(stored.offlineUri);
@@ -99,13 +93,6 @@ export async function importVideo(picked, onProgress) {
     }
     return stored;
   });
-}
-
-async function removeLeftovers(storage, uri) {
-  const all = await storage.list();
-  for (const c of all) {
-    if (c.originalManifestUri === uri && !isUsable(c)) await storage.remove(c.offlineUri);
-  }
 }
 
 export async function removeVideo(offlineUri) {
