@@ -147,4 +147,19 @@ test.describe('Feature: Search the library', () => {
       await expect(search(page)).toBeEditable();
     });
   });
+
+  test('Scenario: tapping the unlocked search field again does not ask for the PIN again', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given search is unlocked', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('tiny', 'medium');
+      await unlockSearch(page);
+    });
+    await test.step('When I tap the search field again', async () => {
+      await search(page).click();
+    });
+    await test.step('Then no PIN is asked and it stays unlocked', async () => {
+      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+      await expect(search(page)).toHaveAttribute('data-state', 'unlocked');
+    });
+  });
 });

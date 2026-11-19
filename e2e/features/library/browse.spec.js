@@ -73,4 +73,16 @@ test.describe('Feature: Browse the library', () => {
       await expect(page.getByTestId('app-version')).toHaveText('v2.7.2');
     });
   });
+
+  test('Scenario: a video named like a series sits just before that series', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given the video "Show", the series "Show" and "tiny" are stored', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('Show - S01E01 - First', 'tiny', 'Show');
+    });
+    await test.step('Then the library lists the video "Show", the series "Show", then "tiny"', async () => {
+      const tiles = page.locator('[data-role="library-grid"] > li');
+      expect(await tiles.evaluateAll((els) => els.map((li) => `${li.dataset.testid}: ${li.querySelector('span').textContent}`)))
+        .toEqual(['library-item: Show', 'series-item: Show', 'library-item: tiny']);
+    });
+  });
 });

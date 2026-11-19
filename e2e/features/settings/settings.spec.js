@@ -87,4 +87,20 @@ test.describe('Feature: Settings', () => {
       await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'verify');
     });
   });
+
+  test('Scenario: cancelling the settings PIN prompt returns to the library', async ({ page, pinSet }) => {
+    await test.step('Given I tapped settings and its PIN prompt is open', async () => {
+      await goto(page, '#/library');
+      await page.getByTestId('settings-button').click();
+      await expect(page.getByTestId('pin-prompt')).toBeVisible();
+    });
+    await test.step('When I tap Cancel', async () => {
+      await page.getByTestId('pin-cancel').click();
+    });
+    await test.step('Then the library is shown and settings stays locked', async () => {
+      await expect(page.getByTestId('screen-library')).toBeVisible();
+      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'locked');
+    });
+  });
 });
