@@ -14,6 +14,7 @@ export const sha256Hex = (s) => createHash('sha256').update(s).digest('hex');
 // Generated in CI (not committed). Served by the test server (repo root) under /fixtures/out/.
 export const FIXTURES_DIR = path.resolve(import.meta.dirname, '..', 'fixtures', 'out');
 export const fixtureUrl = (name) => `/fixtures/out/${name}/${name}.mpd`;
+export const fixtureContainer = (name) => path.join(FIXTURES_DIR, `${name}.kidsvideo`);
 export const fixtureFiles = (name) =>
   [`${name}.mpd`, 'video.mp4', 'audio.mp4', 'poster.jpg'].map((f) => path.join(FIXTURES_DIR, name, f));
 

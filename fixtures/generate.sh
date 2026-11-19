@@ -8,6 +8,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PREPARE="$HERE/../tools/prepare.sh"
+# Fixtures need both forms: the .kidsvideo container and the loose folder.
+export PREPARE_KEEP_FOLDER=1
 OUT="$HERE/out"
 RAW="$OUT/raw"
 FFMPEG="${FFMPEG:-ffmpeg}"
@@ -52,6 +54,10 @@ for name in tiny medium broken-missing-audio episode-like; do
   "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 rm "$OUT/broken-missing-audio/audio.mp4"   # the "broken" part
+# ...and a container with the same part missing.
+rm "$OUT/broken-missing-audio.kidsvideo"
+COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/broken-missing-audio.kidsvideo" \
+  -C "$OUT/broken-missing-audio" broken-missing-audio.mpd poster.jpg video.mp4
 
 # Series episodes (DESIGN.md §3): titles "Series - SxxEyy - Episode". Prepared
 # from copies of "tiny" named like real episodes, out of order on purpose.

@@ -1,15 +1,18 @@
 # Preparing videos (owner's Mac)
 
 Videos must be prepared once on the Mac before the app can store them
-(DESIGN.md §4). Each prepared video becomes a folder of 4 files:
+(DESIGN.md §4). Each prepared video becomes **one file**:
 
 ```
-Kids Library/The Snowy Day/
-  The Snowy Day.mpd   ← the file name is the title shown in the app
-  video.mp4
-  audio.mp4
-  poster.jpg
+Kids Library/
+  The Snowy Day.kidsvideo        ← the file name is the title shown in the app
+  Bluey/Bluey - S01E03 - Keepy Uppy.kidsvideo
 ```
+
+A `.kidsvideo` is a plain, uncompressed `tar` of the 4 parts the app needs
+(`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). On the iPad you pick
+just that one file. Folders prepared before v1.1.0 still work, or convert them:
+`tools/pack.sh --remove-folder "<Kids Library>/Frozen 2"`.
 
 ## One-time setup
 

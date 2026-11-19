@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: fixtures/out
-          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'tools/prepare.sh', 'tools/get-packager.sh', '.github/workflows/ci.yml') }}
+          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'tools/prepare.sh', 'tools/pack.sh', 'tools/get-packager.sh', '.github/workflows/ci.yml') }}
 
       - name: Install pinned ffmpeg + Shaka Packager (static binaries, no apt)
         if: steps.fx-cache.outputs.cache-hit != 'true'

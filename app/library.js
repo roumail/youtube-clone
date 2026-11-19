@@ -1,5 +1,5 @@
 // The video library: Shaka offline storage (DESIGN.md §1, §3, §4).
-import { describePick, registerPickedFiles, fileToDataUrl } from './local-scheme.js';
+import { expandPick, describePick, registerPickedFiles, fileToDataUrl } from './local-scheme.js';
 
 // Never use Shaka's default track picker: on P3 screens it drops SDR video and
 // stores 0 tracks without an error. prepare.sh produces exactly one variant.
@@ -51,7 +51,9 @@ function byLibraryOrder(a, b) {
  * poster). Reports progress 0..1. Throws on any failure and leaves nothing
  * behind: an entry that kept 0 tracks is removed.
  */
-export async function importVideo(files, onProgress) {
+export async function importVideo(picked, onProgress) {
+  // One .kidsvideo file, or (as before) the 4 loose files of one video.
+  const files = await expandPick(picked);
   const { title, poster } = describePick(files);
   const uri = registerPickedFiles(files);
   const posterUrl = await fileToDataUrl(poster);
