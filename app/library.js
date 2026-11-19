@@ -55,6 +55,12 @@ export async function importVideo(picked, onProgress) {
   // Exactly one .kidsvideo file per video.
   const files = await expandPick(picked);
   const { title, poster } = describePick(files);
+  // No duplicates: a title already in the library is refused before anything
+  // is stored (owner decision 2026-11-19).
+  const existing = await listVideos();
+  if (existing.some((c) => (c.appMetadata?.title ?? '').toLocaleLowerCase() === title.toLocaleLowerCase())) {
+    throw new Error(`"${title}" is already in the library`);
+  }
   const uri = registerPickedFiles(files);
   const posterUrl = await fileToDataUrl(poster);
   return withStorage(async (storage) => {

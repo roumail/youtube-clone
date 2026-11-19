@@ -147,4 +147,23 @@ test.describe('Feature: Add a video', () => {
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
     });
   });
+
+  test('Scenario: a video that is already in the library is refused, not added twice', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given "tiny" is already in the library', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('tiny');
+    });
+    const chooser = page.waitForEvent('filechooser');
+    await test.step('When I add "tiny.kidsvideo" again', async () => {
+      await page.getByTestId('add-video-button').click();
+      await enterPin(page, PIN);
+      await (await chooser).setFiles([fixtureContainer('tiny')]);
+    });
+    await test.step('Then it is refused as already in the library, and there is still one "tiny"', async () => {
+      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'error');
+      await expect(page.getByTestId('import-status')).toContainText('already in the library');
+      await page.reload();
+      await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toHaveCount(1);
+    });
+  });
 });

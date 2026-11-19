@@ -178,6 +178,7 @@ e2e/                                ✅ specs (section 7)
 - **"Add video"** button, behind the PIN. A short note on the library screen says what to pick: the video's `.kidsvideo` file. After the correct PIN, the file picker opens straight away, within the same tap on "OK".
   - **iPad risk to check (Appendix A, item 2):** Safari may refuse to open the picker after the asynchronous PIN check. If it does, the fallback is a second "Choose files" tap. That would change the add-video scenario, so it goes back to the owner first.
 - Pick **the video's `.kidsvideo` file** (one tap). Anything else (e.g. loose parts) is refused, with a message saying to pick the `.kidsvideo`.
+- **No duplicates** (owner decision 2026-11-19): a video whose title is already in the library (case-insensitive) is refused before anything is stored: "<title>" is already in the library. To replace one, remove it in Settings first.
 - **Several at once (drafted 2026-11-19, M7, not built):**
   - pick several `.kidsvideo` files together (e.g. a whole season); they're imported **one after another**, and progress says "Adding 2 of 5: <title>";
   - a bad file doesn't stop the rest, and the summary names what failed;
@@ -382,7 +383,7 @@ e2e/
   features/
     first-run/set-pin               Feature: Set a PIN on first run
     library/browse                  Feature: Browse the library (empty, several videos, reload, series order)
-    library/add-video               Feature: Add a video (PIN, one .kidsvideo, second video, wrong PIN, loose parts refused, missing part, unplayable, @ipad picker timing)
+    library/add-video               Feature: Add a video (PIN, one .kidsvideo, second video, wrong PIN, loose parts refused, missing part, unplayable, duplicate refused, @ipad picker timing)
     library/remove-video            Feature: Remove a video
     library/add-several             Feature: Add several videos in one go (drafted, fixme)
     library/series                  Feature: Series (tile per series, ordered episodes; drafted, fixme)
