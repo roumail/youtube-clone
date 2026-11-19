@@ -231,6 +231,14 @@ e2e/                                ✅ specs (section 7)
   - **The PIN itself is never kept**, not even in memory beyond the submit handler. Only its hash is stored (`localStorage['pin.sha256']`), and a scenario checks the PIN appears nowhere else.
   - **Honest limit:** the stored SHA-256 of a 4–6 digit PIN can be brute-forced quickly by someone who can read the device's browser storage. The PIN keeps a child from starting playback (section 6); it isn't meant to resist a determined adult with device access. A test checks that the PIN itself is never stored or left behind (storage, cookies, URL, input field).
   - Same code on both devices for now; revisit later.
+- **Real full screen (owner request 2026-11-19, M14):** a **Full screen** button next to Play/Pause hides the browser around the app (the Mac's tabs and address bar).
+  - It makes the **whole app** full screen (the Fullscreen API on the page), **never the `<video>` element**, so the native video controls never appear and the PIN prompt, the budget prompt and our own controls keep working in full screen.
+  - Tapping it again, or Esc, leaves full screen. **Back to the library leaves full screen too.**
+  - It never starts or stops playback, and needs no PIN.
+  - Shown only where the browser allows it (`document.fullscreenEnabled`): the Mac, the iPad. The iPhone only allows full screen for the video element itself, so there it is hidden; the app installed on the home screen already has no browser around it.
+  - It hides with the other controls while playing (M12).
+
+  Scenarios: `e2e/features/playback/full-screen.spec.js`.
 - **Controls hide while playing (owner request 2026-11-19, M12):** so playback is really full screen.
   - While a video **plays**, Back, Pause and the scrub bar fade out after **3 seconds** without input. On the Mac the mouse pointer hides with them.
   - **Moving the mouse, tapping the screen or pressing a key** shows them again, for another 3 s. A tap that shows the controls does nothing else: it never pauses or plays.
@@ -369,7 +377,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 
 **Controls** (`data-testid`):
 - Library: `app-version` (the released version from `version.json`, or `dev`), `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`, `import-help` (always-visible note: pick the `.kidsvideo` file); **search (M10):** `search-input` (`data-state`: `locked` · `unlocked`), `search-clear`, `search-empty` (the no-matches note).
-- Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`; `screen-player` has `data-controls`: `shown` · `hidden` (M12); **seek (M8):** `seek-bar` (a range input, in seconds), `time-elapsed`, `time-total` (`mm:ss`, or `h:mm:ss` from one hour).
+- Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`; `screen-player` has `data-controls`: `shown` · `hidden` (M12); `fullscreen-button` with `data-state`: `off` · `on` (M14); **seek (M8):** `seek-bar` (a range input, in seconds), `time-elapsed`, `time-total` (`mm:ss`, or `h:mm:ss` from one hour).
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
 - **Series (M7):** `series-item` (library tile, with `data-series`; shows "N episodes"), route `#/series/<name>`, `screen-series` (with its own `back-button` → library), `episode-item`. The player's Back returns to where the video was opened from (library or series list).
@@ -423,6 +431,7 @@ e2e/
     playback/no-autoplay            Feature: No autoplay (end of video: nothing else starts)
     playback/seek                   Feature: Seek (scrub bar, elapsed/total, ← / → 10 s)
     playback/controls-hide          Feature: Controls hide while playing (3 s; mouse/tap/key shows them; clock stays)
+    playback/full-screen            Feature: Real full screen (whole app, PIN prompt still shows, Back leaves it)
     parental-controls/no-way-around-the-pin   Feature: backgrounding, OS "play", script play
     parental-controls/pin-lockout   Feature: PIN lockout (5 wrong → 60 s, survives reload)
     parental-controls/watch-time-limit   Feature: Watch-time limit (optional, behind a flag)
@@ -547,12 +556,13 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M8 – Seek** ✅ | `playback/seek` | **5** | M3. Released as a **minor** version. |
 | **M7 – Series** ✅ | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
 | **M9 – iPhone** ✅ | `devices/iphone` | **4** (each in portrait and landscape) | M2–M4. Released as a **patch** version (fixes the PIN prompt behind the keyboard). |
+| **M14 – Real full screen** | `playback/full-screen` | **3** | M3. Released as a **minor** version. |
 | **M13 – Watch-time limit on by default** ✅ | `parental-controls/watch-time-limit` (2 scenarios rewritten: on by default; switching off in Settings) | **2** | M6. Released as a **minor** version. |
 | **M12 – Controls hide while playing** ✅ | `playback/controls-hide` | **5** | M3. Released as a **minor** version (with M11 in v2.5.0). |
 | **M11 – Custom watch-time budget** ✅ | `parental-controls/watch-time-limit` ("Other…" scenarios) | **3** | M6. Released as a **minor** version. |
 | **M10 – Search** ✅ | `library/search` | **8** | M2–M4. Released as a **minor** version. |
 | **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** (+3 for "Other…", M11) | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
-| | | **75 in total** | |
+| | | **78 in total** | |
 
 Also active: `smoke/` (5). The M0 spike and its tests were removed after the owner's iPad test (2026-11-18); `local-scheme.js` from it is part of the app.
 
