@@ -31,7 +31,7 @@ Specs: (spend more time on the ones on top - 60% top two bullets and 40% divided
 
 Effort split mirrors the specs: sections 1–2 (platform + stack) are the bulk of the thinking; sections 3–6 are deliberately short.
 
-## 1. Platform & installation: Mac + iPad, storage on each device (~30%)
+## 1. Platform & installation: Mac, iPad and iPhone, storage on each device (~30%)
 
 ### Decision: an installable web app (PWA), not a native app
 A native iPad app runs into Apple's signing paywall. A free Apple ID install stops launching after 7 days; a lasting install needs the $99/yr developer program. A browser is already on every device, so we use that instead:
@@ -40,6 +40,9 @@ A native iPad app runs into Apple's signing paywall. A free Apple ID install sto
 - **Mac:** Chrome → ⋮ → Cast, save and share → **Install page as app** (Chrome's own engine). Safari → Add to Dock works too.
 - **iPad:** Chrome (iPadOS 16.4+) or Safari → Share → **Add to Home Screen**. It gets its own icon, opens full-screen, and keeps **its own storage**.
   - **Important:** on iPad, Chrome runs on the same WebKit engine as Safari. Apple requires this for every browser outside the EU. So the browser you pick on iPad doesn't change storage or playback behaviour, and the iPad limits below apply in either one.
+- **iPhone (supported since owner decision 2026-11-19):** installed the same way as on the iPad, with its own storage. Everything said about the iPad below applies to it too. What's different is the small screen, in portrait and landscape:
+  - **The on-screen keyboard covers about half the screen** (less of it in portrait, most of it in landscape). Safari doesn't shrink full-screen layers for it, so a centred PIN prompt ended up behind the keyboard and the page had to be scrolled to type the PIN (seen on v2.1.0). Rule: **the PIN prompt follows the part of the screen the keyboard leaves visible** (`window.visualViewport`), so its field, message and buttons are always above the keyboard and the page never scrolls. On short screens (phone landscape) the prompt is compact, with the title, field and buttons on one row.
+  - Screens fit the phone's width, with no sideways scrolling.
 - **Works offline:** a service worker caches the app's code, so the URL only has to be reachable to install and update.
 
 ### Hosting
@@ -272,13 +275,14 @@ Any new feature gets proposed first and added only after it's approved.
 
   **Owner decision (2026-11-18):** CI ran on macOS runners for a while, to mirror the owner's Mac. It was moved back to Ubuntu because the macOS queue slowed every PR and couldn't be pinned, while the real target, the iPad, can't be reproduced in CI anyway.
   - **Real-Mac checks are local:** `tools/real-episode-check.mjs` drives the Mac's installed Chrome, in a visible window, with a real episode. Run it when preparing new content.
-  - **The iPad** is covered by the manual checklist (Appendix A).
+  - **The iPad and iPhone** are covered by the manual checklist (Appendix A). Phone-sized layout is also checked in CI with WebKit iPhone profiles; the on-screen keyboard is modelled there (see the browser profile below), so the real keyboard is a manual check (the iPhone Simulator in Xcode, or the phone).
 
 ### Layers
 | Layer | Tool | What it covers |
 |---|---|---|
 | End-to-end (user actions) | **Playwright**, Chromium project only | The real app in a real browser: import, library grid, PIN gate, pause/play rules, no autoplay, offline. |
 | iPad | Manual checklist (Appendix A) | Install, Drive picking, offline, lock-screen/headphone behaviour, persistence. |
+| iPhone | Playwright WebKit iPhone profiles (`@iphone`), plus Appendix A | Layout on a phone screen with the on-screen keyboard, in portrait and landscape. |
 
 **End-to-end only. No committed unit tests.**
 - The owner's acceptance test is CI passing, then user testing.
@@ -357,11 +361,13 @@ The specs depend only on what's listed here. Changing it means changing the spec
 **No test hooks in the app.** Tests use only browser-level techniques:
 - Media Session handlers are captured by an init script that wraps `navigator.mediaSession.setActionHandler`.
 - Visibility is simulated by overriding `document.visibilityState`.
+- The iPhone's on-screen keyboard is modelled by an init script (`onScreenKeyboard` in `e2e/support.js`): while a text field has focus, `window.visualViewport` is shorter by the keyboard's height (300 px in portrait, 200 px in landscape), as iPhone Safari reports it, and fires `resize`. Like the real keyboard, it slides away about 300 ms after the field loses focus, so a tap on OK lands before the layout changes.
 
 **Drafted-but-not-built specs** are marked `test.fixme`. They show as skipped in the report and are switched on in the milestone that implements them, so CI stays green on what exists.
 
 **Browser profile:**
 - the pinned Chromium build at an iPad-sized viewport (1180×820), with touch enabled;
+- scenarios tagged `@ipad` also run in WebKit with an iPad profile (`ipad-webkit`); scenarios tagged `@iphone` run **only** in WebKit with iPhone profiles, portrait (`iphone-portrait`) and landscape (`iphone-landscape`);
 - **`(color-gamut: p3)` reported as true** (as on the family's devices), via an init script in `e2e/support.js`.
 
 ### Test style: features as a hierarchy (Gherkin-equivalent, plain Playwright)
@@ -516,8 +522,9 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
 | **M8 – Seek** ✅ | `playback/seek` | **5** | M3. Released as a **minor** version. |
 | **M7 – Series** | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
+| **M9 – iPhone** | `devices/iphone` | **4** (each in portrait and landscape) | M2–M4. Released as a **patch** version (fixes the PIN prompt behind the keyboard). |
 | **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
-| | | **34 in total** (M2 done: 10) | |
+| | | **59 in total** | |
 
 Also active: `smoke/` (5). The M0 spike and its tests were removed after the owner's iPad test (2026-11-18); `local-scheme.js` from it is part of the app.
 
@@ -526,6 +533,9 @@ Also active: `smoke/` (5). The M0 spike and its tests were removed after the own
 2. ~~Watch-time sessions — automatic end~~ **decided 2026-11-19: never automatically.** Only the parent (Settings → End session) or a used-up budget ends a session.
 3. ~~Watch-time budget choices~~ **decided 2026-11-19: 20 / 30 / 45 minutes, no "no limit".** For unlimited, switch the feature off.
 
+Closed on 2026-11-19:
+- **iPhone:** supported, in portrait and landscape (section 1, M9).
+
 Closed on 2026-11-18:
 - **7-day persistence:** not a gate. Prepared videos stay in Google Drive, so a cleared library is simply re-added.
 - **Poster frame:** not important; it stays at 10% into the video.
@@ -533,6 +543,7 @@ Closed on 2026-11-18:
 - **Release management:** see section 7, "Releases".
 
 ## Appendix A – iPad manual checklist
+Also run it on the **iPhone**, in portrait and landscape, plus: every PIN prompt (first run, Play, Settings, a wrong PIN) is fully above the keyboard without scrolling.
 Run on the real iPad, in the app **installed from the home screen**, after each milestone that changes behaviour (and fully at M5). The Mac equivalent runs in CI.
 
 1. **Install / update:** open the site in Safari → Share → Add to Home Screen. After a deploy, open the app online, close it and reopen it; the new version shows.
