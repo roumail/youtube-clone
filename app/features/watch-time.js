@@ -4,6 +4,10 @@
 // itself — only a used-up budget or the parent (Settings → End session).
 const KEY = 'watchTime.session'; // { budget, used } in seconds
 export const BUDGETS = [20, 30, 45]; // minutes (owner decision 2026-11-19)
+// "Other…": any whole number of minutes in this range; the last one is offered next time.
+const CUSTOM_KEY = 'watchTime.lastCustom';
+const CUSTOM_MIN = 5;
+const CUSTOM_MAX = 180;
 
 const read = () => {
   try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; }
@@ -48,15 +52,43 @@ export function init(ctx) {
 
   const timer = setInterval(() => { account(); render(); }, 250);
 
-  for (const minutes of BUDGETS) {
-    $(`budget-option-${minutes}`).addEventListener('click', () => {
-      write({ budget: minutes * 60, used: 0 });
-      prompt.hidden = true;
-      render();
-      const go = onChosen; onChosen = null; onCancel = null;
-      go?.(); // still within the tap: playback may start
-    });
+  function choose(minutes) {
+    write({ budget: minutes * 60, used: 0 });
+    prompt.hidden = true;
+    render();
+    const go = onChosen; onChosen = null; onCancel = null;
+    go?.(); // still within the tap: playback may start
   }
+  for (const minutes of BUDGETS) {
+    $(`budget-option-${minutes}`).addEventListener('click', () => choose(minutes));
+  }
+
+  const custom = prompt.querySelector('[data-role="budget-custom"]');
+  const customInput = $('budget-custom-input');
+  const customError = $('budget-custom-error');
+  function resetCustom() {
+    custom.hidden = true;
+    customError.hidden = true;
+    customError.textContent = '';
+  }
+  $('budget-option-other').addEventListener('click', () => {
+    custom.hidden = false;
+    customInput.value = localStorage.getItem(CUSTOM_KEY) ?? '';
+    customInput.focus();
+  });
+  custom.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const text = customInput.value.trim();
+    const minutes = Number(text);
+    if (!/^\d+$/.test(text) || minutes < CUSTOM_MIN || minutes > CUSTOM_MAX) {
+      customError.textContent = `Enter ${CUSTOM_MIN} to ${CUSTOM_MAX} minutes.`;
+      customError.hidden = false;
+      return;
+    }
+    localStorage.setItem(CUSTOM_KEY, String(minutes));
+    resetCustom();
+    choose(minutes);
+  });
   $('budget-cancel').addEventListener('click', () => {
     prompt.hidden = true;
     const stop = onCancel; onChosen = null; onCancel = null;
@@ -70,6 +102,7 @@ export function init(ctx) {
       const s = read();
       if (s && s.used < s.budget) return false;
       onChosen = proceed; onCancel = cancel;
+      resetCustom();
       prompt.hidden = false;
       return true;
     },

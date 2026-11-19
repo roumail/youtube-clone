@@ -72,7 +72,15 @@
             <button type="button" data-testid="budget-option-20">20 min</button>
             <button type="button" data-testid="budget-option-30">30 min</button>
             <button type="button" data-testid="budget-option-45">45 min</button>
+            <button type="button" data-testid="budget-option-other">Other…</button>
           </div>
+          <form class="budget-custom" data-role="budget-custom" novalidate hidden>
+            <label>Minutes (5–180)
+              <input data-testid="budget-custom-input" type="number" inputmode="numeric" min="5" max="180" step="1" autocomplete="off">
+            </label>
+            <button type="submit" data-testid="budget-custom-start">Start</button>
+            <p data-testid="budget-custom-error" hidden></p>
+          </form>
           <button type="button" data-testid="budget-cancel">Cancel</button>
         </div>
       </div>
