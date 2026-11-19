@@ -154,6 +154,32 @@ export async function setVisibility(page, state) {
   }, state);
 }
 
+// Model the iPhone's on-screen keyboard (DESIGN.md §7): while a text field has
+// focus, window.visualViewport is shorter by the keyboard's height, as iPhone
+// Safari reports it. The page itself doesn't move. Call before goto().
+export async function onScreenKeyboard(page) {
+  await page.addInitScript(() => {
+    const fake = new EventTarget();
+    let keyboard = 0;
+    const keyboardHeight = () => (window.innerWidth > window.innerHeight ? 200 : 300);
+    Object.defineProperties(fake, {
+      width: { get: () => window.innerWidth },
+      height: { get: () => window.innerHeight - keyboard },
+      offsetTop: { get: () => 0 },
+      offsetLeft: { get: () => 0 },
+      pageTop: { get: () => window.scrollY },
+      pageLeft: { get: () => window.scrollX },
+      scale: { get: () => 1 },
+    });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => fake });
+    const typing = (el) => el instanceof HTMLInputElement && !['range', 'file', 'checkbox', 'radio', 'button', 'submit'].includes(el.type);
+    const set = (h) => { if (h !== keyboard) { keyboard = h; fake.dispatchEvent(new Event('resize')); } };
+    document.addEventListener('focusin', (e) => { if (typing(e.target)) set(keyboardHeight()); });
+    document.addEventListener('focusout', (e) => { if (typing(e.target)) set(0); });
+    window.addEventListener('resize', () => fake.dispatchEvent(new Event('resize')));
+  });
+}
+
 // Fire a Media Session action as the OS would (headphones, lock screen, media keys).
 export async function mediaSessionAction(page, action) {
   await page.evaluate((a) => window.__mediaSessionHandlers[a]?.({ action: a }), action);
