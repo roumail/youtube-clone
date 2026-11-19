@@ -180,6 +180,7 @@ function render(s) {
   if (s.route.name === 'player') {
     const status = playerState.status;
     $('screen-player').dataset.state = status;
+    renderControlsVisibility();
     show('play-button', ['paused', 'ended', 'pin-required', 'time-up'].includes(status));
     show('pause-button', status === 'playing');
   }
@@ -386,6 +387,52 @@ function initSearch() {
     update();
   });
 }
+// Controls hide while playing (DESIGN.md §5, M12): after 3 s without input,
+// Back / Pause / scrub bar fade out; any mouse movement, tap or key shows them
+// again. Never while paused or while a prompt is open. The watch-time clock is
+// not part of the controls and always stays.
+const HIDE_CONTROLS_AFTER_MS = 3000;
+let controlsHidden = false;
+let hideTimer = null;
+const controlsMayHide = () => state.route.name === 'player' && playerState.status === 'playing'
+  && !state.prompt && $('budget-prompt').hidden;
+function armHideTimer() {
+  if (hideTimer || controlsHidden) return;
+  hideTimer = setTimeout(() => {
+    hideTimer = null;
+    if (!controlsMayHide()) return;
+    controlsHidden = true;
+    update();
+  }, HIDE_CONTROLS_AFTER_MS);
+}
+function renderControlsVisibility() {
+  if (!controlsMayHide()) {
+    controlsHidden = false;
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  } else {
+    armHideTimer();
+  }
+  $('screen-player').dataset.controls = controlsHidden ? 'hidden' : 'shown';
+}
+function showControls() {
+  if (state.route.name !== 'player') return;
+  clearTimeout(hideTimer);
+  hideTimer = null;
+  if (controlsHidden) {
+    controlsHidden = false;
+    update();
+  } else if (controlsMayHide()) {
+    armHideTimer();
+  }
+}
+function initControlsHide() {
+  const screen = $('screen-player');
+  for (const type of ['pointermove', 'pointerdown', 'touchstart']) {
+    screen.addEventListener(type, showControls, { passive: true });
+  }
+  document.addEventListener('keydown', showControls);
+}
 function initSeek() {
   const v = $('player-video');
   const bar = $('seek-bar');
@@ -543,6 +590,7 @@ async function boot() {
   initPlayer($('player-video'), update);
   initSeek();
   initVisibleArea();
+  initControlsHide();
   // Leaving the app (switching apps, locking the screen) pauses; coming back
   // needs the PIN again.
   document.addEventListener('visibilitychange', () => {
