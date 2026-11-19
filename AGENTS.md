@@ -109,8 +109,10 @@ Out of scope unless the owner asks for it:
   Linux machine without Docker: `tools/run_prepare.sh [--title "…"] <files or folders>`,
   with the destination from `KIDS_LIBRARY` in a gitignored `.env` (see
   `.env.example`); never commit the owner's paths.
-- The image's inputs (base image, ffmpeg, Shaka Packager) are pinned by digest
-  or checksum. A bump changes the pin and nothing else.
+- The image's base (Alpine), ffmpeg and Shaka Packager are pinned by digest or
+  checksum; a bump changes the pin and nothing else. Its few Alpine packages
+  (bash, perl, GNU tar) and their updates come from that Alpine release when
+  the image is built.
 - Manual real-episode check in the owner's Chrome (not CI): adds and plays a
   prepared episode in the live app: `node tools/real-episode-check.mjs "prepared/<Title>"`.
 - Release (owner only): `tools/release.sh minor` (or `major`/`patch`/`1.0.0`, `--dry-run`).
