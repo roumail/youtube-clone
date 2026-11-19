@@ -68,11 +68,6 @@ export async function savePin(pin) {
   localStorage.setItem(PIN_KEY, await sha256Hex(pin));
 }
 
-export async function verifyPin(pin) {
-  const stored = localStorage.getItem(PIN_KEY);
-  return !!stored && (await sha256Hex(pin)) === stored;
-}
-
 function readLockout() {
   try {
     return { failures: 0, until: 0, ...JSON.parse(localStorage.getItem(LOCKOUT_KEY) ?? '{}') };

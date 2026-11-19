@@ -6,7 +6,7 @@
 let player;
 let video;
 let authorized = false; // true only between allowPlay() and the next pause/end
-let onChange = () => {};
+let onChange;
 let closing = Promise.resolve(); // a pending closeVideo(); opening waits for it
 
 /** status: 'loading' | 'paused' | 'pin-required' | 'playing' | 'ended' | 'time-up' | 'error' */
