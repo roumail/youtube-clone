@@ -1,5 +1,5 @@
 // Feature: Search the library — a parent narrows the library by title.
-// Typing needs the PIN; clearing is free (DESIGN.md §3 "Search", M10).
+// Typing needs the PIN; clearing is free.
 import { test, expect, goto, enterPin, PIN, WRONG_PIN } from '../../support.js';
 
 const search = (page) => page.getByTestId('search-input');

@@ -1,5 +1,5 @@
 // Feature: Series — the library shows one tile per series; tapping it lists
-// the episodes in order. Titles "Series - SxxEyy - Episode" (DESIGN.md §3).
+// the episodes in order. Titles "Series - SxxEyy - Episode".
 import { test, expect, goto, startPlaying, expectNotPlaying } from '../../support.js';
 
 const EPISODES = ['Show - S01E10 - Tenth', 'Show - S01E01 - First', 'Show - S01E02 - Second'];

@@ -1,16 +1,18 @@
 # Working on this repo (for any coding agent / LLM)
 
 An offline, PIN-gated kids video library: an installable web app (PWA) for one
-family's Mac and iPad. **Read `DESIGN.md` first — it is the spec and the source
-of truth.** This file only says *how* to work here.
+family's Mac and iPad. **The behaviour specs in `e2e/features/` are the source of
+truth.** `DESIGN.md` keeps only what they can't: the reasons behind decisions,
+notes for the owner, scope, behaviour with no scenario yet, and the manual
+device checklist. This file only says *how* to work here.
 
 ## The owner decides
 - The owner sets the order of work and approves every PR merge, unless they
   explicitly hand merging to you for specific PRs.
-- **Nothing gets added without asking** (DESIGN.md §6). If a feature, setting,
+- **Nothing gets added without asking** (DESIGN.md §3, Scope). If a feature, setting,
   dependency or behaviour isn't in the spec, propose it and wait.
 - **Don't deviate from the spec.** If you learn something that contradicts it,
-  stop, raise it, update `DESIGN.md` in a PR, then continue.
+  stop, raise it, update the spec in a PR, then continue.
 - Open questions that need the owner are listed in DESIGN.md → "Open decisions".
   Ask; don't guess.
 
@@ -50,18 +52,21 @@ of truth.** This file only says *how* to work here.
 ## How features are built
 - Behaviour specs live in `e2e/features/<area>/*.spec.js`: one file per
   `Feature:`, one `test('Scenario: …')` per scenario, Given/When/Then as
-  `test.step` labels (DESIGN.md §7).
-- Unbuilt scenarios are `test.fixme`. To build a milestone, take its feature
-  files from the **milestone ↔ feature map** in DESIGN.md, switch those
-  scenarios from `test.fixme` to `test`, and implement until CI is green.
+  `test.step` labels. How to write them: DESIGN.md §5.
+- Unbuilt scenarios are `test.fixme`. A new feature starts as a feature file of
+  `test.fixme` scenarios, reviewed by the owner; building it means switching
+  them to `test` and implementing until CI is green.
 - Tests wait on app state (`data-state`, `data-import`, …), never on time;
-  `waitForTimeout` is banned by lint. The app ↔ test contract (routes, test ids,
-  states, persisted keys) is in DESIGN.md §7 — change the spec before changing it.
+  `waitForTimeout` is banned by lint. The routes, test ids, states and persisted
+  keys the specs use are the app ↔ test contract — change the spec before
+  changing them.
+- Behaviour listed in DESIGN.md §4 has no scenario yet: write one before
+  changing it.
 - CI runs on Ubuntu in the digest-pinned Playwright image, with a P3 screen
   emulated for every test. A Playwright bump changes `package.json` and the
   image digest together. Real-Mac checks are local (`tools/real-episode-check.mjs`).
 
-## Must-keep technical rules (details in DESIGN.md)
+## Must-keep technical rules
 - Shaka offline: **always pass our own `offline.trackSelectionCallback`**
   (store the single variant). Shaka's default drops SDR video on P3 screens and
   stores 0 tracks without an error. A store with 0 tracks is a failure.
@@ -75,7 +80,8 @@ of truth.** This file only says *how* to work here.
 - Releases (`vMAJOR.MINOR.PATCH` tags + GitHub Releases) are cut **by the
   owner** with `tools/release.sh`, and publishing one deploys it. Never create, move or delete
   tags yourself. When a PR is user-visible, say in it whether it's a
-  major, minor or patch change.
+  major (incompatible, e.g. videos must be re-added), minor (new feature) or
+  patch (fixes only) change.
 
 ## Useful commands
 - Prepare real videos (owner's Mac): `tools/run_prepare.sh [--title "…"] <files or folders>`.

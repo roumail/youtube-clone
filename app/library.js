@@ -1,4 +1,4 @@
-// The video library: Shaka offline storage (DESIGN.md §1, §3, §4).
+// The video library: Shaka offline storage.
 import { expandPick, describePick, registerPickedFiles, fileToDataUrl } from './local-scheme.js';
 
 // Never use Shaka's default track picker: on P3 screens it drops SDR video and
@@ -39,7 +39,7 @@ export async function listVideos() {
 }
 
 /**
- * Series info lives in the title (= the .mpd file name, DESIGN.md §3):
+ * Series info lives in the title (= the .mpd file name):
  * "Bluey - S01E03 - Keepy Uppy" -> { series: 'Bluey', season: 1, episode: 3, episodeTitle: 'Keepy Uppy' }.
  * Anything else is a standalone video: { series: null }.
  */

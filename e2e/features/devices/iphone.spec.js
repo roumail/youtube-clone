@@ -1,4 +1,4 @@
-// Feature: Works on iPhone — portrait and landscape (DESIGN.md §1, M9).
+// Feature: Works on iPhone — portrait and landscape.
 // Runs only in the iphone-portrait and iphone-landscape projects (@iphone).
 // The on-screen keyboard can't be shown in CI, so `onScreenKeyboard` models it
 // the way iPhone Safari reports it: typing into a field shrinks

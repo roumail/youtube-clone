@@ -1,7 +1,7 @@
 # Preparing videos (owner's Mac)
 
-Videos must be prepared once on the Mac before the app can store them
-(DESIGN.md §4). Each prepared video becomes **one file**:
+Videos must be prepared once on the Mac before the app can store them.
+Each prepared video becomes **one file**:
 
 ```
 Kids Library/

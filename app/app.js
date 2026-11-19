@@ -1,4 +1,4 @@
-// App: routing + one state object + render(state) (DESIGN.md §2, §7 contract).
+// App: routing + one state object + render(state).
 // M2 library/import, M3 player + PIN gate, M4 first-run PIN, lockout, change
 // PIN, offline (service worker) and installability.
 import { installLocalScheme, CONTAINER_EXT } from './local-scheme.js';
@@ -104,7 +104,7 @@ function episodeTile(c, hash) {
   return li;
 }
 
-// The library: one tile per series, next to standalone videos (DESIGN.md §3).
+// The library: one tile per series, next to standalone videos.
 // The list is already in library order, so a series' first episode marks its place.
 function libraryTiles(library) {
   const bySeries = new Map();
@@ -358,7 +358,7 @@ function showPosition() {
 }
 // Phones: the on-screen keyboard covers part of the screen, and Safari doesn't
 // shrink full-screen layers for it. Keep the PIN prompt inside the area that is
-// still visible, so the field and buttons stay above the keyboard (DESIGN.md §1).
+// still visible, so the field and buttons stay above the keyboard.
 function initVisibleArea() {
   const vv = window.visualViewport;
   if (!vv) return;
@@ -371,7 +371,7 @@ function initVisibleArea() {
   vv.addEventListener('scroll', apply);
   apply();
 }
-// Library search (DESIGN.md §3 "Search"): locked until the PIN, unlocked until
+// Library search: locked until the PIN, unlocked until
 // the field loses focus; clearing needs no PIN.
 function initSearch() {
   const input = $('search-input');
@@ -391,7 +391,7 @@ function initSearch() {
     update();
   });
 }
-// Real full screen (DESIGN.md §5, M14): the whole app, never the <video>
+// Real full screen: the whole app, never the <video>
 // element (its native controls would get around the PIN), so prompts and our
 // own controls keep working. Hidden where the browser doesn't allow it (iPhone).
 const fullScreenAllowed = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
@@ -414,7 +414,7 @@ function initFullScreen() {
   for (const type of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(type, update);
 }
 
-// Controls hide while playing (DESIGN.md §5, M12): after 3 s without input,
+// Controls hide while playing: after 3 s without input,
 // Back / Pause / scrub bar fade out; any mouse movement, tap or key shows them
 // again. Never while paused or while a prompt is open. The watch-time clock is
 // not part of the controls and always stays.
@@ -478,7 +478,7 @@ function initSeek() {
 }
 
 // Several files picked at once: imported one after another; a bad file doesn't
-// stop the rest, and the summary names what failed (DESIGN.md §4).
+// stop the rest, and the summary names what failed.
 async function importSeveral(files) {
   const total = files.length;
   let added = 0;
@@ -634,7 +634,7 @@ async function boot() {
 
   // Offline + installable: cache the app shell (network-first, sw.js).
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-  // One user, no UI: just ask the browser to keep the library (DESIGN.md §1).
+  // One user, no UI: just ask the browser to keep the library.
   navigator.storage?.persist?.().catch(() => {});
 
   state.features = await loadEnabled(featureContext());

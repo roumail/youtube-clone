@@ -1,4 +1,4 @@
-// Shared test fixtures and helpers. See DESIGN.md §7 "App ↔ test contract".
+// Shared test fixtures and helpers.
 // Rule: wait on observable state, never on time. No waitForTimeout anywhere.
 import { test as base, expect } from '@playwright/test';
 import { createHash } from 'node:crypto';
@@ -25,13 +25,13 @@ export const test = base.extend({
   // flags. Tests that aren't about the watch-time limit start with it switched
   // off (as a parent can in Settings), so a first play doesn't ask for a
   // budget. Feature files about it use test.use({ features: null }) to get the
-  // app's real defaults (DESIGN.md §7).
+  // app's real defaults.
   features: [{ watchTimeLimit: false }, { option: true }],
 
   // Capture Media Session handlers the app registers, so tests can fire
   // "play" as if from headphones / lock screen. No hooks needed in the app.
   // Every test sees a wide-gamut (P3) screen, like the family's MacBook and
-  // iPad. Shaka changes its track choices on such screens (DESIGN.md §1).
+  // iPad. Shaka changes its track choices on such screens.
   page: async ({ page, features }, use) => {
     if (features) {
       await page.addInitScript((f) => {
@@ -92,7 +92,7 @@ export const test = base.extend({
             r.readAsDataURL(blob);
           });
           const storage = new shaka.offline.Storage();
-          // Same rule as the app (DESIGN.md §1): never Shaka's default picker,
+          // Same rule as the app: never Shaka's default picker,
           // which drops SDR video on P3 screens (emulated for every test).
           storage.configure({ offline: {
             trackSelectionCallback: async (tracks) => tracks.filter((t) => t.type === 'variant').slice(0, 1),
@@ -171,7 +171,7 @@ export async function setVisibility(page, state) {
   }, state);
 }
 
-// Model the iPhone's on-screen keyboard (DESIGN.md §7): while a text field has
+// Model the iPhone's on-screen keyboard: while a text field has
 // focus, window.visualViewport is shorter by the keyboard's height, as iPhone
 // Safari reports it; it closes ≈300 ms after the field loses focus. The page itself doesn't move. Call before goto().
 // The device's storage as the browser reports it (navigator.storage.estimate):
