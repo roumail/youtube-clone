@@ -209,7 +209,7 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  test.fixme('Scenario: a renamed file that is not really a .kidsvideo is refused', async ({ page, pinSet }) => {
+  test('Scenario: a renamed file that is not really a .kidsvideo is refused', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
     });
@@ -226,7 +226,7 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  test.fixme('Scenario: a .kidsvideo without its manifest is refused', async ({ page, pinSet }) => {
+  test('Scenario: a .kidsvideo without its manifest is refused', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
     });
@@ -242,7 +242,7 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  test.fixme('Scenario: a video whose storing fails partway (the device fills up) leaves nothing behind', async ({ page, pinSet }) => {
+  test('Scenario: a video whose storing fails partway (the device fills up) leaves nothing behind', async ({ page, pinSet }) => {
     await test.step('Given the device runs out of space after the first few parts of a video are stored', async () => {
       await page.addInitScript(() => {
         let writes = 0;
