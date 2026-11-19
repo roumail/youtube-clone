@@ -17,7 +17,8 @@ OUT="$(dirname "$DIR")/$TITLE.kidsvideo"
 for f in "$TITLE.mpd" video.mp4 audio.mp4 poster.jpg; do
   [[ -f "$DIR/$f" ]] || { echo "not a prepared video folder (missing $f): $DIR" >&2; exit 1; }
 done
-(( ${#TITLE} <= 95 )) || { echo "title too long for the container (max 95 characters): $TITLE" >&2; exit 1; }
+# The tar name field holds 100 bytes: "<Title>.mpd" and its closing NUL must fit.
+(( $(printf '%s' "$TITLE" | wc -c) <= 95 )) || { echo "title too long for the container (max 95 bytes; an accented letter counts as 2): $TITLE" >&2; exit 1; }
 
 TMP="$OUT.partial"
 # ustar, no macOS metadata (._ files / xattrs): a plain archive any tar reads.

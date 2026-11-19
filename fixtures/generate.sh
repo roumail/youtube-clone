@@ -59,12 +59,27 @@ for ep in "Show - S01E10 - Tenth" "Show - S01E02 - Second" "Show - S01E01 - Firs
   "$PREPARE" "$RAW/$ep.mp4" "$OUT" >/dev/null
 done
 
+# The longest title pack.sh accepts (95 bytes), from a copy of "tiny".
+LONG_TITLE="The Longest Title Allowed - A Tale About Many Long Words That Keeps Going Until It Finally Ends"
+cp "$RAW/tiny.mp4" "$RAW/$LONG_TITLE.mp4"
+"$PREPARE" "$RAW/$LONG_TITLE.mp4" "$OUT" >/dev/null
+
 # Unpack every container into a same-named folder: tests that seed the library
 # directly (not through the picker) load the parts over HTTP. Test-only; the
 # real output is just the .kidsvideo file.
 for c in "$OUT"/*.kidsvideo; do
   d="${c%.kidsvideo}"; mkdir -p "$d"; tar -xf "$c" -C "$d"
 done
+
+# pack.sh refuses a title that is 95 characters but 96 bytes (one "é"): its
+# name would fill the tar name field with no closing NUL.
+ACCENTED_TITLE="The Longest Title Allowed - A Café About Many Long Words That Keeps Going Until It Finally Ends"
+mkdir "$RAW/$ACCENTED_TITLE"
+cp "$OUT/tiny/"{video.mp4,audio.mp4,poster.jpg} "$RAW/$ACCENTED_TITLE/"
+cp "$OUT/tiny/tiny.mpd" "$RAW/$ACCENTED_TITLE/$ACCENTED_TITLE.mpd"
+if LC_ALL=C.UTF-8 "$HERE/../tools/pack.sh" "$RAW/$ACCENTED_TITLE" >/dev/null 2>&1; then
+  echo "pack.sh accepted a title over 95 bytes" >&2; exit 1
+fi
 
 # A container with a part missing (no audio.mp4).
 rm "$OUT/broken-missing-audio.kidsvideo"

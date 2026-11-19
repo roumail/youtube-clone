@@ -22,10 +22,9 @@ const sizeText = (bytes) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `
 // guesses the size from the manifest's peak bitrate, which for films is several
 // times too big, and refuses videos that would fit.
 async function checkSpace(title, files) {
-  const estimate = await navigator.storage?.estimate?.().catch(() => null);
-  if (!estimate?.quota) return;
+  const estimate = await navigator.storage.estimate();
   const needed = files.reduce((sum, f) => sum + f.size, 0);
-  const free = Math.max(0, estimate.quota - (estimate.usage ?? 0));
+  const free = Math.max(0, estimate.quota - estimate.usage);
   if (needed > free) {
     throw new Error(`not enough space on this device ("${title}" needs ${sizeText(needed)}, ${sizeText(free)} is free)`);
   }
@@ -33,7 +32,6 @@ async function checkSpace(title, files) {
 
 /** Stored videos that can actually be played, as Shaka StoredContent. */
 export async function listVideos() {
-  if (!shaka.offline.Storage.support()) return [];
   const all = await withStorage((s) => s.list());
   return all.filter(isUsable).sort(byLibraryOrder);
 }
