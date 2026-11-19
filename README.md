@@ -1,6 +1,6 @@
 # Kids video library
 
-An offline, PIN-gated video library for one family's Mac, iPad and iPhone: an
+An offline, PIN-gated video library for a family's Mac, iPad and iPhone: an
 installable web app (PWA). Videos are prepared once on the Mac, sent to the
 iPad and iPhone with AirDrop, and stored on each device. Pausing is free;
 playing needs the PIN every time; nothing plays by itself.
@@ -48,9 +48,9 @@ segments in IndexedDB and plays them through Media Source Extensions
 blow-up on iOS 15, broken playback on iOS 17.4.1, crashes with 100–500 MB
 files). It's production-grade, so nothing is hand-rolled on the storage side.
 
-**Each video is prepared once on the Mac** (Shaka stores DASH, not plain
-`.mp4`), into one `.kidsvideo` file sent to the devices with AirDrop, so the
-iPad and iPhone never process anything. Tools: the pinned Shaka Packager
+**Each video is prepared once on the Mac**, or on any computer with Docker
+(Shaka stores DASH, not plain `.mp4`), into one `.kidsvideo` file sent to the
+devices with AirDrop, so the iPad and iPhone never process anything. Tools: the pinned Shaka Packager
 binary (repackages without re-encoding) and ffmpeg (re-encodes only when needed,
 grabs the poster). No Python anywhere.
 

@@ -1,7 +1,7 @@
-# Preparing videos (owner's Mac)
+# Preparing videos
 
-Videos must be prepared once on the Mac before the app can store them.
-Each prepared video becomes **one file**:
+The app plays only one format: a `.kidsvideo` file. Each video is prepared once,
+on a computer, into one such file:
 
 ```
 Kids Library/
@@ -10,31 +10,56 @@ Kids Library/
 ```
 
 A `.kidsvideo` is a plain, uncompressed `tar` of the 4 parts the app needs
-(`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). On the iPad or iPhone
-you pick just that one file. It's the only format the app accepts.
+(`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). Send it to the iPad or
+iPhone (AirDrop, or any way that puts it in Files) and add it in the app; see
+the main README.
 
-## One-time setup
+There are two ways to run the preparation: with Docker on any computer, or
+directly on a Mac or Linux machine. Both run the same `tools/run_prepare.sh`,
+with the same options.
 
-1. ffmpeg (already installed via Homebrew): `brew install ffmpeg`
+## With Docker (any computer)
+
+Needs Docker (Docker Desktop on a Mac or Windows) and git. Once:
+
+```bash
+git clone https://github.com/roumail/youtube-clone.git
+cd youtube-clone
+docker build -t kids-prepare .
+```
+
+Then mount the folder with your videos as `/in` and your library folder as
+`/out` (it must exist), and pass the inputs as `/in/...` paths:
+
+```bash
+docker run --rm -it --user "$(id -u):$(id -g)" \
+  -v ~/Downloads:/in:ro -v ~/"Kids Library":/out \
+  kids-prepare /in/Frozen.2.2019.1080p.WEB-DL.mkv
+```
+
+- A whole folder: `kids-prepare /in`. A series: `kids-prepare --series "Bluey" /in/Bluey`.
+  Every option below works the same way.
+- `-it` shows the re-encoding progress bar; leave it out to pipe paths in
+  (`ls *.mp4 | sed 's|^|/in/|' | docker run --rm -i ... kids-prepare`).
+- `--user` makes the prepared files yours, not root's.
+- `--tmux` doesn't work in the container; Docker's own `-d` runs it detached
+  (`docker logs -f <id>` to watch).
+
+## Without Docker (Mac or Linux)
+
+1. Get the repo (`git clone`, as above) and ffmpeg: `brew install ffmpeg` on a
+   Mac, your package manager on Linux (`sudo apt install ffmpeg`).
 2. Tell the tools where your library folder is. Copy the example and edit the
    path (`.env` is gitignored, so your path stays private):
    ```bash
    cp .env.example .env
    # then set, e.g.:
-   # KIDS_LIBRARY="$HOME/Library/CloudStorage/GoogleDrive-<you>/My Drive/Kids Library"
+   # KIDS_LIBRARY="$HOME/Movies/Kids Library"
    ```
-   The folder must exist. It is the library's backup; the iPad and iPhone get
-   each `.kidsvideo` from it by AirDrop (see the main README).
+   The folder must exist. Keep it: it is your library's backup.
 
 The pinned Shaka Packager is downloaded automatically on first use
 (`tools/get-packager.sh`, checksum-verified).
-
-## `tools/run_prepare.sh` — the everyday command
-
-```bash
-tools/run_prepare.sh [--dest DIR] [--title "Clean Title"] [--series "Name"] INPUT...
-ls *.mp4 | tools/run_prepare.sh        # paths on stdin, one per line
-```
 
 ### Put it on your PATH (once)
 Link it into a `bin` folder on your PATH, so `run_prepare` works from any
@@ -43,9 +68,16 @@ folder. It follows the link back to the repo, so it still finds `.env` (your
 
 ```bash
 mkdir -p ~/bin
-ln -sf ~/home/2_AREAS/work/youtube-clone/tools/run_prepare.sh ~/bin/run_prepare
+ln -sf "$PWD/tools/run_prepare.sh" ~/bin/run_prepare   # run from the repo folder
 # if ~/bin isn't on your PATH yet (zsh):
 echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
+```
+
+## `tools/run_prepare.sh`: options and examples
+
+```bash
+tools/run_prepare.sh [--dest DIR] [--title "Clean Title"] [--series "Name"] INPUT...
+ls *.mp4 | tools/run_prepare.sh        # paths on stdin, one per line
 ```
 
 | Option | Meaning |
@@ -100,7 +132,7 @@ seconds.
 Re-encoding a film (e.g. HEVC → H.264) can take an hour. With `--tmux` the job
 runs in a detached tmux session, so closing the terminal doesn't stop it:
 ```bash
-fm ~/Downloads/test | run_prepare --tmux       # pipes work too
+find ~/Downloads/test -iname '*.mkv' | run_prepare --tmux   # pipes work too
 tmux attach -t kids-prepare-…                  # watch it (Ctrl-b then d to leave it running)
 ```
 The full output is also saved to `prepared/run_prepare-<session>.log`.
