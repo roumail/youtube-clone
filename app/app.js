@@ -8,7 +8,7 @@ import {
 import { listVideos, importVideo, removeVideo } from './library.js';
 import {
   playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
-  timeUp,
+  timeUp, seekTo, seekBy,
 } from './player.js';
 import { FEATURES, flags, setFlag, loadEnabled, start as startFeature } from './features.js';
 
@@ -251,6 +251,39 @@ function featureContext() {
   return { $, playerState, timeUp, changed: () => update() };
 }
 
+// ---------- seek (M8) ----------
+const pad2 = (n) => String(n).padStart(2, '0');
+function clock(sec) {
+  const s = Math.max(0, Math.floor(sec || 0));
+  return s >= 3600 ? `${Math.floor(s / 3600)}:${pad2(Math.floor((s % 3600) / 60))}:${pad2(s % 60)}` : `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+}
+let dragging = false;
+function showPosition() {
+  const v = $('player-video');
+  const bar = $('seek-bar');
+  const total = Number.isFinite(v.duration) ? v.duration : 0;
+  bar.max = String(Math.floor(total));
+  if (!dragging) bar.value = String(Math.floor(v.currentTime));
+  $('time-elapsed').textContent = clock(dragging ? Number(bar.value) : v.currentTime);
+  $('time-total').textContent = clock(total);
+}
+function initSeek() {
+  const v = $('player-video');
+  const bar = $('seek-bar');
+  for (const ev of ['timeupdate', 'durationchange', 'loadedmetadata', 'seeked', 'emptied']) v.addEventListener(ev, showPosition);
+  bar.addEventListener('pointerdown', () => { dragging = true; });
+  bar.addEventListener('input', () => { seekTo(Number(bar.value)); showPosition(); });
+  bar.addEventListener('change', () => { dragging = false; seekTo(Number(bar.value)); showPosition(); update(); });
+  document.addEventListener('keydown', (e) => {
+    if (state.route.name !== 'player' || state.prompt || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    if (e.target instanceof HTMLInputElement && e.target !== bar) return; // typing a PIN
+    e.preventDefault(); // also stops the range input's own 1-second step
+    seekBy(e.key === 'ArrowRight' ? 10 : -10);
+    showPosition();
+    update();
+  });
+}
+
 // Play (button or OS command): the PIN comes first, every time.
 function onPlayRequested() {
   if (state.route.name !== 'player' || state.prompt) return;
@@ -353,6 +386,7 @@ async function boot() {
   window.addEventListener('hashchange', onRouteChange);
 
   initPlayer($('player-video'), update);
+  initSeek();
   // Leaving the app (switching apps, locking the screen) pauses; coming back
   // needs the PIN again.
   document.addEventListener('visibilitychange', () => {
