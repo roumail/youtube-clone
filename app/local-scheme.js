@@ -21,51 +21,25 @@ export const PICK_SET = ['.mpd', 'video.mp4', 'audio.mp4', 'poster.jpg'];
 export const CONTAINER_EXT = '.kidsvideo';
 const isContainer = (f) => f.name.toLowerCase().endsWith(CONTAINER_EXT);
 
-const text = (bytes, start, len) => {
-  const raw = bytes.subarray(start, start + len);
-  const end = raw.indexOf(0);
-  return new TextDecoder().decode(end === -1 ? raw : raw.subarray(0, end));
-};
-const octal = (bytes, start, len) => parseInt(text(bytes, start, len).trim() || '0', 8);
-
 async function readContainer(file) {
   const parts = [];
   let offset = 0;
-  let paxPath = null;
   while (offset + 512 <= file.size) {
     const h = new Uint8Array(await file.slice(offset, offset + 512).arrayBuffer());
-    if (h.every((b) => b === 0)) break; // end of archive
-    const size = octal(h, 124, 12);
-    const type = String.fromCharCode(h[156] || 48); // '0' when NUL
-    const prefix = text(h, 257, 6).startsWith('ustar') ? text(h, 345, 155) : '';
+    if (String.fromCharCode(...h.subarray(257, 262)) !== 'ustar') break; // end of archive, or not a tar
+    // bsdtar ends the size with a space, GNU tar with a NUL: parseInt stops at either.
+    const size = parseInt(String.fromCharCode(...h.subarray(124, 136)), 8);
     const dataStart = offset + 512;
-    if (type === 'x') {
-      // pax extended header: may carry the real path of the next entry
-      const pax = await file.slice(dataStart, dataStart + size).text();
-      paxPath = /(?:^|\n)\d+ path=([^\n]*)\n/.exec(pax)?.[1] ?? null;
-    } else if (type === '0' || type === '7') {
-      const name = paxPath ?? (prefix ? `${prefix}/${text(h, 0, 100)}` : text(h, 0, 100));
-      paxPath = null;
-      const base = name.split('/').pop();
-      if (!base.startsWith('._')) {
-        parts.push(new File([file.slice(dataStart, dataStart + size)], base));
-      }
-    } else {
-      paxPath = null; // directories, links, global headers: ignored
-    }
+    parts.push(new File([file.slice(dataStart, dataStart + size)], new TextDecoder().decode(h.subarray(0, h.indexOf(0)))));
     offset = dataStart + Math.ceil(size / 512) * 512;
   }
   if (!parts.length) throw new Error(`${file.name} isn't a readable ${CONTAINER_EXT} file`);
   return parts;
 }
 
-/** The pick must be exactly one .kidsvideo; it becomes its 4 parts. */
-export async function expandPick(files) {
-  const list = [...files];
-  if (list.length !== 1 || !isContainer(list[0])) {
-    throw new Error(`pick the video's ${CONTAINER_EXT} file (one file per video)`);
-  }
-  return readContainer(list[0]);
+export async function expandPick([file]) {
+  if (!isContainer(file)) throw new Error(`${file.name} isn't a ${CONTAINER_EXT} file`);
+  return readContainer(file);
 }
 
 /** Check the picked files form one prepared video. Returns {manifest, poster, title} or throws. */

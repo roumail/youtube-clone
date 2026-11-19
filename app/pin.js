@@ -69,11 +69,7 @@ export async function savePin(pin) {
 }
 
 function readLockout() {
-  try {
-    return { failures: 0, until: 0, ...JSON.parse(localStorage.getItem(LOCKOUT_KEY) ?? '{}') };
-  } catch {
-    return { failures: 0, until: 0 };
-  }
+  return { failures: 0, until: 0, ...JSON.parse(localStorage.getItem(LOCKOUT_KEY)) };
 }
 const writeLockout = (l) => localStorage.setItem(LOCKOUT_KEY, JSON.stringify(l));
 

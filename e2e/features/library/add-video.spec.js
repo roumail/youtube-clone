@@ -1,6 +1,6 @@
 // Feature: Add a video — behind the PIN; pick the video's one .kidsvideo file.
 // The title is the .mpd file name.
-import { test, expect, goto, enterPin, fixtureContainer, fixtureParts, PIN, WRONG_PIN } from '../../support.js';
+import { test, expect, goto, enterPin, expectPlaying, fixtureContainer, fixtureParts, PIN, WRONG_PIN } from '../../support.js';
 
 test.describe('Feature: Add a video', () => {
   test('Scenario: PIN, pick the .kidsvideo, it appears in the library', async ({ page, pinSet }) => {
@@ -164,6 +164,47 @@ test.describe('Feature: Add a video', () => {
       await expect(page.getByTestId('import-status')).toContainText('already in the library');
       await page.reload();
       await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toHaveCount(1);
+    });
+  });
+
+  test('Scenario: a single file that is not a .kidsvideo is refused by name', async ({ page, pinSet }) => {
+    await test.step('Given the library is empty', async () => {
+      await goto(page, '#/library');
+    });
+    const chooser = page.waitForEvent('filechooser');
+    await test.step('When I pick only the loose "video.mp4" of "tiny"', async () => {
+      await page.getByTestId('add-video-button').click();
+      await enterPin(page, PIN);
+      await (await chooser).setFiles([fixtureParts('tiny')[1]]);
+    });
+    await test.step('Then the import says video.mp4 isn\'t a .kidsvideo file, and nothing is added', async () => {
+      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'error');
+      await expect(page.getByTestId('import-status')).toHaveText("Couldn't add the video: video.mp4 isn't a .kidsvideo file");
+      await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
+    });
+  });
+
+  // 95 bytes: the longest title tools/pack.sh accepts.
+  test('Scenario: a video with the longest allowed title adds and plays', async ({ page, pinSet }) => {
+    const title = 'The Longest Title Allowed - A Tale About Many Long Words That Keeps Going Until It Finally Ends';
+    await test.step('Given the library is empty', async () => {
+      await goto(page, '#/library');
+    });
+    const chooser = page.waitForEvent('filechooser');
+    await test.step(`When I add "${title}.kidsvideo"`, async () => {
+      await page.getByTestId('add-video-button').click();
+      await enterPin(page, PIN);
+      await (await chooser).setFiles([fixtureContainer(title)]);
+    });
+    await test.step('Then it is listed under its full title', async () => {
+      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
+      await expect(page.getByTestId('library-item').filter({ hasText: title })).toBeVisible();
+    });
+    await test.step('And it plays after play and the PIN', async () => {
+      await page.getByTestId('library-item').filter({ hasText: title }).click();
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
+      await expectPlaying(page);
     });
   });
 });

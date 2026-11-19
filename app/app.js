@@ -360,7 +360,6 @@ function showPosition() {
 // still visible, so the field and buttons stay above the keyboard.
 function initVisibleArea() {
   const vv = window.visualViewport;
-  if (!vv) return;
   const root = document.documentElement.style;
   const apply = () => {
     root.setProperty('--visible-top', `${vv.offsetTop}px`);
