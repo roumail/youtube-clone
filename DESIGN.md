@@ -151,7 +151,16 @@ e2e/                                ✅ specs (section 7)
     - **never** autoplay the next episode.
 
     Scenarios: `e2e/features/library/series.spec.js`.
-- Library grid only: no search, categories, or recommendations.
+- Library grid, plus a **search field** (added on request, 2026-11-19). No categories or recommendations.
+- **Search** (M10). A parent narrows the library by title; a child can't type into it:
+  - a search field above the grid. It is **locked** (read-only) until the PIN is entered: tapping it opens the PIN prompt;
+  - after the right PIN the field is focused **within the same tap** (so the iPad/iPhone keyboard comes up) and typing filters the library live: every video whose title contains the text, ignoring case. A series' name is part of its episodes' titles, so typing it finds the episodes, in episode order;
+  - it stays unlocked **until the field loses focus**; then it locks again. The text and its results stay, and typing again needs the PIN again;
+  - a **clear button** (✕) empties the search and shows the whole library. **Clearing is free** (no PIN): it only shows more, and never starts anything;
+  - no matches: a note says so. A wrong or cancelled PIN leaves the field locked and empty;
+  - the search isn't saved: a reload shows the whole library.
+
+  Scenarios: `e2e/features/library/search.spec.js`.
 - The app never fetches video content from the internet.
 
 ## 4. Adding media (~10%)
@@ -256,8 +265,10 @@ e2e/                                ✅ specs (section 7)
 - The PIN keeps a child from starting playback. It is not meant to stop a determined adult.
 
 Explicitly **out of scope unless asked for**:
-- search, playlists, recommendations, history
+- ~~search~~: **added on request (2026-11-19)**, see section 3 "Search"
+- playlists, recommendations, history
 - playback speed, subtitles, volume UI (hardware buttons only)
+- **next / previous buttons** in the player: **not wanted (owner decision 2026-11-19)**. Another video is opened from the library (or series list), paused, and needs the PIN to play.
 - ~~seek bar~~: **added on request (2026-11-19)**, see section 5 "Seek"
 - accounts, sync, cloud, multiple profiles
 - PiP, AirPlay, downloading from the internet, comments, likes
@@ -345,7 +356,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 | `import-status` | `data-import`: `idle` · `storing` · `done` · `error` |
 
 **Controls** (`data-testid`):
-- Library: `app-version` (the released version from `version.json`, or `dev`), `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`, `import-help` (always-visible note: pick the `.kidsvideo` file).
+- Library: `app-version` (the released version from `version.json`, or `dev`), `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`, `import-help` (always-visible note: pick the `.kidsvideo` file); **search (M10):** `search-input` (`data-state`: `locked` · `unlocked`), `search-clear`, `search-empty` (the no-matches note).
 - Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`; **seek (M8):** `seek-bar` (a range input, in seconds), `time-elapsed`, `time-total` (`mm:ss`, or `h:mm:ss` from one hour).
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
@@ -523,8 +534,9 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M8 – Seek** ✅ | `playback/seek` | **5** | M3. Released as a **minor** version. |
 | **M7 – Series** | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
 | **M9 – iPhone** ✅ | `devices/iphone` | **4** (each in portrait and landscape) | M2–M4. Released as a **patch** version (fixes the PIN prompt behind the keyboard). |
+| **M10 – Search** | `library/search` | **8** | M2–M4. Released as a **minor** version. |
 | **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
-| | | **59 in total** | |
+| | | **67 in total** | |
 
 Also active: `smoke/` (5). The M0 spike and its tests were removed after the owner's iPad test (2026-11-18); `local-scheme.js` from it is part of the app.
 
