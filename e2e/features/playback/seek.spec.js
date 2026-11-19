@@ -1,6 +1,6 @@
 // Feature: Seek — a scrub bar (elapsed / total) and ← / → to jump 10 s.
 // The child may seek freely: seeking never starts playback, so it can't get
-// around the PIN (owner decision 2026-11-19). Drafted for review (test.fixme).
+// around the PIN (owner decision 2026-11-19). Built in M8.
 import {
   test, expect, goto, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState,
 } from '../../support.js';
@@ -14,7 +14,7 @@ test.describe('Feature: Seek', () => {
     await openVideo(page, 'medium');
   });
 
-  test.fixme('Scenario: the player shows a scrub bar with elapsed and total time', async ({ page }) => {
+  test('Scenario: the player shows a scrub bar with elapsed and total time', async ({ page }) => {
     await test.step('Then the bar is at the start and shows 00:00 / 01:00', async () => {
       await expect(page.getByTestId('seek-bar')).toBeVisible();
       await expect(page.getByTestId('time-elapsed')).toHaveText('00:00');
@@ -22,7 +22,7 @@ test.describe('Feature: Seek', () => {
     });
   });
 
-  test.fixme('Scenario: dragging the bar while paused jumps there and stays paused, with no PIN', async ({ page }) => {
+  test('Scenario: dragging the bar while paused jumps there and stays paused, with no PIN', async ({ page }) => {
     await test.step('When I drag the bar to 0:30', async () => {
       await page.getByTestId('seek-bar').fill('30');
     });
@@ -35,7 +35,7 @@ test.describe('Feature: Seek', () => {
     });
   });
 
-  test.fixme('Scenario: seeking while playing keeps playing from the new point', async ({ page }) => {
+  test('Scenario: seeking while playing keeps playing from the new point', async ({ page }) => {
     await test.step('Given "medium" is playing', async () => {
       await startPlaying(page);
     });
@@ -48,7 +48,7 @@ test.describe('Feature: Seek', () => {
     });
   });
 
-  test.fixme('Scenario: the arrow keys jump 10 seconds back and forward', async ({ page }) => {
+  test('Scenario: the arrow keys jump 10 seconds back and forward', async ({ page }) => {
     await test.step('When I press → twice while paused', async () => {
       await page.keyboard.press('ArrowRight');
       await page.keyboard.press('ArrowRight');
@@ -65,7 +65,7 @@ test.describe('Feature: Seek', () => {
     });
   });
 
-  test.fixme('Scenario: the elapsed time follows playback', async ({ page }) => {
+  test('Scenario: the elapsed time follows playback', async ({ page }) => {
     await test.step('Given "medium" is playing', async () => {
       await startPlaying(page);
     });

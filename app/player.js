@@ -107,6 +107,15 @@ export async function allowPlay() {
   }
 }
 
+/** Seek (M8). Never starts playback: free for the child, no PIN needed. */
+export function seekTo(seconds) {
+  if (!video || !Number.isFinite(video.duration)) return;
+  video.currentTime = Math.max(0, Math.min(video.duration, seconds));
+  // Seeking back from the end makes it a normal paused video again.
+  if (playerState.status === 'ended' && video.currentTime < video.duration) set('paused');
+}
+export const seekBy = (delta) => video && seekTo(video.currentTime + delta);
+
 /** An optional feature (watch-time limit) says playing must stop now. */
 export function timeUp() {
   if (playerState.status !== 'playing') return;

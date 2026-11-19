@@ -392,7 +392,7 @@ e2e/
     playback/pause-and-resume       Feature: Pause and resume (pause never shows a PIN window; resume needs it; resumes in place)
     playback/multiple-videos        Feature: Several videos (back stops playback; switching starts paused; reopen from 0:00)
     playback/no-autoplay            Feature: No autoplay (end of video: nothing else starts)
-    playback/seek                   Feature: Seek (scrub bar, elapsed/total, ← / → 10 s; drafted)
+    playback/seek                   Feature: Seek (scrub bar, elapsed/total, ← / → 10 s)
     parental-controls/no-way-around-the-pin   Feature: backgrounding, OS "play", script play
     parental-controls/pin-lockout   Feature: PIN lockout (5 wrong → 60 s, survives reload)
     parental-controls/watch-time-limit   Feature: Watch-time limit (optional, behind a flag)
@@ -514,7 +514,7 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M3 – Player + PIN gate** ✅ | `playback/open-video`, `playback/play-requires-pin`, `playback/pause-and-resume`, `playback/multiple-videos`, `playback/no-autoplay`, `parental-controls/no-way-around-the-pin` | 3 + 3 + 3 + 3 + 1 + 3 = **16** | M2 (videos must be in the library) |
 | **M4 – First run, lockout, settings, offline** ✅ | `first-run/set-pin`, `parental-controls/pin-lockout`, `settings/settings`, `offline/offline` | 3 + 2 + 2 + 1 = **8** | M2, M3. Also adds `manifest.webmanifest`, icons, `sw.js` (network-first) and the startup `persist()` call |
 | **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
-| **M8 – Seek** | `playback/seek` | **5** | M3. Released as a **minor** version. |
+| **M8 – Seek** ✅ | `playback/seek` | **5** | M3. Released as a **minor** version. |
 | **M7 – Series** | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
 | **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
 | | | **34 in total** (M2 done: 10) | |

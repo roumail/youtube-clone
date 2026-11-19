@@ -72,3 +72,13 @@ progress[data-testid="import-progress"] { width: 100%; margin: 8px 0; }
 .budget-options button { font-size: 1.1rem; padding: 14px 20px; }
 .feature-settings { display: grid; gap: 10px; margin: 16px 0; }
 .feature-toggle { display: flex; align-items: center; gap: 10px; }
+
+/* Seek (M8): scrub bar with elapsed / total, just above the buttons */
+.seek {
+  position: absolute; z-index: 2; display: flex; align-items: center; gap: 12px;
+  left: calc(20px + env(safe-area-inset-left)); right: calc(20px + env(safe-area-inset-right));
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  background: rgb(30 30 30 / 0.6); backdrop-filter: blur(6px); padding: 8px 14px; border-radius: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.seek input[type="range"] { flex: 1; height: 32px; accent-color: var(--fg); }
