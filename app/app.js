@@ -588,7 +588,7 @@ async function showVersion() {
     const res = await fetch('version.json', { cache: 'no-cache' });
     if (!res.ok) return;
     const { version } = await res.json();
-    if (typeof version === 'string' && /^v\d+\.\d+\.\d+$/.test(version)) $('app-version').textContent = version;
+    $('app-version').textContent = version;
   } catch {
     // offline and not cached yet: keep the current text
   }

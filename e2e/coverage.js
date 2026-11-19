@@ -14,6 +14,7 @@ const options = {
   all: { dir: ['./app'], filter: { '**/vendor/**': false, '**/*.js': true } },
   reports: [
     'v8',
+    'lcovonly', // lcov.info, read by tools/diff-coverage.mjs
     ['console-details', { metrics: ['lines', 'branches'] }],
     ['markdown-details', { metrics: ['lines', 'branches'] }],
   ],
