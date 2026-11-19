@@ -547,7 +547,7 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M8 – Seek** ✅ | `playback/seek` | **5** | M3. Released as a **minor** version. |
 | **M7 – Series** ✅ | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
 | **M9 – iPhone** ✅ | `devices/iphone` | **4** (each in portrait and landscape) | M2–M4. Released as a **patch** version (fixes the PIN prompt behind the keyboard). |
-| **M13 – Watch-time limit on by default** | `parental-controls/watch-time-limit` (2 scenarios rewritten: on by default; switching off in Settings) | **2** | M6. Released as a **minor** version. |
+| **M13 – Watch-time limit on by default** ✅ | `parental-controls/watch-time-limit` (2 scenarios rewritten: on by default; switching off in Settings) | **2** | M6. Released as a **minor** version. |
 | **M12 – Controls hide while playing** ✅ | `playback/controls-hide` | **5** | M3. Released as a **minor** version (with M11 in v2.5.0). |
 | **M11 – Custom watch-time budget** ✅ | `parental-controls/watch-time-limit` ("Other…" scenarios) | **3** | M6. Released as a **minor** version. |
 | **M10 – Search** ✅ | `library/search` | **8** | M2–M4. Released as a **minor** version. |

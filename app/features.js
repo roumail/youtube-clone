@@ -1,19 +1,26 @@
 // Optional parental features behind flags (DESIGN.md §5, "Optional parental
 // features"). Each feature is its own module; a feature that's off is never
 // loaded. Flags live in localStorage['features'] and are switched in Settings,
-// which is behind the PIN. Every feature defaults to off.
+// which is behind the PIN. Each feature has its own default; a flag nobody has
+// touched follows it.
 const FLAGS_KEY = 'features';
 
 export const FEATURES = [
-  { id: 'watchTimeLimit', title: 'Watch-time limit', load: () => import('./features/watch-time.js') },
+  // On by default (owner decision 2026-11-19); a parent can switch it off.
+  { id: 'watchTimeLimit', title: 'Watch-time limit', default: true, load: () => import('./features/watch-time.js') },
 ];
 
+const defaults = () => Object.fromEntries(FEATURES.map((f) => [f.id, !!f.default]));
+
+/** Every feature's on/off: the stored choice, else the feature's default. */
 export function flags() {
+  let stored = {};
   try {
-    return JSON.parse(localStorage.getItem(FLAGS_KEY)) ?? {};
+    stored = JSON.parse(localStorage.getItem(FLAGS_KEY)) ?? {};
   } catch {
-    return {};
+    // unreadable: fall back to the defaults
   }
+  return { ...defaults(), ...stored };
 }
 
 export function setFlag(id, on) {
