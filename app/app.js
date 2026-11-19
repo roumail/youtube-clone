@@ -296,7 +296,7 @@ async function onPinSubmit(event) {
     update();
     $('search-input').focus();
     return;
-  } else if (purpose === 'play') {
+  } else {
     update();
     // Optional features may step in first (e.g. ask for a watch-time budget);
     // they call proceed() from their own tap, so playback still starts in-gesture.
@@ -375,7 +375,6 @@ function initSearch() {
   const input = $('search-input');
   input.addEventListener('click', () => { if (!state.searchUnlocked) askPin('search'); });
   input.addEventListener('input', () => {
-    if (!state.searchUnlocked) return update(); // puts the old text back
     state.search = input.value;
     update();
   });
@@ -425,7 +424,6 @@ function armHideTimer() {
   if (hideTimer || controlsHidden) return;
   hideTimer = setTimeout(() => {
     hideTimer = null;
-    if (!controlsMayHide()) return;
     controlsHidden = true;
     update();
   }, HIDE_CONTROLS_AFTER_MS);
@@ -522,7 +520,6 @@ function onPause() {
 
 function onPinCancel() {
   const purpose = state.prompt?.purpose;
-  if (purpose === 'setup') return; // the first-run PIN can't be skipped
   state.prompt = null;
   state.newPin = null;
   if (purpose === 'settings') go('#/library');
@@ -533,7 +530,6 @@ function onPinCancel() {
 async function onFilesPicked(event) {
   const files = [...event.target.files];
   event.target.value = '';
-  if (!files.length) return;
   if (files.length > 1) return importSeveral(files);
   state.importStatus = { phase: 'storing', progress: 0, message: 'Adding video…' };
   update();
@@ -559,14 +555,12 @@ async function onRemove(offlineUri) {
 function onRouteChange() {
   const previous = state.route;
   state.route = parseRoute(location.hash);
-  const leftPlayer = previous.name === 'player'
-    && (state.route.name !== 'player' || state.route.videoId !== previous.videoId);
-  if (leftPlayer) {
-    if (state.route.name !== 'player') exitFullScreen(); // Back to the library leaves full screen
+  if (previous.name === 'player') {
+    exitFullScreen(); // Back to the library leaves full screen
     if (state.prompt?.purpose === 'play') state.prompt = null;
     closeVideo().then(update);
   }
-  if (state.route.name === 'player' && (leftPlayer || previous.name !== 'player' || playerState.offlineUri == null)) {
+  if (state.route.name === 'player') {
     const exists = state.library.some((c) => c.offlineUri === state.route.videoId);
     openVideo(state.route.videoId, exists).then(update);
   }
@@ -625,10 +619,8 @@ async function boot() {
   });
   // OS media controls (lock screen, Control Center, headphones, media keys):
   // "play" goes through the PIN like the on-screen button; "pause" is free.
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.setActionHandler('play', onPlayRequested);
-    navigator.mediaSession.setActionHandler('pause', onPause);
-  }
+  navigator.mediaSession.setActionHandler('play', onPlayRequested);
+  navigator.mediaSession.setActionHandler('pause', onPause);
 
   // Offline + installable: cache the app shell (network-first, sw.js).
   navigator.serviceWorker.register('sw.js');
