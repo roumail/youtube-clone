@@ -1,12 +1,11 @@
 // Feature: Add several videos in one go — pick a whole season's .kidsvideo
 // files at once; they're imported one after another with progress.
-// Drafted for review; not built yet (test.fixme).
 import { test, expect, goto, enterPin, fixtureContainer, fixtureParts, PIN } from '../../support.js';
 
 const SEASON = ['Show - S01E01 - First', 'Show - S01E02 - Second', 'Show - S01E10 - Tenth'];
 
 test.describe('Feature: Add several videos in one go', () => {
-  test.fixme('Scenario: picking 3 episodes adds all 3, one after another', async ({ page, pinSet }) => {
+  test('Scenario: picking 3 episodes adds all 3, one after another', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
     });
@@ -25,7 +24,7 @@ test.describe('Feature: Add several videos in one go', () => {
     });
   });
 
-  test.fixme('Scenario: one bad file does not stop the others', async ({ page, pinSet }) => {
+  test('Scenario: one bad file does not stop the others', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
     });
@@ -43,7 +42,7 @@ test.describe('Feature: Add several videos in one go', () => {
     });
   });
 
-  test.fixme('Scenario: anything that is not a .kidsvideo is refused by name, the rest are added', async ({ page, pinSet }) => {
+  test('Scenario: anything that is not a .kidsvideo is refused by name, the rest are added', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
     });

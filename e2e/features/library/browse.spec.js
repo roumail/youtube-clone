@@ -43,18 +43,13 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test('Scenario: episodes of a series are listed together, in episode order', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a series sits among the other videos by its name', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given three episodes of "Show" (stored out of order) and "tiny" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('Show - S01E10 - Tenth', 'tiny', 'Show - S01E02 - Second', 'Show - S01E01 - First');
     });
-    await test.step('Then the episodes appear together, E01, E02, E10, and the other video by name', async () => {
-      await expect(page.getByTestId('library-item')).toHaveText([
-        /Show - S01E01 - First/,
-        /Show - S01E02 - Second/,
-        /Show - S01E10 - Tenth/,
-        /tiny/,
-      ]);
+    await test.step('Then the library shows the "Show" tile, then "tiny" (alphabetical)', async () => {
+      await expect(page.locator('[data-testid="series-item"], [data-testid="library-item"]')).toHaveText([/Show/, /tiny/]);
     });
   });
 });
