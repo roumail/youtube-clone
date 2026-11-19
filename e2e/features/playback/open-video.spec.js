@@ -68,7 +68,7 @@ test.describe('Feature: Open a video', () => {
     }
   });
 
-  test.fixme('Scenario: a video whose stored parts are gone shows an error instead of playing', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a video whose stored parts are gone shows an error instead of playing', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is listed, but the browser has since deleted its stored video and audio', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');

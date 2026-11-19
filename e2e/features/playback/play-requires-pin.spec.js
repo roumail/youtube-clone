@@ -50,7 +50,7 @@ test.describe('Feature: Playing needs the PIN', () => {
     });
   });
 
-  test.fixme('Scenario: after the end, play asks for the PIN and starts again from the beginning', async ({ page }) => {
+  test('Scenario: after the end, play asks for the PIN and starts again from the beginning', async ({ page }) => {
     await test.step('Given "medium" has played to its end', async () => {
       await page.getByTestId('seek-bar').fill('58');
       await page.getByTestId('play-button').click();
