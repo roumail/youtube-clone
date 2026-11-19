@@ -34,7 +34,11 @@ export const test = base.extend({
   page: async ({ page, features }, use) => {
     if (features) {
       await page.addInitScript((f) => {
-        if (!localStorage.getItem('features')) localStorage.setItem('features', JSON.stringify(f));
+        try {
+          if (!localStorage.getItem('features')) localStorage.setItem('features', JSON.stringify(f));
+        } catch {
+          // pages without storage (e.g. about:blank) have no app to configure
+        }
       }, features);
     }
     await page.addInitScript(() => {
