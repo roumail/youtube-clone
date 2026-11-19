@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prepare one video for the library.
 #
-#   tools/prepare.sh "My Video.mp4" "<Google Drive>/Kids Library"
+#   tools/prepare.sh "My Video.mp4" "<Kids Library>"
 #
 # Writes "<output-root>/My Video.kidsvideo": one file (an uncompressed tar) holding:
 #   My Video.mpd   DASH manifest; its file name is the title shown in the app

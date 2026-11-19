@@ -1,5 +1,6 @@
 // Shaka "local:" scheme plugin: lets Shaka read a packaged video
-// from files the parent picked (Files / Google Drive / Finder) instead of HTTP.
+// from files the parent picked (Files on the iPad/iPhone, Finder on the Mac)
+// instead of HTTP.
 //
 //   const uri = registerPickedFiles(fileList);   // -> "local://pick/My%20Video.mpd"
 //   await storage.store(uri, { title, poster }).promise;

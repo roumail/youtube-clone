@@ -1,9 +1,9 @@
 # Kids video library
 
 An offline, PIN-gated video library for one family's Mac, iPad and iPhone: an
-installable web app (PWA). Videos are prepared once on the Mac, shared through
-Google Drive, and stored on each device. Pausing is free; playing needs the PIN
-every time; nothing plays by itself.
+installable web app (PWA). Videos are prepared once on the Mac, sent to the
+iPad and iPhone with AirDrop, and stored on each device. Pausing is free;
+playing needs the PIN every time; nothing plays by itself.
 
 - **Live app:** https://www.rohailtaimour.com/youtube-clone/
 - **What it does:** the behaviour specs in `e2e/features/` are the source of truth.
@@ -18,11 +18,14 @@ every time; nothing plays by itself.
 - **Each device has its own library and its own PIN**, kept in that device's
   browser storage. The PIN can be changed in Settings.
 - **Deleting the home-screen app** (or clearing its data) deletes its library.
-  Re-adding from Google Drive is the recovery; the files there are the backup.
+  Re-adding from the Mac's library folder is the recovery; the files there are
+  the backup.
 - **Forgotten PIN:** delete and re-add the home-screen app (this also clears
   the library).
-- **iPad, picking from Google Drive:** the file is downloaded to a temporary
-  place first, so about 2× the video's size has to be free for a moment.
+- **Adding a video on the iPad or iPhone:** AirDrop its `.kidsvideo` from the
+  Mac; it lands in Files → Downloads. In the app: Add video → PIN → pick it
+  there. Then delete it from Downloads: the app keeps its own copy, so leaving
+  it there stores the video twice.
 - **Keep a child inside the app:** turn on iPad Guided Access.
 - **Honest limits.** The PIN and the watch-time limit stop a child, not a
   determined adult: the stored SHA-256 of a 4–6 digit PIN can be brute-forced by
@@ -46,10 +49,10 @@ blow-up on iOS 15, broken playback on iOS 17.4.1, crashes with 100–500 MB
 files). It's production-grade, so nothing is hand-rolled on the storage side.
 
 **Each video is prepared once on the Mac** (Shaka stores DASH, not plain
-`.mp4`), into one `.kidsvideo` file shared through Google Drive, so the iPad
-never processes anything. Tools: the pinned Shaka Packager binary (repackages
-without re-encoding) and ffmpeg (re-encodes only when needed, grabs the poster).
-No Python anywhere.
+`.mp4`), into one `.kidsvideo` file sent to the devices with AirDrop, so the
+iPad and iPhone never process anything. Tools: the pinned Shaka Packager
+binary (repackages without re-encoding) and ffmpeg (re-encodes only when needed,
+grabs the poster). No Python anywhere.
 
 **Stack:** plain HTML, CSS and JavaScript modules, no framework, no build step.
 The only app dependency is the vendored, pinned Shaka Player in `app/vendor/`.
