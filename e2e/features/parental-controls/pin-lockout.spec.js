@@ -45,4 +45,23 @@ test.describe('Feature: PIN lockout', () => {
       await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
   });
+
+  test.fixme('Scenario: a lockout started in another window stops this one too', async ({ page, context, pinSet }) => {
+    const other = await context.newPage();
+    await test.step('Given the settings PIN prompt is open in two windows', async () => {
+      await goto(page, '#/settings');
+      await goto(other, '#/settings');
+    });
+    await test.step('When the other window is locked out by 5 wrong PINs', async () => {
+      for (let i = 0; i < 5; i++) await enterPin(other, WRONG_PIN);
+      await expect(other.getByTestId('pin-prompt')).toHaveAttribute('data-state', 'locked-out');
+    });
+    await test.step('And I then enter the correct PIN in this window', async () => {
+      await enterPin(page, PIN);
+    });
+    await test.step('Then this window is locked out too, and settings stays locked', async () => {
+      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-state', 'locked-out');
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'locked');
+    });
+  });
 });

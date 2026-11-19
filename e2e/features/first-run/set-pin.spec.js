@@ -79,4 +79,26 @@ test.describe('Feature: Set a PIN on first run', () => {
       expect((await context.cookies()).filter((c) => c.value.includes(pin))).toEqual([]);
     });
   });
+
+  test.fixme('Scenario: a new PIN that is too short or not only digits is refused', async ({ page }) => {
+    await test.step('Given a fresh install with no PIN set', async () => {
+      await goto(page, '#/library');
+    });
+    for (const pin of ['123', '12ab']) {
+      await test.step(`When I enter "${pin}"`, async () => {
+        await enterPin(page, pin);
+      });
+      await test.step('Then it is refused with "Use 4 to 6 digits." and setup continues', async () => {
+        await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-state', 'wrong');
+        await expect(page.getByTestId('pin-error')).toHaveText('Use 4 to 6 digits.');
+        await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'setup');
+      });
+    }
+    await test.step('When I enter "2468"', async () => {
+      await enterPin(page, '2468');
+    });
+    await test.step('Then I am asked to confirm it', async () => {
+      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'confirm');
+    });
+  });
 });

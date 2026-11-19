@@ -67,4 +67,30 @@ test.describe('Feature: Open a video', () => {
       });
     }
   });
+
+  test.fixme('Scenario: a video whose stored parts are gone shows an error instead of playing', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given "tiny" is listed, but the browser has since deleted its stored video and audio', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('tiny');
+      await page.evaluate(() => new Promise((resolve, reject) => {
+        const open = indexedDB.open('shaka_offline_db');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const stores = [...db.objectStoreNames].filter((name) => name.startsWith('segment'));
+          const tx = db.transaction(stores, 'readwrite');
+          for (const name of stores) tx.objectStore(name).clear();
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => reject(tx.error);
+        };
+      }));
+    });
+    await test.step('When I open "tiny"', async () => {
+      await page.getByTestId('library-item').filter({ hasText: 'tiny' }).click();
+    });
+    await test.step('Then the player shows an error, with no play button', async () => {
+      await expect(playerState(page)).toHaveAttribute('data-state', 'error');
+      await expect(page.getByTestId('play-button')).toBeHidden();
+    });
+  });
 });
