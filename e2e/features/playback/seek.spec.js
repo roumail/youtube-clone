@@ -2,7 +2,7 @@
 // The child may seek freely: seeking never starts playback, so it can't get
 // around the PIN (owner decision 2026-11-19). Built in M8.
 import {
-  test, expect, goto, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState,
+  test, expect, goto, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState, slowPlayer,
 } from '../../support.js';
 
 const position = (page) => page.getByTestId('player-video').evaluate((v) => v.currentTime);
@@ -148,6 +148,24 @@ test.describe('Feature: Seek', () => {
     await test.step('Then it keeps playing from where I held it', async () => {
       await expectPlaying(page);
       expect(await position(page)).toBeGreaterThanOrEqual(held);
+    });
+  });
+
+  test('Scenario: the arrow keys while a video is still opening do nothing', async ({ page }) => {
+    const player = await slowPlayer(page);
+    await test.step('Given "medium" is opening slowly', async () => {
+      await page.getByTestId('screen-player').getByTestId('back-button').click();
+      await player.hold('load');
+      await page.getByTestId('library-item').filter({ hasText: 'medium' }).click();
+      await expect(playerState(page)).toHaveAttribute('data-state', 'loading');
+    });
+    await test.step('When I press → while it opens', async () => {
+      await page.keyboard.press('ArrowRight');
+    });
+    await test.step('Then, once it has opened, it is paused at the start', async () => {
+      await player.release('load');
+      await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
+      expect(await position(page)).toBe(0);
     });
   });
 });

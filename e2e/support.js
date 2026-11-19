@@ -259,6 +259,39 @@ export async function onScreenKeyboard(page) {
   });
 }
 
+// A slow device (a big film on the iPad): opening a video (Shaka's load) or
+// closing it (unload) waits while the test holds it. Call once the app has
+// loaded; release() returns when the held calls have finished.
+export async function slowPlayer(page) {
+  await page.evaluate(() => {
+    const gates = {};
+    const running = {};
+    window.__player = { gates, running };
+    for (const kind of ['load', 'unload']) {
+      const original = shaka.Player.prototype[kind];
+      shaka.Player.prototype[kind] = function (...args) {
+        const call = (async () => {
+          await gates[kind]?.promise;
+          return original.apply(this, args);
+        })();
+        running[kind] = call.catch(() => {});
+        return call;
+      };
+    }
+  });
+  return {
+    hold: (kind) => page.evaluate((k) => {
+      let release;
+      window.__player.gates[k] = { promise: new Promise((resolve) => { release = resolve; }), release };
+    }, kind),
+    release: (kind) => page.evaluate(async (k) => {
+      window.__player.gates[k].release();
+      delete window.__player.gates[k];
+      await window.__player.running[k];
+    }, kind),
+  };
+}
+
 // Fire a Media Session action as the OS would (headphones, lock screen, media keys).
 export async function mediaSessionAction(page, action) {
   await page.evaluate((a) => window.__mediaSessionHandlers[a]?.({ action: a }), action);
