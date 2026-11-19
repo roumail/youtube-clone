@@ -46,7 +46,7 @@ test.describe('Feature: PIN lockout', () => {
     });
   });
 
-  test.fixme('Scenario: a lockout started in another window stops this one too', async ({ page, context, pinSet }) => {
+  test('Scenario: a lockout started in another window stops this one too', async ({ page, context, pinSet }) => {
     const other = await context.newPage();
     await test.step('Given the settings PIN prompt is open in two windows', async () => {
       await goto(page, '#/settings');
