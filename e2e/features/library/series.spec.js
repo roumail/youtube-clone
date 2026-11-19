@@ -61,4 +61,16 @@ test.describe('Feature: Series', () => {
       expect(decodeURIComponent(page.url())).not.toContain('S01E02');
     });
   });
+
+  test.fixme('Scenario: an episode without a title is listed by its number alone', async ({ page, seedLibrary }) => {
+    await test.step('Given "Show - S01E03" (no episode title) is stored too', async () => {
+      await seedLibrary('Show - S01E03');
+    });
+    await test.step('When I tap the "Show" tile', async () => {
+      await page.getByTestId('series-item').filter({ hasText: 'Show' }).click();
+    });
+    await test.step('Then its episodes read "S01E01 · First", "S01E02 · Second", "S01E03", "S01E10 · Tenth"', async () => {
+      await expect(page.getByTestId('episode-item')).toHaveText(['S01E01 · First', 'S01E02 · Second', 'S01E03', 'S01E10 · Tenth']);
+    });
+  });
 });

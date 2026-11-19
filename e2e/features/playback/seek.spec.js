@@ -76,4 +76,38 @@ test.describe('Feature: Seek', () => {
       await expect(page.getByTestId('time-elapsed')).not.toHaveText('00:00', { timeout: 5000 });
     });
   });
+
+  test.fixme('Scenario: a video an hour or longer shows hours in its times', async ({ page, seedLibrary }) => {
+    await test.step('Given "long" (1 hour 5 seconds) is open', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('long');
+      await openVideo(page, 'long');
+    });
+    await test.step('Then its total time reads "1:00:05"', async () => {
+      await expect(page.getByTestId('time-total')).toHaveText('1:00:05');
+    });
+    await test.step('When I drag the bar to one hour', async () => {
+      await page.getByTestId('seek-bar').fill('3600');
+    });
+    await test.step('Then the elapsed time reads "1:00:00"', async () => {
+      await expect(page.getByTestId('time-elapsed')).toHaveText('1:00:00');
+    });
+  });
+
+  test.fixme('Scenario: seeking back from the end makes the video paused again', async ({ page }) => {
+    await test.step('Given "medium" has played to its end', async () => {
+      await page.getByTestId('seek-bar').fill('58');
+      await startPlaying(page);
+      await expect(playerState(page)).toHaveAttribute('data-state', 'ended');
+    });
+    await test.step('When I drag the bar back to 0:30', async () => {
+      await page.getByTestId('seek-bar').fill('30');
+    });
+    await test.step('Then it is paused at 0:30, with the play button showing', async () => {
+      await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
+      await expect(page.getByTestId('time-elapsed')).toHaveText('00:30');
+      await expect(page.getByTestId('play-button')).toBeVisible();
+      await expectNotPlaying(page);
+    });
+  });
 });

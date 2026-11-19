@@ -46,4 +46,45 @@ test.describe('Feature: Settings', () => {
       expect(await page.evaluate(() => localStorage.getItem('pin.sha256'))).toBe(sha256Hex('5555'));
     });
   });
+
+  test.fixme('Scenario: a mismatched confirmation while changing the PIN asks again and keeps the old PIN', async ({ page, pinSet }) => {
+    await test.step('Given I am changing the PIN, after giving the current one', async () => {
+      await goto(page, '#/library');
+      await page.getByTestId('settings-button').click();
+      await enterPin(page, PIN);
+      await page.getByTestId('change-pin-button').click();
+      await enterPin(page, PIN);
+    });
+    await test.step('When I enter "5555" and confirm with "6666"', async () => {
+      await enterPin(page, '5555');
+      await enterPin(page, '6666');
+    });
+    await test.step('Then it says the PINs didn\'t match and asks for a new PIN again', async () => {
+      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'change');
+      await expect(page.getByTestId('pin-error')).toHaveText("The PINs didn't match. Try again.");
+    });
+    await test.step('And the old PIN is still the one stored', async () => {
+      expect(await page.evaluate(() => localStorage.getItem('pin.sha256'))).toBe(sha256Hex(PIN));
+    });
+  });
+
+  test.fixme('Scenario: going back while the settings PIN prompt is open returns to the library, still locked', async ({ page, pinSet }) => {
+    await test.step('Given I tapped settings and its PIN prompt is open', async () => {
+      await goto(page, '#/library');
+      await page.getByTestId('settings-button').click();
+      await expect(page.getByTestId('pin-prompt')).toBeVisible();
+    });
+    await test.step('When I go back without entering the PIN', async () => {
+      await page.goBack();
+    });
+    await test.step('Then the library is shown and the prompt is gone', async () => {
+      await expect(page.getByTestId('screen-library')).toBeVisible();
+      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+    });
+    await test.step('And settings asks for the PIN again next time', async () => {
+      await page.getByTestId('settings-button').click();
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'locked');
+      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'verify');
+    });
+  });
 });

@@ -52,4 +52,25 @@ test.describe('Feature: Browse the library', () => {
       await expect(page.locator('[data-testid="series-item"], [data-testid="library-item"]')).toHaveText([/Show/, /tiny/]);
     });
   });
+
+  test.fixme('Scenario: opening the app at its plain address shows the library', async ({ page, pinSet }) => {
+    await test.step('When I open the app with no route (the home-screen icon, the bare URL)', async () => {
+      await goto(page, '');
+    });
+    await test.step('Then the library is shown', async () => {
+      await expect(page.getByTestId('screen-library')).toBeVisible();
+    });
+  });
+
+  test.fixme('Scenario: the library shows the released version', async ({ page, pinSet }) => {
+    await test.step('Given the site runs release "v2.7.2"', async () => {
+      await page.route('**/version.json', (route) => route.fulfill({ json: { version: 'v2.7.2', commit: '0123abc' } }));
+    });
+    await test.step('When I open the library', async () => {
+      await goto(page, '#/library');
+    });
+    await test.step('Then "v2.7.2" is shown next to "Library"', async () => {
+      await expect(page.getByTestId('app-version')).toHaveText('v2.7.2');
+    });
+  });
 });
