@@ -1,5 +1,5 @@
 // Playwright globalTeardown: merge every test's coverage into one report
-// (coverage-report/: HTML, plus a per-file table in the log and in
+// (coverage-report/: HTML, lcov.info, plus a per-file table in the log and in
 // coverage-details.md).
 import { COVERAGE, coverageReport } from './coverage.js';
 
