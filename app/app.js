@@ -8,7 +8,9 @@ import {
 import { listVideos, importVideo, removeVideo } from './library.js';
 import {
   playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
+  timeUp,
 } from './player.js';
+import { FEATURES, flags, setFlag, loadEnabled, start as startFeature } from './features.js';
 
 const $ = (testid, root = document) => root.querySelector(`[data-testid="${testid}"]`);
 
@@ -21,6 +23,7 @@ const state = {
   //              mode: 'setup' | 'confirm' | 'verify' | 'change', status: 'entry' | 'wrong', error }
   prompt: null,
   newPin: null, // first entry of a new PIN, until it is confirmed
+  features: {}, // running optional features, by id (features.js)
   importStatus: { phase: 'idle', progress: 0, message: '' },
 };
 
@@ -99,7 +102,7 @@ function render(s) {
   if (s.route.name === 'player') {
     const status = playerState.status;
     $('screen-player').dataset.state = status;
-    show('play-button', ['paused', 'ended', 'pin-required'].includes(status));
+    show('play-button', ['paused', 'ended', 'pin-required', 'time-up'].includes(status));
     show('pause-button', status === 'playing');
   }
 
@@ -109,6 +112,10 @@ function render(s) {
   document.querySelector('[data-role="settings-list"]').replaceChildren(
     ...(s.settingsUnlocked ? s.library.map(settingsRow) : []),
   );
+  document.querySelector('[data-role="feature-settings"]').replaceChildren(
+    ...(s.settingsUnlocked ? featureSettings(s) : []),
+  );
+  for (const f of Object.values(s.features)) f.render?.();
 
   // PIN prompt (overlay over any screen)
   const prompt = pinPromptFor(s);
@@ -203,9 +210,45 @@ async function onPinSubmit(event) {
     state.settingsUnlocked = true;
   } else if (purpose === 'play') {
     update();
+    // Optional features may step in first (e.g. ask for a watch-time budget);
+    // they call proceed() from their own tap, so playback still starts in-gesture.
+    const proceed = () => { allowPlay().then(update); update(); };
+    const cancel = () => { cancelPlay(); update(); };
+    if (Object.values(state.features).some((f) => f.beforePlay?.(proceed, cancel))) return update();
     await allowPlay(); // still within the tap, so autoplay rules allow it
   }
   update();
+}
+
+// Settings rows for optional features: one toggle each, plus a running
+// feature's own rows (e.g. "End watch-time session").
+function featureSettings(s) {
+  const on = flags();
+  const rows = [];
+  for (const f of FEATURES) {
+    const label = document.createElement('label');
+    label.className = 'feature-toggle';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.dataset.testid = `feature-toggle-${f.id}`;
+    box.checked = !!on[f.id];
+    box.addEventListener('change', () => onFeatureToggle(f.id, box.checked));
+    label.append(box, ` ${f.title}`);
+    rows.push(label);
+    rows.push(...(s.features[f.id]?.settingsRows?.() ?? []));
+  }
+  return rows;
+}
+
+async function onFeatureToggle(id, on) {
+  setFlag(id, on);
+  if (on && !state.features[id]) state.features[id] = await startFeature(id, featureContext());
+  if (!on && state.features[id]) { state.features[id].stop(); delete state.features[id]; }
+  update();
+}
+
+function featureContext() {
+  return { $, playerState, timeUp, changed: () => update() };
 }
 
 // Play (button or OS command): the PIN comes first, every time.
@@ -326,6 +369,8 @@ async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   // One user, no UI: just ask the browser to keep the library (DESIGN.md §1).
   navigator.storage?.persist?.().catch(() => {});
+
+  state.features = await loadEnabled(featureContext());
 
   state.pinSet = hasPin();
   if (!state.pinSet) state.prompt = { purpose: 'setup', mode: 'setup', status: 'entry', error: '' };

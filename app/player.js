@@ -9,7 +9,7 @@ let authorized = false; // true only between allowPlay() and the next pause/end
 let onChange = () => {};
 let closing = Promise.resolve(); // a pending closeVideo(); opening waits for it
 
-/** status: 'loading' | 'paused' | 'pin-required' | 'playing' | 'ended' | 'error' */
+/** status: 'loading' | 'paused' | 'pin-required' | 'playing' | 'ended' | 'time-up' | 'error' */
 export const playerState = { status: 'loading', offlineUri: null };
 
 function set(status) {
@@ -85,7 +85,7 @@ export function closeVideo() {
 
 /** Play was requested (button or OS command): the PIN comes first. */
 export function requestPlay() {
-  if (!['paused', 'ended'].includes(playerState.status)) return false;
+  if (!['paused', 'ended', 'time-up'].includes(playerState.status)) return false;
   set('pin-required');
   return true;
 }
@@ -105,6 +105,14 @@ export async function allowPlay() {
     authorized = false;
     set('paused');
   }
+}
+
+/** An optional feature (watch-time limit) says playing must stop now. */
+export function timeUp() {
+  if (playerState.status !== 'playing') return;
+  authorized = false;
+  set('time-up'); // set first, so the pause event doesn't turn it into 'paused'
+  video.pause();
 }
 
 export function pause() {

@@ -40,6 +40,23 @@
         <button type="button" data-testid="pause-button">Pause</button>
       </div>
       <p class="error-note">This video isn't in the library.</p>
+      <!-- Optional feature "watchTimeLimit" (features/watch-time.js) -->
+      <div class="session-bar" data-testid="session-bar" hidden>
+        <span data-testid="session-time" data-seconds="0"></span>
+        <span data-testid="session-remaining"></span>
+        <span data-testid="clock"></span>
+      </div>
+      <div class="budget-prompt" data-testid="budget-prompt" role="dialog" aria-modal="true" hidden>
+        <div class="budget-card">
+          <h2>How long can they watch?</h2>
+          <div class="budget-options">
+            <button type="button" data-testid="budget-option-20">20 min</button>
+            <button type="button" data-testid="budget-option-30">30 min</button>
+            <button type="button" data-testid="budget-option-45">45 min</button>
+          </div>
+          <button type="button" data-testid="budget-cancel">Cancel</button>
+        </div>
+      </div>
     </section>
 
     <section data-testid="screen-settings" data-state="locked" hidden>
@@ -48,6 +65,7 @@
         <h1>Settings</h1>
       </header>
       <button type="button" data-testid="change-pin-button">Change PIN</button>
+      <div class="feature-settings" data-role="feature-settings"></div>
       <ul data-role="settings-list"></ul>
     </section>
 

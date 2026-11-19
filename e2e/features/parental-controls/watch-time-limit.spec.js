@@ -2,7 +2,7 @@
 // (DESIGN.md §5, "Optional parental features"). Off by default. When on, the
 // parent sets a time budget for the session; only playing time counts, across
 // all videos; the session survives refreshes and relaunches.
-// Drafted for review; not built yet (test.fixme).
+// Built in M6.
 import { test, expect, goto, enterPin, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState, PIN } from '../../support.js';
 
 // Seed the feature flag (normally switched on in Settings, behind the PIN).
@@ -13,7 +13,7 @@ async function enableWatchTime(page) {
 }
 
 test.describe('Feature: Watch-time limit (optional)', () => {
-  test.fixme('Scenario: off by default — no budget prompt and no session clock', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: off by default — no budget prompt and no session clock', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given the feature has never been switched on and "medium" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
@@ -28,7 +28,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: switching the feature on or off happens in Settings, behind the PIN', async ({ page, pinSet }) => {
+  test('Scenario: switching the feature on or off happens in Settings, behind the PIN', async ({ page, pinSet }) => {
     await test.step('Given settings is unlocked with the PIN', async () => {
       await goto(page, '#/library');
       await page.getByTestId('settings-button').click();
@@ -43,7 +43,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: the first play of a session asks the parent for a budget', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the first play of a session asks the parent for a budget', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given the feature is on and "medium" is open', async () => {
       await goto(page, '#/library');
@@ -61,7 +61,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: the player shows time watched, time left and the current time', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the player shows time watched, time left and the current time', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await page.clock.install({ time: new Date('2026-11-19T18:05:00') });
     await test.step('Given a 30-minute session is playing', async () => {
@@ -80,8 +80,9 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: only playing time counts, not paused time', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: only playing time counts, not paused time', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
+    await page.clock.install(); // fake timers: fast-forward 5 minutes while paused
     await test.step('Given a session is running and I pause', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
@@ -100,7 +101,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: when the budget runs out, playback stops and needs the PIN', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: when the budget runs out, playback stops and needs the PIN', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given a session with 1 second of budget left is playing', async () => {
       await page.addInitScript(() => localStorage.setItem('watchTime.session', JSON.stringify({ budget: 1800, used: 1799 })));
@@ -122,7 +123,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: one budget across all videos', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: one budget across all videos', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given I watched part of "medium" in a session and went back', async () => {
       await goto(page, '#/library');
@@ -145,7 +146,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: a refresh or relaunch keeps the session and its budget', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a refresh or relaunch keeps the session and its budget', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given a session with 20 of 30 minutes used', async () => {
       await page.addInitScript(() => {
@@ -163,7 +164,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: the parent can end the session in Settings', async ({ page, pinSet }) => {
+  test('Scenario: the parent can end the session in Settings', async ({ page, pinSet }) => {
     await enableWatchTime(page);
     await test.step('Given a session is running and settings is unlocked', async () => {
       await page.addInitScript(() => localStorage.setItem('watchTime.session', JSON.stringify({ budget: 1800, used: 600 })));
