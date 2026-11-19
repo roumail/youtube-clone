@@ -26,7 +26,7 @@ test.describe('Feature: Controls hide while playing', () => {
     await openVideo(page, 'medium');
   });
 
-  test.fixme('Scenario: while playing, the controls hide after 3 seconds without input', async ({ page }) => {
+  test('Scenario: while playing, the controls hide after 3 seconds without input', async ({ page }) => {
     await test.step('Given "medium" is playing', async () => {
       await startPlaying(page);
       await expectControls(page, true);
@@ -40,7 +40,7 @@ test.describe('Feature: Controls hide while playing', () => {
     });
   });
 
-  test.fixme('Scenario: moving the mouse shows them again, until the next 3 seconds of stillness', async ({ page }) => {
+  test('Scenario: moving the mouse shows them again, until the next 3 seconds of stillness', async ({ page }) => {
     await test.step('Given "medium" is playing with the controls hidden', async () => {
       await startPlaying(page);
       await page.clock.fastForward(3500);
@@ -59,7 +59,7 @@ test.describe('Feature: Controls hide while playing', () => {
     });
   });
 
-  test.fixme('Scenario: tapping the video shows the controls and does not pause or play', async ({ page }) => {
+  test('Scenario: tapping the video shows the controls and does not pause or play', async ({ page }) => {
     await test.step('Given "medium" is playing with the controls hidden', async () => {
       await startPlaying(page);
       await page.clock.fastForward(3500);
@@ -75,7 +75,7 @@ test.describe('Feature: Controls hide while playing', () => {
     });
   });
 
-  test.fixme('Scenario: while paused, the controls stay visible', async ({ page }) => {
+  test('Scenario: while paused, the controls stay visible', async ({ page }) => {
     await test.step('Given "medium" is open and paused', async () => {
       await expectNotPlaying(page);
     });
@@ -88,7 +88,7 @@ test.describe('Feature: Controls hide while playing', () => {
     });
   });
 
-  test.fixme('Scenario: the watch-time clock stays visible when the controls hide', async ({ page }) => {
+  test('Scenario: the watch-time clock stays visible when the controls hide', async ({ page }) => {
     await test.step('Given the watch-time limit is on and a 30-minute session is playing', async () => {
       await page.evaluate(() => {
         localStorage.setItem('features', JSON.stringify({ watchTimeLimit: true }));
