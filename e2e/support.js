@@ -20,11 +20,27 @@ export const fixtureParts = (name) =>
   [`${name}.mpd`, 'video.mp4', 'audio.mp4', 'poster.jpg'].map((f) => path.join(FIXTURES_DIR, name, f));
 
 export const test = base.extend({
+  // Optional features seeded for a fresh install, unless the app already has
+  // flags. Tests that aren't about the watch-time limit start with it switched
+  // off (as a parent can in Settings), so a first play doesn't ask for a
+  // budget. Feature files about it use test.use({ features: null }) to get the
+  // app's real defaults (DESIGN.md §7).
+  features: [{ watchTimeLimit: false }, { option: true }],
+
   // Capture Media Session handlers the app registers, so tests can fire
   // "play" as if from headphones / lock screen. No hooks needed in the app.
   // Every test sees a wide-gamut (P3) screen, like the family's MacBook and
   // iPad. Shaka changes its track choices on such screens (DESIGN.md §1).
-  page: async ({ page }, use) => {
+  page: async ({ page, features }, use) => {
+    if (features) {
+      await page.addInitScript((f) => {
+        try {
+          if (!localStorage.getItem('features')) localStorage.setItem('features', JSON.stringify(f));
+        } catch {
+          // pages without storage (e.g. about:blank) have no app to configure
+        }
+      }, features);
+    }
     await page.addInitScript(() => {
       const original = window.matchMedia.bind(window);
       window.matchMedia = (q) => (/color-gamut:\s*p3|dynamic-range:\s*high/.test(q)

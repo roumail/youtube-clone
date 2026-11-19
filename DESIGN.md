@@ -252,7 +252,8 @@ e2e/                                ✅ specs (section 7)
   - `ctx` gives it what it needs: player events (play, pause, ended, tick), the PIN prompt, and a place to render.
 - The flags live in `localStorage['features']` (e.g. `{ "watchTimeLimit": true }`). **They are switched in Settings, so changing one needs the PIN.**
 - **A feature that's off is never loaded**, so there's no hidden behaviour. The core rules (PIN to play, free pause, no autoplay) are always on and aren't features.
-- Every feature defaults to **off**.
+- Each feature has its own default. **The watch-time limit is on by default** (owner decision 2026-11-19: a parent expects the limit, and turning it off is the deliberate choice). A flag nobody has touched follows the default; switching it off in Settings is remembered.
+  - Test harness: tests that aren't about the watch-time limit start with it switched off (the `features` option in `e2e/support.js`), so a first play doesn't ask for a budget. Its own feature file runs with the app's real defaults.
 
 **First feature: watch-time limit (`watchTimeLimit`)** — scenarios in `e2e/features/parental-controls/watch-time-limit.spec.js`:
 - **Session:** a session starts when the parent sets a **budget** at the first play, right after the PIN: 20 / 30 / 45 min, or **Other…** (owner request 2026-11-19).
@@ -546,6 +547,7 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M8 – Seek** ✅ | `playback/seek` | **5** | M3. Released as a **minor** version. |
 | **M7 – Series** ✅ | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
 | **M9 – iPhone** ✅ | `devices/iphone` | **4** (each in portrait and landscape) | M2–M4. Released as a **patch** version (fixes the PIN prompt behind the keyboard). |
+| **M13 – Watch-time limit on by default** | `parental-controls/watch-time-limit` (2 scenarios rewritten: on by default; switching off in Settings) | **2** | M6. Released as a **minor** version. |
 | **M12 – Controls hide while playing** ✅ | `playback/controls-hide` | **5** | M3. Released as a **minor** version (with M11 in v2.5.0). |
 | **M11 – Custom watch-time budget** ✅ | `parental-controls/watch-time-limit` ("Other…" scenarios) | **3** | M6. Released as a **minor** version. |
 | **M10 – Search** ✅ | `library/search` | **8** | M2–M4. Released as a **minor** version. |
