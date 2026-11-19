@@ -80,7 +80,7 @@ test.describe('Feature: Set a PIN on first run', () => {
     });
   });
 
-  test.fixme('Scenario: a new PIN that is too short or not only digits is refused', async ({ page }) => {
+  test('Scenario: a new PIN that is too short or not only digits is refused', async ({ page }) => {
     await test.step('Given a fresh install with no PIN set', async () => {
       await goto(page, '#/library');
     });

@@ -47,7 +47,7 @@ test.describe('Feature: Settings', () => {
     });
   });
 
-  test.fixme('Scenario: a mismatched confirmation while changing the PIN asks again and keeps the old PIN', async ({ page, pinSet }) => {
+  test('Scenario: a mismatched confirmation while changing the PIN asks again and keeps the old PIN', async ({ page, pinSet }) => {
     await test.step('Given I am changing the PIN, after giving the current one', async () => {
       await goto(page, '#/library');
       await page.getByTestId('settings-button').click();
@@ -68,7 +68,7 @@ test.describe('Feature: Settings', () => {
     });
   });
 
-  test.fixme('Scenario: going back while the settings PIN prompt is open returns to the library, still locked', async ({ page, pinSet }) => {
+  test('Scenario: going back while the settings PIN prompt is open returns to the library, still locked', async ({ page, pinSet }) => {
     await test.step('Given I tapped settings and its PIN prompt is open', async () => {
       await goto(page, '#/library');
       await page.getByTestId('settings-button').click();
