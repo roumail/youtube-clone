@@ -3,7 +3,7 @@
 import { test as base, expect } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { COVERAGE, coverageReport } from './coverage.js';
+import { COVERAGE, coverageReport, recordServiceWorkers } from './coverage.js';
 import { readFileSync, statSync } from 'node:fs';
 
 export { expect };
@@ -29,11 +29,22 @@ export const test = base.extend({
   // app's real defaults.
   features: [{ watchTimeLimit: false }, { option: true }],
 
+  // Coverage only: a debugging port per test worker, so the service worker's
+  // coverage can be recorded too (e2e/coverage.js).
+  coveragePort: [async ({ browserName }, use, workerInfo) => {
+    await use(COVERAGE && browserName === 'chromium' ? 9300 + workerInfo.parallelIndex : 0);
+  }, { scope: 'worker' }],
+  launchOptions: [async ({ launchOptions, coveragePort }, use) => {
+    await use(coveragePort
+      ? { ...launchOptions, args: [...(launchOptions.args ?? []), `--remote-debugging-port=${coveragePort}`] }
+      : launchOptions);
+  }, { scope: 'worker' }],
+
   // Capture Media Session handlers the app registers, so tests can fire
   // "play" as if from headphones / lock screen. No hooks needed in the app.
   // Every test sees a wide-gamut (P3) screen, like the family's MacBook and
   // iPad. Shaka changes its track choices on such screens.
-  page: async ({ page, features, browserName }, use) => {
+  page: async ({ page, features, browserName, coveragePort }, use) => {
     // Coverage of app/ (CI sets COVERAGE): Chromium only, whole test incl. reloads.
     // Chromium drops a page's coverage when it navigates, so it's saved before
     // every goto/reload and recording starts again.
@@ -42,6 +53,7 @@ export const test = base.extend({
       const entries = await page.coverage.stopJSCoverage();
       if (entries.length) await coverageReport().add(entries);
     };
+    const serviceWorkers = collect && coveragePort ? await recordServiceWorkers(coveragePort) : null;
     if (collect) {
       await page.coverage.startJSCoverage({ resetOnNavigation: false });
       for (const method of ['goto', 'reload']) {
@@ -88,6 +100,10 @@ export const test = base.extend({
     page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
     await use(page);
     if (collect) await saveCoverage();
+    if (serviceWorkers) {
+      const entries = await serviceWorkers.stop();
+      if (entries.length) await coverageReport().add(entries);
+    }
     expect(problems, 'CSP violations / uncaught page errors').toEqual([]);
   },
 
