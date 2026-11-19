@@ -35,8 +35,24 @@ export const test = base.extend({
   // iPad. Shaka changes its track choices on such screens.
   page: async ({ page, features, browserName }, use) => {
     // Coverage of app/ (CI sets COVERAGE): Chromium only, whole test incl. reloads.
+    // Chromium drops a page's coverage when it navigates, so it's saved before
+    // every goto/reload and recording starts again.
     const collect = COVERAGE && browserName === 'chromium';
-    if (collect) await page.coverage.startJSCoverage({ resetOnNavigation: false });
+    const saveCoverage = async () => {
+      const entries = await page.coverage.stopJSCoverage();
+      if (entries.length) await coverageReport().add(entries);
+    };
+    if (collect) {
+      await page.coverage.startJSCoverage({ resetOnNavigation: false });
+      for (const method of ['goto', 'reload']) {
+        const original = page[method].bind(page);
+        page[method] = async (...args) => {
+          await saveCoverage();
+          await page.coverage.startJSCoverage({ resetOnNavigation: false });
+          return original(...args);
+        };
+      }
+    }
     if (features) {
       await page.addInitScript((f) => {
         try {
@@ -71,7 +87,7 @@ export const test = base.extend({
     });
     page.on('pageerror', (e) => problems.push(`page error: ${e.message}`));
     await use(page);
-    if (collect) await coverageReport().add(await page.coverage.stopJSCoverage());
+    if (collect) await saveCoverage();
     expect(problems, 'CSP violations / uncaught page errors').toEqual([]);
   },
 
