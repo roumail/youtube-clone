@@ -217,6 +217,12 @@ e2e/                                ✅ specs (section 7)
   - **The PIN itself is never kept**, not even in memory beyond the submit handler. Only its hash is stored (`localStorage['pin.sha256']`), and a scenario checks the PIN appears nowhere else.
   - **Honest limit:** the stored SHA-256 of a 4–6 digit PIN can be brute-forced quickly by someone who can read the device's browser storage. The PIN keeps a child from starting playback (section 6); it isn't meant to resist a determined adult with device access. A test checks that the PIN itself is never stored or left behind (storage, cookies, URL, input field).
   - Same code on both devices for now; revisit later.
+- **Seek (owner request 2026-11-19, M8):**
+  - a **scrub bar** along the bottom of the player (drag on iPad, click/drag on Mac), with **elapsed / total** time;
+  - **← / →** jump 10 s back or forward (keyboard, e.g. on the Mac). No skip buttons and no scroll-wheel seeking.
+  - **The child may seek freely, no PIN:** seeking **never starts playback**. Seeking while paused stays paused, and seeking while playing plays on from the new point.
+
+  Scenarios: `e2e/features/playback/seek.spec.js`.
 - Tip, no code involved: turn on iPad **Guided Access** to keep a child inside the app.
 
 ### Optional parental features (feature flags) — built in M6 (2026-11-19)
@@ -247,7 +253,8 @@ e2e/                                ✅ specs (section 7)
 
 Explicitly **out of scope unless asked for**:
 - search, playlists, recommendations, history
-- seek bar, playback speed, subtitles, volume UI (hardware buttons only)
+- playback speed, subtitles, volume UI (hardware buttons only)
+- ~~seek bar~~: **added on request (2026-11-19)**, see section 5 "Seek"
 - accounts, sync, cloud, multiple profiles
 - PiP, AirPlay, downloading from the internet, comments, likes
 
@@ -334,7 +341,7 @@ The specs depend only on what's listed here. Changing it means changing the spec
 
 **Controls** (`data-testid`):
 - Library: `app-version` (the released version from `version.json`, or `dev`), `library-item` (with `data-video-id`), `add-video-button`, `settings-button`, `import-input`, `import-progress`, `import-help` (always-visible note: pick the `.kidsvideo` file).
-- Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`.
+- Player: `player-video` (the `<video>` element), `play-button`, `pause-button`, `back-button`; **seek (M8):** `seek-bar` (a range input, in seconds), `time-elapsed`, `time-total` (`mm:ss`, or `h:mm:ss` from one hour).
 - PIN prompt: `pin-input`, `pin-submit`, `pin-cancel`, `pin-error`.
 - Settings: `change-pin-button`, `settings-video-item`, `remove-video-button`, `back-button`.
 - **Proposed for series (M7, not built yet):** `series-item` (library tile, with `data-series`), route `#/series/<name>`, `screen-series`, `episode-item`.
@@ -384,6 +391,7 @@ e2e/
     playback/pause-and-resume       Feature: Pause and resume (pause never shows a PIN window; resume needs it; resumes in place)
     playback/multiple-videos        Feature: Several videos (back stops playback; switching starts paused; reopen from 0:00)
     playback/no-autoplay            Feature: No autoplay (end of video: nothing else starts)
+    playback/seek                   Feature: Seek (scrub bar, elapsed/total, ← / → 10 s; drafted)
     parental-controls/no-way-around-the-pin   Feature: backgrounding, OS "play", script play
     parental-controls/pin-lockout   Feature: PIN lockout (5 wrong → 60 s, survives reload)
     parental-controls/watch-time-limit   Feature: Watch-time limit (optional, behind a flag)
@@ -505,6 +513,7 @@ To build a milestone: switch **all** its scenarios from `test.fixme` to `test` i
 | **M3 – Player + PIN gate** ✅ | `playback/open-video`, `playback/play-requires-pin`, `playback/pause-and-resume`, `playback/multiple-videos`, `playback/no-autoplay`, `parental-controls/no-way-around-the-pin` | 3 + 3 + 3 + 3 + 1 + 3 = **16** | M2 (videos must be in the library) |
 | **M4 – First run, lockout, settings, offline** ✅ | `first-run/set-pin`, `parental-controls/pin-lockout`, `settings/settings`, `offline/offline` | 3 + 2 + 2 + 1 = **8** | M2, M3. Also adds `manifest.webmanifest`, icons, `sw.js` (network-first) and the startup `persist()` call |
 | **M5 – Hardening** | none new: Appendix A on the iPad, and a Mac pass | manual | M2–M4 |
+| **M8 – Seek** | `playback/seek` | **5** | M3. Released as a **minor** version. |
 | **M7 – Series** | `library/series`, `library/add-several` | 4 + 3 = **7** | M2–M4. Independent of M6. Released as a **minor** version. |
 | **M6 – Optional features + watch-time limit** ✅ | `parental-controls/watch-time-limit` | **9** | M2–M4. Builds the feature-flag mechanism first, then the watch-time module. Released as a **minor** version. |
 | | | **34 in total** (M2 done: 10) | |
