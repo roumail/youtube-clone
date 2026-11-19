@@ -8,7 +8,7 @@
 # INPUT: video files and/or folders (folders are searched recursively for
 #        .mp4 .m4v .mov .mkv .webm .avi). With no INPUT, paths are read from
 #        stdin. Works through a symlink on your PATH (e.g. ~/bin/run_prepare).
-# --dest:  where prepared folders go (e.g. your Google Drive "Kids Library").
+# --dest:  where prepared folders go (e.g. your "Kids Library" folder).
 #          Default: $KIDS_LIBRARY, from the environment or from .env in the
 #          repo root (gitignored; copy .env.example).
 # --title: title for a single input file. Otherwise the file name is tidied:
@@ -74,7 +74,7 @@ if [[ -z "$DEST" ]]; then
 fi
 if [[ ! -d "$DEST" ]]; then
   echo "Destination does not exist: $DEST" >&2
-  echo "(Create it first, e.g. the 'Kids Library' folder in Google Drive.)" >&2
+  echo "(Create it first, e.g. a 'Kids Library' folder.)" >&2
   exit 1
 fi
 

@@ -10,8 +10,8 @@ Kids Library/
 ```
 
 A `.kidsvideo` is a plain, uncompressed `tar` of the 4 parts the app needs
-(`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). On the iPad you pick
-just that one file. It's the only format the app accepts.
+(`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). On the iPad or iPhone
+you pick just that one file. It's the only format the app accepts.
 
 ## One-time setup
 
@@ -23,8 +23,8 @@ just that one file. It's the only format the app accepts.
    # then set, e.g.:
    # KIDS_LIBRARY="$HOME/Library/CloudStorage/GoogleDrive-<you>/My Drive/Kids Library"
    ```
-   The folder must exist. Pointing it at your Google Drive folder means
-   prepared videos upload automatically and the iPad can pick them from Files.
+   The folder must exist. It is the library's backup; the iPad and iPhone get
+   each `.kidsvideo` from it by AirDrop (see the main README).
 
 The pinned Shaka Packager is downloaded automatically on first use
 (`tools/get-packager.sh`, checksum-verified).
@@ -68,7 +68,7 @@ tools/run_prepare.sh ~/Videos/"Bluey - Keepy Uppy.mp4"
 ```
 
 Everything matching a pattern in the current folder, piped in (populates
-`KIDS_LIBRARY` on Google Drive):
+`KIDS_LIBRARY`):
 ```bash
 cd ~/Downloads/Bluey
 ls *.mp4 | run_prepare
