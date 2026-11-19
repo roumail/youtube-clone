@@ -1,5 +1,4 @@
-// Optional parental features behind flags (DESIGN.md §5, "Optional parental
-// features"). Each feature is its own module; a feature that's off is never
+// Optional parental features behind flags. Each feature is its own module; a feature that's off is never
 // loaded. Flags live in localStorage['features'] and are switched in Settings,
 // which is behind the PIN. Each feature has its own default; a flag nobody has
 // touched follows it.

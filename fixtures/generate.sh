@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate deterministic, synthetic test fixtures (DESIGN.md §7). Nothing real,
+# Generate deterministic, synthetic test fixtures. Nothing real,
 # nothing committed: output goes to fixtures/out/ (gitignored, cached in CI).
 # Packaged fixtures are produced by tools/prepare.sh itself, so every e2e run
 # exercises the real preparation path.
@@ -52,7 +52,7 @@ for name in tiny medium broken-missing-audio episode-like; do
   "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 
-# Series episodes (DESIGN.md §3): titles "Series - SxxEyy - Episode". Prepared
+# Series episodes: titles "Series - SxxEyy - Episode". Prepared
 # from copies of "tiny" named like real episodes, out of order on purpose.
 for ep in "Show - S01E10 - Tenth" "Show - S01E02 - Second" "Show - S01E01 - First"; do
   cp "$RAW/tiny.mp4" "$RAW/$ep.mp4"

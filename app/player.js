@@ -1,4 +1,4 @@
-// The player (DESIGN.md §5): Shaka on our own <video>, custom controls only.
+// The player: Shaka on our own <video>, custom controls only.
 // Pause is free; playback only ever starts through allowPlay() (after the PIN).
 // Anything else that starts playback (script, OS media keys, browser quirks)
 // is paused immediately.

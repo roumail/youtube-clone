@@ -1,4 +1,4 @@
-// Lint only the e2e specs. The key rule: no sleeping in tests (DESIGN.md §7).
+// Lint only the e2e specs. The key rule: no sleeping in tests.
 import playwright from 'eslint-plugin-playwright';
 
 export default [

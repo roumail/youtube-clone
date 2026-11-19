@@ -1,4 +1,4 @@
-// PIN storage, checking and lockout (DESIGN.md §5). Only a SHA-256 hash is stored.
+// PIN storage, checking and lockout. Only a SHA-256 hash is stored.
 export const PIN_KEY = 'pin.sha256';
 export const LOCKOUT_KEY = 'pin.lockout'; // { failures, until } — until is epoch ms
 const MAX_FAILURES = 5;

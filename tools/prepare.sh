@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prepare one video for the library (DESIGN.md §4).
+# Prepare one video for the library.
 #
 #   tools/prepare.sh "My Video.mp4" "<Google Drive>/Kids Library"
 #

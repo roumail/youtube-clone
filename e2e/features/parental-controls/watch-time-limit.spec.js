@@ -1,5 +1,5 @@
-// Feature: Watch-time limit — an OPTIONAL parental feature behind a flag
-// (DESIGN.md §5, "Optional parental features"). Off by default. When on, the
+// Feature: Watch-time limit — an optional parental feature behind a flag, on
+// by default and switched in Settings. When on, the
 // parent sets a time budget for the session; only playing time counts, across
 // all videos; the session survives refreshes and relaunches.
 // Built in M6.
@@ -13,7 +13,7 @@ async function enableWatchTime(page) {
 }
 
 // These scenarios start from the app's real defaults (the harness otherwise
-// starts with the watch-time limit switched off, DESIGN.md §7).
+// starts with the watch-time limit switched off).
 test.use({ features: null });
 
 test.describe('Feature: Watch-time limit (optional)', () => {

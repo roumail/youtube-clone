@@ -1,4 +1,4 @@
-// Feature "watchTimeLimit" (DESIGN.md §5): the parent sets a time budget at the
+// Feature "watchTimeLimit": the parent sets a time budget at the
 // first play of a session; one budget for all videos; only actual playing time
 // counts; the session survives refreshes and relaunches and never ends by
 // itself — only a used-up budget or the parent (Settings → End session).

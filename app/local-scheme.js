@@ -1,4 +1,4 @@
-// Shaka "local:" scheme plugin (DESIGN.md §2): lets Shaka read a packaged video
+// Shaka "local:" scheme plugin: lets Shaka read a packaged video
 // from files the parent picked (Files / Google Drive / Finder) instead of HTTP.
 //
 //   const uri = registerPickedFiles(fileList);   // -> "local://pick/My%20Video.mpd"

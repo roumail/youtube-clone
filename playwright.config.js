@@ -1,4 +1,4 @@
-// Pinned Chrome, plus WebKit iPad/iPhone profiles for tagged scenarios. DESIGN.md §7.
+// Pinned Chrome, plus WebKit iPad/iPhone profiles for tagged scenarios.
 // CI runs it on Ubuntu in the pinned Playwright image; real Mac checks are local
 // (tools/real-episode-check.mjs).
 import { defineConfig, devices } from '@playwright/test';
@@ -42,7 +42,7 @@ export default defineConfig({
       grep: /@ipad/,
       use: { ...devices['iPad Pro 11 landscape'] },
     },
-    // iPhone (DESIGN.md §1, M9): Safari's engine with iPhone profiles, both
+    // iPhone: Safari's engine with iPhone profiles, both
     // orientations. Only scenarios tagged @iphone.
     { name: 'iphone-portrait', grep: /@iphone/, use: { ...devices['iPhone 13'] } },
     { name: 'iphone-landscape', grep: /@iphone/, use: { ...devices['iPhone 13 landscape'] } },
