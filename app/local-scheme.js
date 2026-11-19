@@ -68,8 +68,8 @@ export function registerPickedFiles(files) {
 
 function plugin(uri, request) {
   const file = picked.get(decodeURIComponent(uri.slice(HOST.length)));
-  const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers?.Range ?? request.headers?.range ?? '');
-  const part = range ? file.slice(Number(range[1]), range[2] ? Number(range[2]) + 1 : undefined) : file;
+  const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers?.Range ?? request.headers?.range ?? '');
+  const part = range ? file.slice(Number(range[1]), Number(range[2]) + 1) : file;
   const op = part.arrayBuffer().then((data) => ({
     uri, originalUri: uri, data, headers: {}, status: range ? 206 : 200, fromCache: false,
   }));

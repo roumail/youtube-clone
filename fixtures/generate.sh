@@ -54,7 +54,8 @@ done
 
 # Series episodes: titles "Series - SxxEyy - Episode". Prepared
 # from copies of "tiny" named like real episodes, out of order on purpose.
-for ep in "Show - S01E10 - Tenth" "Show - S01E02 - Second" "Show - S01E01 - First"; do
+# "Show - S01E03" has no episode title.
+for ep in "Show - S01E10 - Tenth" "Show - S01E02 - Second" "Show - S01E01 - First" "Show - S01E03"; do
   cp "$RAW/tiny.mp4" "$RAW/$ep.mp4"
   "$PREPARE" "$RAW/$ep.mp4" "$OUT" >/dev/null
 done
@@ -80,6 +81,10 @@ cp "$OUT/tiny/tiny.mpd" "$RAW/$ACCENTED_TITLE/$ACCENTED_TITLE.mpd"
 if LC_ALL=C.UTF-8 "$HERE/../tools/pack.sh" "$RAW/$ACCENTED_TITLE" >/dev/null 2>&1; then
   echo "pack.sh accepted a title over 95 bytes" >&2; exit 1
 fi
+
+# A container without its manifest (no .mpd).
+COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/no-manifest.kidsvideo" \
+  -C "$OUT/tiny" poster.jpg audio.mp4 video.mp4
 
 # A container with a part missing (no audio.mp4).
 rm "$OUT/broken-missing-audio.kidsvideo"

@@ -62,7 +62,7 @@ test.describe('Feature: Series', () => {
     });
   });
 
-  test.fixme('Scenario: an episode without a title is listed by its number alone', async ({ page, seedLibrary }) => {
+  test('Scenario: an episode without a title is listed by its number alone', async ({ page, seedLibrary }) => {
     await test.step('Given "Show - S01E03" (no episode title) is stored too', async () => {
       await seedLibrary('Show - S01E03');
     });
