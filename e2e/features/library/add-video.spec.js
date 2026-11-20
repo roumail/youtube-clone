@@ -185,7 +185,7 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  // 95 bytes: the longest title tools/pack.sh accepts.
+  // 95 bytes: the longest title tools/kidsvideo accepts.
   test('Scenario: a video with the longest allowed title adds and plays', async ({ page, pinSet }) => {
     const title = 'The Longest Title Allowed - A Tale About Many Long Words That Keeps Going Until It Finally Ends';
     await test.step('Given the library is empty', async () => {

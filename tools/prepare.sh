@@ -24,11 +24,13 @@ INPUT="$1"
 ROOT="${2:-prepared}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PACKAGER="${PACKAGER:-$HERE/bin/packager}"
+KIDSVIDEO="${KIDSVIDEO:-$HERE/bin/kidsvideo}"
 FFMPEG="${FFMPEG:-ffmpeg}"
 FFPROBE="${FFPROBE:-ffprobe}"
 
 [[ -f "$INPUT" ]] || { echo "no such file: $INPUT" >&2; exit 1; }
 [[ -x "$PACKAGER" ]] || { echo "Shaka Packager not found; run tools/get-packager.sh" >&2; exit 1; }
+[[ -x "$KIDSVIDEO" ]] || { echo "kidsvideo not found; run tools/run_prepare.sh once (it builds it; needs Go)" >&2; exit 1; }
 
 NAME="$(basename "$INPUT")"; TITLE="${NAME%.*}"
 DEST="$ROOT/$TITLE"
@@ -117,7 +119,7 @@ AT="$(awk -v d="$DUR" 'BEGIN { printf "%.2f", d * 0.1 }')"
 mkdir -p "$ROOT"
 mv "$WORK/out" "$DEST"
 # One file per video: "<Title>.kidsvideo" (the app adds it in a single pick).
-"$HERE/pack.sh" "$DEST" >/dev/null
+"$KIDSVIDEO" pack "$DEST" >/dev/null
 rm -rf "$DEST"
 echo "prepared: $ROOT/$TITLE.kidsvideo"
 ls -lh "$ROOT/$TITLE.kidsvideo"

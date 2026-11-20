@@ -17,7 +17,7 @@ export const PICK_SET = ['.mpd', 'video.mp4', 'audio.mp4', 'poster.jpg'];
 
 // ---------- single-file container (.kidsvideo) ----------
 // A .kidsvideo is an uncompressed tar of "<Title>.mpd", video.mp4, audio.mp4
-// and poster.jpg (tools/pack.sh). We read only the 512-byte headers and hand
+// and poster.jpg (tools/kidsvideo). We read only the 512-byte headers and hand
 // out each part as a lazy slice of the picked file: nothing is copied.
 export const CONTAINER_EXT = '.kidsvideo';
 const isContainer = (f) => f.name.toLowerCase().endsWith(CONTAINER_EXT);
