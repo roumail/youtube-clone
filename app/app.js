@@ -396,12 +396,12 @@ const fullScreenElement = () => document.fullscreenElement ?? document.webkitFul
 function enterFullScreen() {
   const root = document.documentElement;
   const request = root.requestFullscreen ?? root.webkitRequestFullscreen;
-  Promise.resolve(request?.call(root)).catch(() => {}).finally(update);
+  Promise.resolve(request.call(root)).finally(update);
 }
 function exitFullScreen() {
   if (!fullScreenElement()) return;
   const exit = document.exitFullscreen ?? document.webkitExitFullscreen;
-  Promise.resolve(exit?.call(document)).catch(() => {}).finally(update);
+  Promise.resolve(exit.call(document)).finally(update);
 }
 function initFullScreen() {
   $('fullscreen-button').addEventListener('click', () => {
