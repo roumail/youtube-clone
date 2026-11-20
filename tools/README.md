@@ -175,7 +175,9 @@ Kids Library/
     at most 1.2 Mbit/s (H.264), stereo audio at 96 kbit/s, so at most about
     0.6 GB per hour. A track already within that is copied (seconds); anything
     else is re-encoded (a film can take a while, done once);
-  - writes one `<Title>.kidsvideo` file (via `tools/pack.sh`).
+  - writes one `<Title>.kidsvideo` file (via `tools/kidsvideo`, a small Go tool
+    that `run_prepare.sh` builds; `kidsvideo verify <file>` checks a file the way
+    the app reads it).
 - **Skips** videos already prepared in the destination, so re-running a batch
   is safe.
 - Keeps going if one video fails, and prints a summary at the end

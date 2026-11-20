@@ -78,7 +78,7 @@ done
 cp "$RAW/tiny.mp4" "$RAW/Show.mp4"
 "$PREPARE" "$RAW/Show.mp4" "$OUT" >/dev/null
 
-# The longest title pack.sh accepts (95 bytes), from a copy of "tiny".
+# The longest title kidsvideo pack accepts (95 bytes), from a copy of "tiny".
 LONG_TITLE="The Longest Title Allowed - A Tale About Many Long Words That Keeps Going Until It Finally Ends"
 cp "$RAW/tiny.mp4" "$RAW/$LONG_TITLE.mp4"
 "$PREPARE" "$RAW/$LONG_TITLE.mp4" "$OUT" >/dev/null
@@ -90,14 +90,14 @@ for c in "$OUT"/*.kidsvideo; do
   d="${c%.kidsvideo}"; mkdir -p "$d"; tar -xf "$c" -C "$d"
 done
 
-# pack.sh refuses a title that is 95 characters but 96 bytes (one "é"): its
+# kidsvideo pack refuses a title that is 95 characters but 96 bytes (one "é"): its
 # name would fill the tar name field with no closing NUL.
 ACCENTED_TITLE="The Longest Title Allowed - A Café About Many Long Words That Keeps Going Until It Finally Ends"
 mkdir "$RAW/$ACCENTED_TITLE"
 cp "$OUT/tiny/"{video.mp4,audio.mp4,poster.jpg} "$RAW/$ACCENTED_TITLE/"
 cp "$OUT/tiny/tiny.mpd" "$RAW/$ACCENTED_TITLE/$ACCENTED_TITLE.mpd"
-if LC_ALL=C.UTF-8 "$HERE/../tools/pack.sh" "$RAW/$ACCENTED_TITLE" >/dev/null 2>&1; then
-  echo "pack.sh accepted a title over 95 bytes" >&2; exit 1
+if "${KIDSVIDEO:-$HERE/../tools/bin/kidsvideo}" pack "$RAW/$ACCENTED_TITLE" >/dev/null 2>&1; then
+  echo "kidsvideo pack accepted a title over 95 bytes" >&2; exit 1
 fi
 
 # A container without its manifest (no .mpd).
