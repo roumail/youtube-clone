@@ -1,0 +1,33 @@
+name: Shaka update check
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # Fails when Shaka has a newer release or npm lists advisories for the
+      # vendored version; a failed scheduled run is emailed to the owner.
+      - name: Vendored Shaka Player is the latest release, with no known advisories
+        run: |
+          vendored=$(sed -n 's/^VERSION=//p' tools/verify-vendor.sh)
+          latest=$(npm view shaka-player version)
+          echo "vendored $vendored, latest $latest"
+          work=$(mktemp -d)
+          printf '{"name":"shaka-check","private":true,"dependencies":{"shaka-player":"%s"}}' "$vendored" > "$work/package.json"
+          (cd "$work" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund > /dev/null && npm audit --audit-level=low)
+          if [ "$vendored" != "$latest" ]; then
+            echo "::error::Shaka Player $latest is out; app/vendor has $vendored"
+            exit 1
+          fi

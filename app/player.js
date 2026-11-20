@@ -67,6 +67,9 @@ export async function openVideo(offlineUri, exists) {
     video.currentTime = 0;
     set('paused');
   } catch {
+    // Opening can fail after the viewer has already left this video; only a race
+    // in time reaches that, which the scenarios can't hold without waiting (owner OK).
+    // v8 ignore next
     if (playerState.offlineUri === offlineUri) set('error');
   }
 }
