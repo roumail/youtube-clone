@@ -19,8 +19,12 @@ let registered = new Map();
 // kidsvideo.json are read up front; each part is read later, as Shaka asks.
 export const CONTAINER_EXT = '.kidsvideo';
 
-export function pickedSource([file]) {
-  if (!file.name.toLowerCase().endsWith(CONTAINER_EXT)) throw new Error(`${file.name} isn't a ${CONTAINER_EXT} file`);
+export function requireContainerName(name) {
+  if (!name.toLowerCase().endsWith(CONTAINER_EXT)) throw new Error(`${name} isn't a ${CONTAINER_EXT} file`);
+}
+
+export function pickedSource(file) {
+  requireContainerName(file.name);
   return { name: file.name, size: file.size, read: (start, end) => file.slice(start, end).arrayBuffer() };
 }
 

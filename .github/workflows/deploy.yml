@@ -73,10 +73,18 @@ jobs:
         env:
           SHA: ${{ steps.target.outputs.sha }}
           TAG: ${{ steps.target.outputs.tag }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          GOOGLE_APP_ID: ${{ vars.GOOGLE_APP_ID }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           mkdir _site
           rsync -a app/ _site/
           printf '{"version":"%s","commit":"%s"}\n' "$TAG" "$SHA" > _site/version.json
+          # "Add from Google Drive" appears only when the three values are set.
+          if [ -n "$GOOGLE_CLIENT_ID" ] && [ -n "$GOOGLE_APP_ID" ] && [ -n "$GOOGLE_API_KEY" ]; then
+            jq -n --arg clientId "$GOOGLE_CLIENT_ID" --arg apiKey "$GOOGLE_API_KEY" --arg appId "$GOOGLE_APP_ID" \
+              '{clientId: $clientId, apiKey: $apiKey, appId: $appId}' > _site/google.json
+          fi
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 

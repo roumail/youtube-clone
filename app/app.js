@@ -1,7 +1,8 @@
 // App: routing + one state object + render(state).
 // M2 library/import, M3 player + PIN gate, M4 first-run PIN, lockout, change
 // PIN, offline (service worker) and installability.
-import { installLocalScheme, CONTAINER_EXT } from './local-scheme.js';
+import { installLocalScheme, pickedSource, CONTAINER_EXT } from './local-scheme.js';
+import { initDrive, pickFromDrive } from './drive.js';
 import {
   hasPin, verifyPinSync, savePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
 } from './pin.js';
@@ -21,7 +22,7 @@ const state = {
   settingsUnlocked: false,
   search: '', // library search text (not saved); typing needs the PIN
   searchUnlocked: false, // until the search field loses focus
-  // PIN prompt: { purpose: 'setup' | 'import' | 'settings' | 'play' | 'change' | 'search',
+  // PIN prompt: { purpose: 'setup' | 'import' | 'drive' | 'settings' | 'play' | 'change' | 'search',
   //              mode: 'setup' | 'confirm' | 'verify' | 'change', status: 'entry' | 'wrong', error }
   prompt: null,
   newPin: null, // first entry of a new PIN, until it is confirmed
@@ -284,6 +285,9 @@ async function onPinSubmit(event) {
   if (purpose === 'import') {
     // Still within the tap on "OK", so the browser allows opening the picker.
     $('import-input').click();
+  } else if (purpose === 'drive') {
+    // Also within the tap: Google's sign-in opens a pop-up.
+    pickFromDrive(importItems);
   } else if (purpose === 'settings') {
     state.settingsUnlocked = true;
   } else if (purpose === 'search') {
@@ -451,20 +455,20 @@ function initSeek() {
 
 // Several files picked at once: imported one after another; a bad file doesn't
 // stop the rest, and the summary names what failed.
-async function importSeveral(files) {
-  const total = files.length;
+async function importSeveral(items, sourceOf) {
+  const total = items.length;
   let added = 0;
   const failed = [];
-  for (const [i, file] of files.entries()) {
-    if (!file.name.toLowerCase().endsWith(CONTAINER_EXT)) {
-      failed.push(`${file.name} (not a ${CONTAINER_EXT} file)`);
+  for (const [i, item] of items.entries()) {
+    if (!item.name.toLowerCase().endsWith(CONTAINER_EXT)) {
+      failed.push(`${item.name} (not a ${CONTAINER_EXT} file)`);
       continue;
     }
-    const name = file.name.slice(0, -CONTAINER_EXT.length);
+    const name = item.name.slice(0, -CONTAINER_EXT.length);
     state.importStatus = { phase: 'storing', progress: 0, message: `Adding ${i + 1} of ${total}: ${name}…` };
     update();
     try {
-      await importVideo([file], (p) => {
+      await importVideo(sourceOf(item), (p) => {
         state.importStatus.progress = p;
         update();
       });
@@ -503,14 +507,13 @@ function onPinCancel() {
   update();
 }
 
-async function onFilesPicked(event) {
-  const files = [...event.target.files];
-  event.target.value = '';
-  if (files.length > 1) return importSeveral(files);
+// Picked files or files in Google Drive: sourceOf(item) gives its byte source.
+async function importItems(items, sourceOf) {
+  if (items.length > 1) return importSeveral(items, sourceOf);
   state.importStatus = { phase: 'storing', progress: 0, message: 'Adding video…' };
   update();
   try {
-    const stored = await importVideo(files, (p) => {
+    const stored = await importVideo(sourceOf(items[0]), (p) => {
       state.importStatus.progress = p;
       update();
     });
@@ -575,7 +578,12 @@ async function boot() {
   $('back-button', $('screen-player')).addEventListener('click', () => go(state.returnTo));
   $('pin-prompt').querySelector('form').addEventListener('submit', onPinSubmit);
   $('pin-cancel').addEventListener('click', onPinCancel);
-  $('import-input').addEventListener('change', onFilesPicked);
+  $('import-input').addEventListener('change', (event) => {
+    const files = [...event.target.files];
+    event.target.value = '';
+    importItems(files, pickedSource);
+  });
+  $('add-from-drive-button').addEventListener('click', () => askPin('drive'));
   $('play-button').addEventListener('click', onPlayRequested);
   $('pause-button').addEventListener('click', onPause);
   $('change-pin-button').addEventListener('click', () => askPin('change'));
@@ -611,6 +619,7 @@ async function boot() {
   scheduleLockoutEnd();
   $('app').dataset.ready = 'true';
   showVersion();
+  initDrive().then((ready) => { $('add-from-drive-button').hidden = !ready; });
 }
 
 boot();
