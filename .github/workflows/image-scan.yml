@@ -3,10 +3,10 @@ name: Image scan
 on:
   pull_request:
     branches: [main]
-    paths: [Dockerfile, .dockerignore, 'tools/*.sh', .github/workflows/image-scan.yml]
+    paths: [Dockerfile, .dockerignore, 'tools/*.sh', 'tools/kidsvideo/**', .github/workflows/image-scan.yml]
   push:
     branches: [main]
-    paths: [Dockerfile, .dockerignore, 'tools/*.sh', .github/workflows/image-scan.yml]
+    paths: [Dockerfile, .dockerignore, 'tools/*.sh', 'tools/kidsvideo/**', .github/workflows/image-scan.yml]
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:

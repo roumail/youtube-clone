@@ -8,6 +8,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PREPARE="$HERE/../tools/prepare.sh"
+KIDSVIDEO="${KIDSVIDEO:-$HERE/../tools/bin/kidsvideo}"
 OUT="$HERE/out"
 RAW="$OUT/raw"
 FFMPEG="${FFMPEG:-ffmpeg}"
@@ -57,7 +58,12 @@ make_raw broken-missing-audio 3
   -c:v libx264 -profile:v main -g 10 -c:a aac -b:a 16k -t 3605 \
   "$RAW/long.mp4"
 
-for name in tiny medium broken-missing-audio episode-like long; do
+# "surround": "tiny" with 5.1 audio (6 channels at 384 kbit/s), as many films have.
+"$FFMPEG" -hide_banner -loglevel error -y -i "$RAW/tiny.mp4" \
+  -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=3" \
+  -map 0:v -map 1:a -c:v copy -c:a aac -ac 6 -b:a 384k -shortest "$RAW/surround.mp4"
+
+for name in tiny medium broken-missing-audio episode-like long surround; do
   "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 
@@ -73,7 +79,7 @@ done
 cp "$RAW/tiny.mp4" "$RAW/Show.mp4"
 "$PREPARE" "$RAW/Show.mp4" "$OUT" >/dev/null
 
-# The longest title pack.sh accepts (95 bytes), from a copy of "tiny".
+# The longest title kidsvideo pack accepts (95 bytes), from a copy of "tiny".
 LONG_TITLE="The Longest Title Allowed - A Tale About Many Long Words That Keeps Going Until It Finally Ends"
 cp "$RAW/tiny.mp4" "$RAW/$LONG_TITLE.mp4"
 "$PREPARE" "$RAW/$LONG_TITLE.mp4" "$OUT" >/dev/null
@@ -85,24 +91,34 @@ for c in "$OUT"/*.kidsvideo; do
   d="${c%.kidsvideo}"; mkdir -p "$d"; tar -xf "$c" -C "$d"
 done
 
-# pack.sh refuses a title that is 95 characters but 96 bytes (one "é"): its
+# kidsvideo pack refuses a title that is 95 characters but 96 bytes (one "é"): its
 # name would fill the tar name field with no closing NUL.
 ACCENTED_TITLE="The Longest Title Allowed - A Café About Many Long Words That Keeps Going Until It Finally Ends"
 mkdir "$RAW/$ACCENTED_TITLE"
 cp "$OUT/tiny/"{video.mp4,audio.mp4,poster.jpg} "$RAW/$ACCENTED_TITLE/"
 cp "$OUT/tiny/tiny.mpd" "$RAW/$ACCENTED_TITLE/$ACCENTED_TITLE.mpd"
-if LC_ALL=C.UTF-8 "$HERE/../tools/pack.sh" "$RAW/$ACCENTED_TITLE" >/dev/null 2>&1; then
-  echo "pack.sh accepted a title over 95 bytes" >&2; exit 1
+if "$KIDSVIDEO" pack "$RAW/$ACCENTED_TITLE" >/dev/null 2>&1; then
+  echo "kidsvideo pack accepted a title over 95 bytes" >&2; exit 1
 fi
 
+# Broken containers can't come from kidsvideo pack, so they're built with tar,
+# in format 2: kidsvideo.json first.
+format2() { printf '{"format":2,"title":"%s"}\n' "$1" > "$RAW/kidsvideo.json"; }
+
 # A container without its manifest (no .mpd).
+format2 no-manifest
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/no-manifest.kidsvideo" \
-  -C "$OUT/tiny" poster.jpg audio.mp4 video.mp4
+  -C "$RAW" kidsvideo.json -C "$OUT/tiny" poster.jpg audio.mp4 video.mp4
 
 # A container with a part missing (no audio.mp4).
 rm "$OUT/broken-missing-audio.kidsvideo"
+format2 broken-missing-audio
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/broken-missing-audio.kidsvideo" \
-  -C "$OUT/broken-missing-audio" broken-missing-audio.mpd poster.jpg video.mp4
+  -C "$RAW" kidsvideo.json -C "$OUT/broken-missing-audio" broken-missing-audio.mpd poster.jpg video.mp4
+
+# A container made by the tools before format 2: no kidsvideo.json.
+COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/old-format.kidsvideo" \
+  -C "$OUT/tiny" tiny.mpd poster.jpg audio.mp4 video.mp4
 
 # Real episodes declare SDR colour (BT.709). Shaka marks such video hdr=SDR,
 # which its default offline track picker drops on P3 screens. Fixtures must
@@ -116,8 +132,7 @@ mv "$OUT/unplayable/tiny.mpd" "$OUT/unplayable/unplayable.mpd"
 sed -i.bak 's/codecs="avc1\.[0-9A-Fa-f]*"/codecs="xyz1.000000"/' "$OUT/unplayable/unplayable.mpd" && rm "$OUT/unplayable/unplayable.mpd.bak"
 grep -q 'codecs="xyz1.000000"' "$OUT/unplayable/unplayable.mpd" \
   || { echo "unplayable fixture: codec not replaced" >&2; exit 1; }
-COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/unplayable.kidsvideo" \
-  -C "$OUT/unplayable" unplayable.mpd poster.jpg audio.mp4 video.mp4
+"$KIDSVIDEO" pack "$OUT/unplayable" >/dev/null
 
 # A film-like manifest: "tiny" whose declared (peak) bitrate is 100x its real
 # one, as with real films. Shaka's own size guess (bitrate x duration) is then
@@ -127,8 +142,20 @@ mv "$OUT/high-peak/tiny.mpd" "$OUT/high-peak/high-peak.mpd"
 perl -pi -e 's/bandwidth="(\d+)"/"bandwidth=\"" . ($1 * 100) . "\""/ge' "$OUT/high-peak/high-peak.mpd"
 cmp -s "$OUT/tiny/tiny.mpd" "$OUT/high-peak/high-peak.mpd" \
   && { echo "high-peak fixture: bandwidth not changed" >&2; exit 1; }
-COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/high-peak.kidsvideo" \
-  -C "$OUT/high-peak" high-peak.mpd poster.jpg audio.mp4 video.mp4
+"$KIDSVIDEO" pack "$OUT/high-peak" >/dev/null
+
+# Size target: at most 720p, video at most 1.2 Mbit/s on average, stereo audio
+# at most 96 kbit/s. "episode-like" is 1080p; "surround" has 5.1 audio.
+seconds() { sed -n 's/.*mediaPresentationDuration="PT\([0-9.]*\)S".*/\1/p' "$1"; }
+kbps() { awk -v bytes="$(wc -c < "$1")" -v s="$2" 'BEGIN { printf "%d", bytes * 8 / s / 1000 }'; }
+grep -q 'height="720"' "$OUT/episode-like/episode-like.mpd" \
+  || { echo "size target: episode-like (1080p) not scaled to 720p" >&2; exit 1; }
+(( $(kbps "$OUT/episode-like/video.mp4" "$(seconds "$OUT/episode-like/episode-like.mpd")") <= 1200 )) \
+  || { echo "size target: episode-like video above 1.2 Mbit/s" >&2; exit 1; }
+grep -q 'AudioChannelConfiguration[^>]*value="2"' "$OUT/surround/surround.mpd" \
+  || { echo "size target: surround audio not stereo" >&2; exit 1; }
+(( $(kbps "$OUT/surround/audio.mp4" "$(seconds "$OUT/surround/surround.mpd")") <= 110 )) \
+  || { echo "size target: surround audio above 96 kbit/s" >&2; exit 1; }
 
 grep -q 'lang="en"' "$OUT/episode-like/episode-like.mpd" \
   || { echo "prepare.sh did not pick the English audio track" >&2; exit 1; }

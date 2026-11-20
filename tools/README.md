@@ -9,8 +9,10 @@ Kids Library/
   Bluey/Bluey - S01E03 - Keepy Uppy.kidsvideo
 ```
 
-A `.kidsvideo` is a plain, uncompressed `tar` of the 4 parts the app needs
-(`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). Send it to the iPad or
+A `.kidsvideo` (format 2) is a plain, uncompressed `tar`: a small
+`kidsvideo.json` first (format and title), then the 4 parts the app needs
+(`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). The app refuses files
+made by older versions of the tools; prepare those again. Send it to the iPad or
 iPhone (AirDrop, or any way that puts it in Files) and add it in the app; see
 the main README.
 
@@ -171,9 +173,13 @@ Kids Library/
 ### What it does
 - For each video, runs `tools/prepare.sh`, which:
   - picks the **English** audio track if there are several (otherwise the first);
-  - re-encodes only when needed (not H.264 + AAC, or not MP4/MOV), otherwise
-    just repackages, which is fast;
-  - writes one `<Title>.kidsvideo` file (via `tools/pack.sh`).
+  - keeps each video small, to save space on the devices: at most 720p, video
+    at most 1.2 Mbit/s (H.264), stereo audio at 96 kbit/s, so at most about
+    0.6 GB per hour. A track already within that is copied (seconds); anything
+    else is re-encoded (a film can take a while, done once);
+  - writes one `<Title>.kidsvideo` file (via `tools/kidsvideo`, a small Go tool
+    that `run_prepare.sh` builds; `kidsvideo verify <file>` checks a file the way
+    the app reads it).
 - **Skips** videos already prepared in the destination, so re-running a batch
   is safe.
 - Keeps going if one video fails, and prints a summary at the end

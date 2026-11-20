@@ -1,5 +1,6 @@
 *
 !tools/run_prepare.sh
 !tools/prepare.sh
-!tools/pack.sh
+!tools/kidsvideo/go.mod
+!tools/kidsvideo/main.go
 !tools/get-packager.sh
