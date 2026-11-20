@@ -8,9 +8,13 @@ let video;
 let authorized = false; // true only between allowPlay() and the next pause/end
 let onChange;
 let closing = Promise.resolve(); // a pending closeVideo(); opening waits for it
+let loadLater = null; // a streamed video opened before signing in: loads at play
 
-/** status: 'loading' | 'paused' | 'pin-required' | 'playing' | 'ended' | 'time-up' | 'error' */
-export const playerState = { status: 'loading', offlineUri: null };
+/**
+ * status: 'loading' | 'paused' | 'pin-required' | 'playing' | 'ended' | 'time-up' | 'error';
+ * error: what went wrong, when it's known.
+ */
+export const playerState = { status: 'loading', offlineUri: null, error: '' };
 
 function set(status) {
   playerState.status = status;
@@ -51,27 +55,45 @@ async function shakaPlayer() {
   return player;
 }
 
-/** Load a stored video, paused at 0:00. Never plays. */
-export async function openVideo(offlineUri, exists) {
-  authorized = false;
-  playerState.offlineUri = offlineUri;
-  if (!exists) return set('error');
-  set('loading');
+// Load into Shaka, paused at 0:00; uriFor() gives what to load. True if loaded.
+// Leaving the video meanwhile, or failing, gives a falsy result.
+async function load(offlineUri, uriFor) {
   await closing;
   if (playerState.offlineUri !== offlineUri) return;
   try {
     const p = await shakaPlayer();
-    await p.load(offlineUri, 0);
+    await p.load(await uriFor(), 0);
     if (playerState.offlineUri !== offlineUri) return; // navigated away meanwhile
     video.pause();
     video.currentTime = 0;
-    set('paused');
-  } catch {
+    return true;
+  } catch (e) {
     // Opening can fail after the viewer has already left this video; only a race
     // in time reaches that, which the scenarios can't hold without waiting (owner OK).
     // v8 ignore next
-    if (playerState.offlineUri === offlineUri) set('error');
+    if (playerState.offlineUri !== offlineUri) return false;
+    playerState.error = e.userMessage ?? '';
+    set('error');
+    return false;
   }
+}
+
+/**
+ * Open a video, paused at 0:00. Never plays. uriFor() gives what to load (a
+ * streamed video reads Google Drive); with later, loading waits for play.
+ */
+export async function openVideo(offlineUri, exists, uriFor = async () => offlineUri, later = false) {
+  authorized = false;
+  loadLater = null;
+  playerState.offlineUri = offlineUri;
+  playerState.error = '';
+  if (!exists) return set('error');
+  if (later) {
+    loadLater = () => load(offlineUri, uriFor);
+    return set('paused');
+  }
+  set('loading');
+  if (await load(offlineUri, uriFor)) set('paused');
 }
 
 /** Leaving the player: stop and unload, so nothing keeps playing. */
@@ -97,9 +119,23 @@ export function cancelPlay() {
   set('paused');
 }
 
-/** The correct PIN was entered: start (or resume) playback. */
-export async function allowPlay() {
+/**
+ * The correct PIN was entered: start (or resume) playback. ready, if given, is
+ * waited for first (a Google sign-in for a streamed video).
+ */
+export async function allowPlay(ready) {
   if (playerState.status !== 'pin-required') return;
+  if (ready) {
+    set('loading');
+    try {
+      await ready;
+    } catch (e) {
+      playerState.error = e.message;
+      return set('error');
+    }
+    if (loadLater && !(await loadLater())) return;
+    loadLater = null;
+  }
   if (video.ended) video.currentTime = 0;
   authorized = true;
   try {

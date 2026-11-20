@@ -2,11 +2,16 @@
 // M2 library/import, M3 player + PIN gate, M4 first-run PIN, lockout, change
 // PIN, offline (service worker) and installability.
 import { installLocalScheme, pickedSource, CONTAINER_EXT } from './local-scheme.js';
-import { initDrive, pickFromDrive } from './drive.js';
+import {
+  initDrive, pickFromDrive, signedIn, signIn, signInEnds, driveSource,
+} from './drive.js';
 import {
   hasPin, verifyPinSync, savePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
 } from './pin.js';
-import { listVideos, importVideo, removeVideo, parseTitle } from './library.js';
+import {
+  listVideos, importVideo, addStreamed, streamUri, removeVideo, parseTitle,
+} from './library.js';
+import { isStreamed, hideStreamed } from './streamed.js';
 import {
   playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
   timeUp, seekTo, seekBy,
@@ -18,7 +23,7 @@ const $ = (testid, root = document) => root.querySelector(`[data-testid="${testi
 const state = {
   route: { name: 'library' },
   pinSet: false,
-  library: [], // usable Shaka StoredContent
+  library: [], // the catalogue: stored and streamed videos (library.js listVideos)
   settingsUnlocked: false,
   search: '', // library search text (not saved); typing needs the PIN
   searchUnlocked: false, // until the search field loses focus
@@ -29,6 +34,7 @@ const state = {
   returnTo: '#/library', // where the player's Back goes (the library or a series list)
   features: {}, // running optional features, by id (features.js)
   importStatus: { phase: 'idle', progress: 0, message: '' },
+  signingIn: null, // a Google sign-in started by the tap that opened a streamed video
 };
 
 function parseRoute(hash) {
@@ -74,15 +80,19 @@ function tile(testid, poster, ...texts) {
   return li;
 }
 
-// Opening a video remembers where Back should return to.
+// Opening a video remembers where Back should return to. A streamed video
+// renews the Google sign-in on this tap if needed, so it is ready by play.
 function openFrom(c, from) {
   state.returnTo = from;
+  state.signingIn = c.playsFrom === 'drive' && !signedIn() ? signIn() : null;
+  state.signingIn?.catch(() => {}); // a failed sign-in is shown by the player
   go(`#/player/${encodeURIComponent(c.offlineUri)}`);
 }
 
 function videoTile(c) {
   const li = tile('library-item', c.appMetadata.poster, c.appMetadata.title);
   li.dataset.videoId = c.offlineUri;
+  li.dataset.playsFrom = c.playsFrom;
   li.addEventListener('click', () => openFrom(c, '#/library'));
   return li;
 }
@@ -101,6 +111,7 @@ function episodeTile(c, hash) {
   const label = `S${pad2(p.season)}E${pad2(p.episode)}${p.episodeTitle ? ` · ${p.episodeTitle}` : ''}`;
   const li = tile('episode-item', c.appMetadata?.poster, label);
   li.dataset.videoId = c.offlineUri;
+  li.dataset.playsFrom = c.playsFrom;
   li.addEventListener('click', () => openFrom(c, hash));
   return li;
 }
@@ -127,12 +138,15 @@ function settingsRow(c) {
   li.dataset.testid = 'settings-video-item';
   const title = document.createElement('span');
   title.textContent = c.appMetadata.title;
-  const remove = document.createElement('button');
-  remove.type = 'button';
-  remove.dataset.testid = 'remove-video-button';
-  remove.textContent = 'Remove';
-  remove.addEventListener('click', () => onRemove(c.offlineUri));
-  li.append(title, remove);
+  // A stored video's copy can be removed; a streamed one has none, so it can
+  // only be hidden from this device (it stays in Google Drive).
+  const streamed = c.playsFrom === 'drive';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.testid = streamed ? 'hide-video-button' : 'remove-video-button';
+  button.textContent = streamed ? 'Hide' : 'Remove';
+  button.addEventListener('click', () => (streamed ? onHide : onRemove)(c.offlineUri));
+  li.append(title, button);
   return li;
 }
 
@@ -181,7 +195,9 @@ function render(s) {
   if (s.route.name === 'player') {
     const status = playerState.status;
     $('screen-player').dataset.state = status;
+    $('player-error').textContent = playerState.error || "This video isn't in the library.";
     renderControlsVisibility();
+    watchSignIn();
     show('play-button', ['paused', 'ended', 'pin-required', 'time-up'].includes(status));
     show('pause-button', status === 'playing');
   }
@@ -287,7 +303,7 @@ async function onPinSubmit(event) {
     $('import-input').click();
   } else if (purpose === 'drive') {
     // Also within the tap: Google's sign-in opens a pop-up.
-    pickFromDrive(importItems);
+    pickFromDrive((docs, sourceOf) => importItems(docs, sourceOf, addStreamed));
   } else if (purpose === 'settings') {
     state.settingsUnlocked = true;
   } else if (purpose === 'search') {
@@ -300,10 +316,10 @@ async function onPinSubmit(event) {
     update();
     // Optional features may step in first (e.g. ask for a watch-time budget);
     // they call proceed() from their own tap, so playback still starts in-gesture.
-    const proceed = () => { allowPlay().then(update); update(); };
+    const proceed = () => { allowPlay(signInForPlay()).then(update); update(); };
     const cancel = () => { cancelPlay(); update(); };
     if (Object.values(state.features).some((f) => f.beforePlay?.(proceed, cancel))) return update();
-    await allowPlay(); // still within the tap, so autoplay rules allow it
+    await allowPlay(signInForPlay()); // still within the tap, so autoplay rules allow it
   }
   update();
 }
@@ -453,9 +469,42 @@ function initSeek() {
   });
 }
 
-// Several files picked at once: imported one after another; a bad file doesn't
+// ---------- streamed videos ----------
+
+// Within the play PIN's tap: a streamed video needs a valid Google sign-in.
+// Returns the sign-in in progress, or null when none is needed.
+function signInForPlay() {
+  return isStreamed(playerState.offlineUri) && !signedIn() ? signIn() : null;
+}
+
+// A streamed video pauses just before the sign-in ends; play with the PIN
+// signs in again (renewing it needs a tap).
+let signInTimer = null;
+function watchSignIn() {
+  if (playerState.status !== 'playing' || !isStreamed(playerState.offlineUri)) {
+    clearTimeout(signInTimer);
+    signInTimer = null;
+  } else if (!signInTimer) {
+    signInTimer = setTimeout(() => { signInTimer = null; onPause(); }, signInEnds() - Date.now());
+  }
+}
+
+// What the player loads for a streamed video: its parts, read from Google
+// Drive, once the sign-in started by the opening tap (if any) is done.
+async function streamFrom(entry, signing) {
+  try {
+    await signing;
+    return await streamUri(driveSource(entry.file));
+  } catch (e) {
+    throw Object.assign(e, {
+      userMessage: e.offline ? `"${entry.appMetadata.title}" streams from Google Drive and needs the internet.` : e.message,
+    });
+  }
+}
+
+// Several files picked at once: added one after another; a bad file doesn't
 // stop the rest, and the summary names what failed.
-async function importSeveral(items, sourceOf) {
+async function importSeveral(items, sourceOf, add) {
   const total = items.length;
   let added = 0;
   const failed = [];
@@ -468,7 +517,7 @@ async function importSeveral(items, sourceOf) {
     state.importStatus = { phase: 'storing', progress: 0, message: `Adding ${i + 1} of ${total}: ${name}…` };
     update();
     try {
-      await importVideo(sourceOf(item), (p) => {
+      await add(sourceOf(item), (p) => {
         state.importStatus.progress = p;
         update();
       });
@@ -507,13 +556,14 @@ function onPinCancel() {
   update();
 }
 
-// Picked files or files in Google Drive: sourceOf(item) gives its byte source.
-async function importItems(items, sourceOf) {
-  if (items.length > 1) return importSeveral(items, sourceOf);
+// Picked files (stored: importVideo) or files in Google Drive (streamed:
+// addStreamed); sourceOf(item) gives its byte source.
+async function importItems(items, sourceOf, add) {
+  if (items.length > 1) return importSeveral(items, sourceOf, add);
   state.importStatus = { phase: 'storing', progress: 0, message: 'Adding video…' };
   update();
   try {
-    const stored = await importVideo(sourceOf(items[0]), (p) => {
+    const stored = await add(sourceOf(items[0]), (p) => {
       state.importStatus.progress = p;
       update();
     });
@@ -531,6 +581,12 @@ async function onRemove(offlineUri) {
   update();
 }
 
+async function onHide(offlineUri) {
+  await hideStreamed(offlineUri);
+  await refreshLibrary();
+  update();
+}
+
 function onRouteChange() {
   const previous = state.route;
   state.route = parseRoute(location.hash);
@@ -539,8 +595,14 @@ function onRouteChange() {
     closeVideo().then(update);
   }
   if (state.route.name === 'player') {
-    const exists = state.library.some((c) => c.offlineUri === state.route.videoId);
-    openVideo(state.route.videoId, exists).then(update);
+    const id = state.route.videoId;
+    const entry = state.library.find((c) => c.offlineUri === id);
+    // A streamed video loads now if signed in (or signing in, from the tap that
+    // opened it); otherwise at play, after signing in.
+    const signing = state.signingIn;
+    state.signingIn = null;
+    if (entry?.playsFrom === 'drive') openVideo(id, true, () => streamFrom(entry, signing), !signing && !signedIn()).then(update);
+    else openVideo(id, Boolean(entry)).then(update);
   }
   if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
   if (state.route.name === 'settings' && !state.settingsUnlocked && state.pinSet) {
@@ -581,7 +643,7 @@ async function boot() {
   $('import-input').addEventListener('change', (event) => {
     const files = [...event.target.files];
     event.target.value = '';
-    importItems(files, pickedSource);
+    importItems(files, pickedSource, importVideo);
   });
   $('add-from-drive-button').addEventListener('click', () => askPin('drive'));
   $('play-button').addEventListener('click', onPlayRequested);
