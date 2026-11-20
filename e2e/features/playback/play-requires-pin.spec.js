@@ -10,9 +10,9 @@ test.describe('Feature: Playing needs the PIN', () => {
     await openVideo(page, 'medium');
   });
 
-  test('Scenario: play asks for the PIN, and the correct PIN starts playback', async ({ page }) => {
+  test('Scenario: play asks for the PIN, and the correct PIN starts playback @ipad', async ({ page }) => {
     await test.step('When I tap play', async () => {
-      await page.getByTestId('play-button').click();
+      await page.getByTestId('play-button').tap();
     });
     await test.step('Then the PIN prompt is shown and nothing plays yet', async () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'pin-required');
@@ -27,9 +27,9 @@ test.describe('Feature: Playing needs the PIN', () => {
     });
   });
 
-  test('Scenario: a wrong PIN does not start playback', async ({ page }) => {
+  test('Scenario: a wrong PIN does not start playback @ipad', async ({ page }) => {
     await test.step('When I tap play and enter a wrong PIN', async () => {
-      await page.getByTestId('play-button').click();
+      await page.getByTestId('play-button').tap();
       await enterPin(page, WRONG_PIN);
     });
     await test.step('Then the prompt says it is wrong and nothing plays', async () => {
@@ -38,10 +38,10 @@ test.describe('Feature: Playing needs the PIN', () => {
     });
   });
 
-  test('Scenario: cancelling the PIN prompt leaves the video paused', async ({ page }) => {
+  test('Scenario: cancelling the PIN prompt leaves the video paused @ipad', async ({ page }) => {
     await test.step('When I tap play and then cancel the PIN prompt', async () => {
-      await page.getByTestId('play-button').click();
-      await page.getByTestId('pin-cancel').click();
+      await page.getByTestId('play-button').tap();
+      await page.getByTestId('pin-cancel').tap();
     });
     await test.step('Then the prompt closes and the video is still paused', async () => {
       await expect(page.getByTestId('pin-prompt')).toBeHidden();

@@ -168,11 +168,11 @@ export async function enterPin(page, pin) {
   const prompt = page.getByTestId('pin-prompt');
   await expect(prompt).toBeVisible();
   await prompt.getByTestId('pin-input').fill(pin);
-  await prompt.getByTestId('pin-submit').click();
+  await prompt.getByTestId('pin-submit').tap();
 }
 
 export async function openVideo(page, title) {
-  await page.getByTestId('library-item').filter({ hasText: title }).click();
+  await page.getByTestId('library-item').filter({ hasText: title }).tap();
   await expect(page.getByTestId('screen-player')).toHaveAttribute('data-state', 'paused');
 }
 
@@ -388,7 +388,7 @@ export async function mediaSessionAction(page, action) {
 
 // Tap play, enter the PIN, and wait until media time actually advances.
 export async function startPlaying(page) {
-  await page.getByTestId('play-button').click();
+  await page.getByTestId('play-button').tap();
   await enterPin(page, PIN);
   await expectPlaying(page);
 }
