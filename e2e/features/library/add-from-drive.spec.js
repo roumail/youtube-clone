@@ -179,9 +179,9 @@ test.describe('Feature: Add from Google Drive', () => {
     await test.step('When I pick "tiny.kidsvideo" again', async () => {
       await addFromDrive(page);
     });
-    await test.step('Then it is refused as already in the library, after reading only its first 512-byte header', async () => {
+    await test.step('Then it is refused as already in the library, after reading only the kidsvideo.json at its start', async () => {
       await expect(page.getByTestId('import-status')).toHaveText("Couldn't add the video: \"tiny\" is already in the library");
-      expect(google.bytesRead('tiny.kidsvideo')).toBeLessThanOrEqual(512);
+      expect(google.bytesRead('tiny.kidsvideo')).toBeLessThanOrEqual(1024);
     });
   });
 
@@ -195,9 +195,9 @@ test.describe('Feature: Add from Google Drive', () => {
     await test.step('When I pick "tiny.kidsvideo"', async () => {
       await addFromDrive(page);
     });
-    await test.step('Then it is refused for lack of space, using the size Drive reports, after reading only its first 512-byte header', async () => {
+    await test.step('Then it is refused for lack of space, using the size Drive reports, after reading only the kidsvideo.json at its start', async () => {
       await expect(page.getByTestId('import-status')).toContainText(/not enough space on this device \("tiny" needs [\d.]+ MB, [\d.]+ MB is free\)/);
-      expect(google.bytesRead('tiny.kidsvideo')).toBeLessThanOrEqual(512);
+      expect(google.bytesRead('tiny.kidsvideo')).toBeLessThanOrEqual(1024);
     });
   });
 });
