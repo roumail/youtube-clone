@@ -85,6 +85,7 @@ function tile(testid, poster, ...texts) {
 function openFrom(c, from) {
   state.returnTo = from;
   state.signingIn = c.playsFrom === 'drive' && !signedIn() ? signIn() : null;
+  state.signingIn?.catch(() => {}); // a failed sign-in is shown by the player
   go(`#/player/${encodeURIComponent(c.offlineUri)}`);
 }
 
