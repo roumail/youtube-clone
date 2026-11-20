@@ -98,9 +98,9 @@ test.describe('Feature: Download a streamed video', () => {
   test('Scenario: a download that does not fit is refused before it starts', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed and there is room for only half of it', async () => {
+      await freeSpace(page, Math.floor(containerSize('medium') / 2));
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'medium.kidsvideo');
-      await freeSpace(page, Math.floor(containerSize('medium') / 2));
     });
     await test.step('When I download it', async () => {
       await download(page, 'medium');
@@ -186,13 +186,13 @@ test.describe('Feature: Download a streamed video', () => {
         .getByTestId('hide-video-button').tap();
     });
     await test.step('Then nothing of it is left on the device', async () => {
-      const left = await page.evaluate(async () => {
+      await expect(page.getByTestId('settings-video-item')).toHaveCount(0);
+      await expect.poll(() => page.evaluate(async () => {
         const storage = new shaka.offline.Storage();
         const n = (await storage.list()).length;
         await storage.destroy();
         return n;
-      });
-      expect(left).toBe(0);
+      })).toBe(0);
       await expect(playerState(page)).toBeHidden();
     });
   });
