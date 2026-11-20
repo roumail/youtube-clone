@@ -197,6 +197,9 @@ data (home-folder paths, email addresses), `.env` files, video files and files
 over 2 MB. If `gitleaks` is installed (`brew install gitleaks`) it runs too.
 
 ## Lower-level tools
+- `tools/kidsvideo/` — the Go tool that packs and checks `.kidsvideo` files.
+  It is planned to take over `prepare.sh`, `run_prepare.sh` and
+  `get-packager.sh` in stages; see `tools/kidsvideo/README.md`.
 - `tools/prepare.sh <video> [output-root]` — prepares exactly one video
   (default output: `./prepared`, gitignored). `run_prepare.sh` calls this.
 - `tools/get-packager.sh` — downloads the pinned Shaka Packager into
