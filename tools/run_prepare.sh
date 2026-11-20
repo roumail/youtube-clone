@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Prepare one or many videos for the kids library (owner's Mac).
-# A wrapper around tools/prepare.sh — see tools/README.md for examples.
+# Around "kidsvideo prepare" (tools/kidsvideo/), one video at a time — see
+# tools/README.md for examples.
 #
 #   tools/run_prepare.sh [--dest DIR] [--title "T"] [--series "S"] [--tmux] INPUT...
 #   ls *.mp4 | tools/run_prepare.sh          (paths on stdin, one per line)
@@ -80,8 +81,8 @@ fi
 
 # Pinned Shaka Packager (no-op if already present).
 "$HERE/get-packager.sh" >/dev/null || { echo "could not install Shaka Packager" >&2; exit 1; }
-# kidsvideo (the container tool, tools/kidsvideo/): built here when Go is
-# installed; the Docker image already has it.
+# kidsvideo (tools/kidsvideo/, prepares and packs each video): built here when
+# Go is installed; the Docker image already has it.
 if command -v go >/dev/null; then
   (cd "$HERE/kidsvideo" && go build -trimpath -o "$HERE/bin/kidsvideo" .) || { echo "could not build tools/kidsvideo" >&2; exit 1; }
 fi
@@ -128,7 +129,6 @@ if [[ "$USE_TMUX" == 0 && -z "${TMUX:-}" && -t 2 ]] && command -v tmux >/dev/nul
   echo "tip: long jobs (re-encodes) can run detached with --tmux (or RUN_PREPARE_TMUX=1 in .env)" >&2
 fi
 
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 done_n=0; skip_n=0; fail_n=0; FAILED=()
 
 # Tidy a release-style name into a title: dots/underscores become spaces (only
@@ -149,7 +149,7 @@ episode_title_from() { # basename-without-extension, matched-episode-tag
 }
 
 for f in "${FILES[@]}"; do
-  base="$(basename "$f")"; stem="${base%.*}"; ext="${base##*.}"
+  base="$(basename "$f")"; stem="${base%.*}"
   title="$stem"; dest="$DEST"
   if [[ -n "$SERIES" ]]; then
     season=""; episode=""; tag=""
@@ -173,19 +173,12 @@ for f in "${FILES[@]}"; do
     title="${cleaned:-$stem}"
   fi
 
-  src="$f"
-  if [[ "$title" != "$stem" ]]; then
-    # prepare.sh takes the title from the file name: link under the new name.
-    mkdir -p "$TMP/titled"
-    src="$TMP/titled/$title.$ext"
-    ln -sf "$(cd "$(dirname "$f")" && pwd)/$base" "$src"
-  fi
   echo "== $title"
   if [[ -f "$dest/$title.kidsvideo" ]]; then
     echo "   already prepared, skipping"; skip_n=$((skip_n + 1)); continue
   fi
   mkdir -p "$dest"
-  if "$HERE/prepare.sh" "$src" "$dest" 2>&1 | sed 's/^/   /'; then
+  if PACKAGER="${PACKAGER:-$HERE/bin/packager}" "$HERE/bin/kidsvideo" prepare --title "$title" --dest "$dest" "$f" 2>&1 | sed 's/^/   /'; then
     if [[ -f "$dest/$title.kidsvideo" ]]; then done_n=$((done_n + 1)); else fail_n=$((fail_n + 1)); FAILED+=("$f"); fi
   else
     fail_n=$((fail_n + 1)); FAILED+=("$f")

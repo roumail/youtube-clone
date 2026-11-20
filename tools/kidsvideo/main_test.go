@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// A prepared video folder as prepare.sh leaves it: "<Title>.mpd" and the three parts.
+// A prepared video folder as prepare leaves it before packing: "<Title>.mpd" and the three parts.
 func preparedFolder(t *testing.T, title string) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), title)
@@ -171,7 +171,7 @@ func TestVerifyRefuses(t *testing.T) {
 
 func TestUsage(t *testing.T) {
 	code, stdout, stderr := cli("unpack")
-	if code != 2 || stdout != "" || stderr != "usage: kidsvideo pack <prepared-parts-folder> | kidsvideo verify <file.kidsvideo>\n" {
+	if code != 2 || stdout != "" || stderr != usage+"\n" {
 		t.Fatalf("code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }

@@ -5,7 +5,7 @@ import { readHead, readParts, describeParts, registerParts, posterDataUrl } from
 import { listStreamed, saveStreamed } from './streamed.js';
 
 // Never use Shaka's default track picker: on P3 screens it drops SDR video and
-// stores 0 tracks without an error. prepare.sh produces exactly one variant.
+// stores 0 tracks without an error. kidsvideo prepare produces exactly one variant.
 const pickSingleVariant = async (tracks) => tracks.filter((t) => t.type === 'variant').slice(0, 1);
 
 async function withStorage(fn) {

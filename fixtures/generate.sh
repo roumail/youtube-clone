@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Generate deterministic, synthetic test fixtures. Nothing real,
 # nothing committed: output goes to fixtures/out/ (gitignored, cached in CI).
-# Packaged fixtures are produced by tools/prepare.sh itself, so every e2e run
-# exercises the real preparation path.
-# Needs: ffmpeg + ffprobe on PATH, and tools/get-packager.sh run once.
+# Packaged fixtures are produced by "kidsvideo prepare" itself (tools/kidsvideo/),
+# so every e2e run exercises the real preparation path.
+# Needs: ffmpeg + ffprobe on PATH, tools/get-packager.sh run once, and kidsvideo
+# built (tools/bin/kidsvideo, or KIDSVIDEO=...).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-PREPARE="$HERE/../tools/prepare.sh"
 KIDSVIDEO="${KIDSVIDEO:-$HERE/../tools/bin/kidsvideo}"
+prepare() { "$KIDSVIDEO" prepare --dest "$2" "$1"; } # <video> <output folder>
 OUT="$HERE/out"
 RAW="$OUT/raw"
 FFMPEG="${FFMPEG:-ffmpeg}"
@@ -64,7 +65,7 @@ make_raw broken-missing-audio 3
   -map 0:v -map 1:a -c:v copy -c:a aac -ac 6 -b:a 384k -shortest "$RAW/surround.mp4"
 
 for name in tiny medium broken-missing-audio episode-like long surround; do
-  "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
+  prepare "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 
 # Series episodes: titles "Series - SxxEyy - Episode". Prepared
@@ -72,17 +73,17 @@ done
 # "Show - S01E03" has no episode title.
 for ep in "Show - S01E10 - Tenth" "Show - S01E02 - Second" "Show - S01E01 - First" "Show - S01E03"; do
   cp "$RAW/tiny.mp4" "$RAW/$ep.mp4"
-  "$PREPARE" "$RAW/$ep.mp4" "$OUT" >/dev/null
+  prepare "$RAW/$ep.mp4" "$OUT" >/dev/null
 done
 
 # A standalone video named exactly like the series "Show", from a copy of "tiny".
 cp "$RAW/tiny.mp4" "$RAW/Show.mp4"
-"$PREPARE" "$RAW/Show.mp4" "$OUT" >/dev/null
+prepare "$RAW/Show.mp4" "$OUT" >/dev/null
 
 # The longest title kidsvideo pack accepts (95 bytes), from a copy of "tiny".
 LONG_TITLE="The Longest Title Allowed - A Tale About Many Long Words That Keeps Going Until It Finally Ends"
 cp "$RAW/tiny.mp4" "$RAW/$LONG_TITLE.mp4"
-"$PREPARE" "$RAW/$LONG_TITLE.mp4" "$OUT" >/dev/null
+prepare "$RAW/$LONG_TITLE.mp4" "$OUT" >/dev/null
 
 # Unpack every container into a same-named folder: tests that seed the library
 # directly (not through the picker) load the parts over HTTP. Test-only; the
@@ -144,29 +145,29 @@ cmp -s "$OUT/tiny/tiny.mpd" "$OUT/high-peak/high-peak.mpd" \
   && { echo "high-peak fixture: bandwidth not changed" >&2; exit 1; }
 "$KIDSVIDEO" pack "$OUT/high-peak" >/dev/null
 
-# Size target: at most 720p, video at most 1.2 Mbit/s on average, stereo audio
-# at most 96 kbit/s. "episode-like" is 1080p; "surround" has 5.1 audio.
+# Size target: at most 540p, video at most 0.7 Mbit/s on average, stereo audio
+# at 64 kbit/s. "episode-like" is 1080p; "surround" has 5.1 audio.
 seconds() { sed -n 's/.*mediaPresentationDuration="PT\([0-9.]*\)S".*/\1/p' "$1"; }
 kbps() { awk -v bytes="$(wc -c < "$1")" -v s="$2" 'BEGIN { printf "%d", bytes * 8 / s / 1000 }'; }
-grep -q 'height="720"' "$OUT/episode-like/episode-like.mpd" \
-  || { echo "size target: episode-like (1080p) not scaled to 720p" >&2; exit 1; }
-(( $(kbps "$OUT/episode-like/video.mp4" "$(seconds "$OUT/episode-like/episode-like.mpd")") <= 1200 )) \
-  || { echo "size target: episode-like video above 1.2 Mbit/s" >&2; exit 1; }
+grep -q 'height="540"' "$OUT/episode-like/episode-like.mpd" \
+  || { echo "size target: episode-like (1080p) not scaled to 540p" >&2; exit 1; }
+(( $(kbps "$OUT/episode-like/video.mp4" "$(seconds "$OUT/episode-like/episode-like.mpd")") <= 700 )) \
+  || { echo "size target: episode-like video above 0.7 Mbit/s" >&2; exit 1; }
 grep -q 'AudioChannelConfiguration[^>]*value="2"' "$OUT/surround/surround.mpd" \
   || { echo "size target: surround audio not stereo" >&2; exit 1; }
-(( $(kbps "$OUT/surround/audio.mp4" "$(seconds "$OUT/surround/surround.mpd")") <= 110 )) \
-  || { echo "size target: surround audio above 96 kbit/s" >&2; exit 1; }
+(( $(kbps "$OUT/surround/audio.mp4" "$(seconds "$OUT/surround/surround.mpd")") <= 80 )) \
+  || { echo "size target: surround audio above 64 kbit/s" >&2; exit 1; }
 
 grep -q 'lang="en"' "$OUT/episode-like/episode-like.mpd" \
-  || { echo "prepare.sh did not pick the English audio track" >&2; exit 1; }
+  || { echo "kidsvideo prepare did not pick the English audio track" >&2; exit 1; }
 
 # Raw inputs: already-H.264 (repackage path) and VP9/Opus (re-encode path).
 cp "$RAW/tiny.mp4" "$OUT/raw-h264.mp4"
 "$FFMPEG" -hide_banner -loglevel error -y -i "$RAW/tiny.mp4" \
   -c:v libvpx-vp9 -b:v 0 -crf 40 -deadline realtime -c:a libopus "$OUT/raw-vp9.webm"
 
-# Exercise the re-encode path of prepare.sh too.
-"$PREPARE" "$OUT/raw-vp9.webm" "$OUT/prepared-from-vp9" >/dev/null
+# Exercise the re-encode path of kidsvideo prepare too.
+prepare "$OUT/raw-vp9.webm" "$OUT/prepared-from-vp9" >/dev/null
 test -f "$OUT/prepared-from-vp9/raw-vp9.kidsvideo"
 
 rm -rf "$RAW"
