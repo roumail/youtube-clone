@@ -137,7 +137,7 @@ runs in a detached tmux session, so closing the terminal doesn't stop it:
 find ~/Downloads/test -iname '*.mkv' | run_prepare --tmux   # pipes work too
 tmux attach -t kids-prepare-…                  # watch it (Ctrl-b then d to leave it running)
 ```
-The full output is also saved to `prepared/run_prepare-<session>.log`.
+The full output is also saved to `logs/run_prepare-<session>.log`.
 
 To make it the default, set `RUN_PREPARE_TMUX=1` in your `.env`; `--no-tmux`
 runs one job in the terminal anyway. Without either, the tool prints a one-line

@@ -111,8 +111,8 @@ fi
 if [[ "$USE_TMUX" == 1 && -z "${TMUX:-}" ]]; then
   command -v tmux >/dev/null || { echo "--tmux needs tmux (brew install tmux); or run without --tmux" >&2; exit 1; }
   session="kids-prepare-$(date +%m%d-%H%M%S)"
-  mkdir -p "$ROOT/prepared"
-  log="$ROOT/prepared/run_prepare-$session.log"
+  mkdir -p "$ROOT/logs"
+  log="$ROOT/logs/run_prepare-$session.log"
   args=("$SELF" --dest "$DEST")
   [[ -n "$TITLE" ]] && args+=(--title "$TITLE")
   [[ -n "$SERIES" ]] && args+=(--series "$SERIES")
