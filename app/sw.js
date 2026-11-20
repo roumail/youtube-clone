@@ -28,6 +28,9 @@ self.addEventListener('fetch', (e) => {
   const { request } = e;
   // Google's scripts and Drive's video bytes (sent with the sign-in token) are
   // not the app's: they go to the network untouched, never into this cache.
+  // The Drive scenarios fake Google with Playwright routes, which make the page
+  // skip the service worker, so no scenario reaches this branch (owner OK).
+  // v8 ignore next
   if (new URL(request.url).origin !== self.location.origin) return;
   e.respondWith((async () => {
     try {
