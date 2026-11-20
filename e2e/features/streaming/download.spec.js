@@ -3,7 +3,8 @@
 // connection, like a stored one. A download is short-lived and may be lost
 // (the browser can clear it, or the parent removes it); the video then simply
 // streams again. Only streamed videos offer Download: a stored video is
-// already on the device. A download can be cancelled while it runs.
+// already on the device. A download can be cancelled while it runs. Several
+// can run at once; each has its own row and Cancel (progress-rows.spec.js).
 // Google is faked at the network boundary.
 // Not @ipad, for the same reason as add-from-drive.spec.js.
 import {
@@ -24,6 +25,7 @@ async function streamFromDrive(page, google, ...names) {
 }
 
 const item = (page, title) => page.getByTestId('library-item').filter({ hasText: title });
+const row = (page, text) => page.getByTestId('import-status').filter({ hasText: text });
 
 async function download(page, title) {
   await item(page, title).getByTestId('download-button').tap();
@@ -222,6 +224,93 @@ test.describe('Feature: Download a streamed video', () => {
         return n;
       })).toBe(0);
       await expect(playerState(page)).toBeHidden();
+    });
+  });
+
+  // Several downloads at once. Each is started in turn while the earlier one
+  // is still running, so a Cancel or a failure that reaches the wrong
+  // download shows up whichever order they were started in.
+
+  test.fixme('Scenario: two downloads at once both finish', async ({ page, pinSet }) => {
+    const google = await fakeGoogle(page, shared());
+    let releaseTiny;
+    let releaseMedium;
+    await test.step('Given "tiny" and "medium" are streamed', async () => {
+      await goto(page, '#/library');
+      await streamFromDrive(page, google, 'tiny.kidsvideo', 'medium.kidsvideo');
+    });
+    await test.step('When I download "tiny", and "medium" while "tiny" still downloads', async () => {
+      releaseTiny = google.holdReads('tiny.kidsvideo');
+      releaseMedium = google.holdReads('medium.kidsvideo');
+      await download(page, 'tiny');
+      await download(page, 'medium');
+    });
+    await test.step('Then both say they are downloading, and neither offers Download again', async () => {
+      for (const title of ['tiny', 'medium']) {
+        await expect(item(page, title)).toHaveAttribute('data-downloaded', 'downloading');
+        await expect(item(page, title).getByTestId('download-button')).toHaveCount(0);
+      }
+    });
+    await test.step('And when Google Drive answers, both are downloaded', async () => {
+      releaseTiny();
+      releaseMedium();
+      await expect(item(page, 'tiny')).toHaveAttribute('data-downloaded', 'true');
+      await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'true');
+    });
+  });
+
+  for (const [cancelled, other, which] of [['tiny', 'medium', 'first'], ['medium', 'tiny', 'second']]) {
+    test.fixme(`Scenario: with two downloads at once, Cancel on the ${which} one stops only that one`, async ({ page, pinSet }) => {
+      const google = await fakeGoogle(page, shared());
+      const release = {};
+      await test.step('Given "tiny" and "medium" are streamed, and both are downloading, "tiny" started first', async () => {
+        await goto(page, '#/library');
+        await streamFromDrive(page, google, 'tiny.kidsvideo', 'medium.kidsvideo');
+        release.tiny = google.holdReads('tiny.kidsvideo');
+        release.medium = google.holdReads('medium.kidsvideo');
+        await download(page, 'tiny');
+        await expect(item(page, 'tiny')).toHaveAttribute('data-downloaded', 'downloading');
+        await download(page, 'medium');
+        await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'downloading');
+      });
+      await test.step(`When I tap Cancel in the row of "${cancelled}"`, async () => {
+        await row(page, `Downloading "${cancelled}"`).getByTestId('cancel-download-button').tap();
+        release[cancelled]();
+      });
+      await test.step(`Then "${cancelled}" is cancelled and nothing of it is kept`, async () => {
+        await expect(row(page, `Download of "${cancelled}" cancelled.`)).toBeVisible();
+        await expect(item(page, cancelled)).toHaveAttribute('data-downloaded', 'false');
+      });
+      await test.step(`And "${other}" still downloads to the end`, async () => {
+        await expect(item(page, other)).toHaveAttribute('data-downloaded', 'downloading');
+        await expect(row(page, `Downloading "${other}"`).getByTestId('cancel-download-button')).toBeVisible();
+        release[other]();
+        await expect(item(page, other)).toHaveAttribute('data-downloaded', 'true');
+        await expect(row(page, `Downloaded "${other}".`)).toBeVisible();
+      });
+    });
+  }
+
+  test.fixme('Scenario: with two downloads at once, a lost connection fails only the one it hits', async ({ page, pinSet }) => {
+    const google = await fakeGoogle(page, shared());
+    let releaseMedium;
+    await test.step('Given "tiny" and "medium" are streamed, and "medium" is downloading', async () => {
+      await goto(page, '#/library');
+      await streamFromDrive(page, google, 'tiny.kidsvideo', 'medium.kidsvideo');
+      releaseMedium = google.holdReads('medium.kidsvideo');
+      await download(page, 'medium');
+      await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'downloading');
+    });
+    await test.step('When I download "tiny" too and the connection drops for it', async () => {
+      google.dropConnection('tiny.kidsvideo');
+      await download(page, 'tiny');
+    });
+    await test.step('Then "tiny" says the connection was lost, and "medium" still downloads to the end', async () => {
+      await expect(row(page, 'the connection to Google Drive was lost')).toContainText('tiny');
+      await expect(item(page, 'tiny')).toHaveAttribute('data-downloaded', 'false');
+      await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'downloading');
+      releaseMedium();
+      await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'true');
     });
   });
 });
