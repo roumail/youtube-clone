@@ -303,6 +303,7 @@ export async function fakeGoogle(page, files, folders = []) {
   const denied = new Set();
   const dropped = new Set();
   const served = new Map();
+  let otherThanReads = 0;
   const token = 'fake-token';
   // As with Google: picked files become readable only by the Cloud project the
   // Picker was opened for, given by its project number (setAppId).
@@ -373,6 +374,7 @@ export async function fakeGoogle(page, files, folders = []) {
   }));
   await context.route('https://www.googleapis.com/drive/v3/files/*', async (route) => {
     const request = route.request();
+    if (request.method() !== 'GET') otherThanReads += 1;
     const entry = shared.find(({ id }) => new URL(request.url()).pathname.endsWith(`/${id}`));
     const signedIn = (await request.headerValue('authorization')) === `Bearer ${token}`;
     const pickedForThisProject = (await page.evaluate(() => window.__fakeGoogle.appId)) === projectNumber;
@@ -397,6 +399,7 @@ export async function fakeGoogle(page, files, folders = []) {
     deny: (name) => denied.add(name),
     dropConnection: (name) => dropped.add(name),
     signIns: () => page.evaluate(() => window.__fakeGoogle.signIns),
+    requestsOtherThanReads: () => otherThanReads,
     bytesRead: (name) => (name ? served.get(name) ?? 0 : [...served.values()].reduce((a, b) => a + b, 0)),
   };
 }

@@ -40,7 +40,7 @@ test.describe('Feature: Add from Google Drive', () => {
     });
   });
 
-  test.fixme('Scenario: sign in, pick "tiny.kidsvideo", and it is added as streamed and plays', async ({ page, pinSet }) => {
+  test('Scenario: sign in, pick "tiny.kidsvideo", and it is added as streamed and plays', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');

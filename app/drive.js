@@ -1,6 +1,6 @@
-// Google Drive as a source of .kidsvideo files: Google's sign-in (a token for
-// drive.file: only the files picked here), Google's Picker, and a byte source
-// that reads ranges of a picked file with that token.
+// Google Drive, the shelf that streamed videos play from: Google's sign-in (a
+// token for drive.file: only the files picked here), Google's Picker, and a
+// byte source that reads ranges of a file with the current token.
 // Set up only when the deploy wrote google.json (the client ID and Picker API
 // key); otherwise "Add from Google Drive" stays hidden.
 import { requireContainerName } from './local-scheme.js';
@@ -8,6 +8,7 @@ import { requireContainerName } from './local-scheme.js';
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 let config;
 let token = null; // { value, expiresAt } for this session
+let pending = null; // a sign-in in progress
 
 const loadScript = (src) => new Promise((resolve, reject) => {
   const script = document.createElement('script');
@@ -27,37 +28,67 @@ export async function initDrive() {
   return true;
 }
 
-function source(doc, access) {
-  requireContainerName(doc.name);
+/** True while this session's sign-in is valid (it ends a minute before Google's does). */
+export const signedIn = () => Boolean(token) && Date.now() < token.expiresAt;
+/** When this session's sign-in ends (ms since 1970). */
+export const signInEnds = () => token.expiresAt;
+
+/**
+ * Google's sign-in pop-up. Call it within a tap (the PIN's OK). Resolves once
+ * signed in; rejects if the pop-up was closed or Google isn't reachable.
+ */
+export function signIn() {
+  pending = new Promise((resolve, reject) => {
+    google.accounts.oauth2.initTokenClient({
+      client_id: config.clientId,
+      scope: SCOPE,
+      callback: (response) => {
+        token = { value: response.access_token, expiresAt: Date.now() + (response.expires_in - 60) * 1000 };
+        resolve();
+      },
+      error_callback: () => reject(new Error('the Google sign-in was closed')),
+    }).requestAccessToken();
+  }).finally(() => { pending = null; });
+  return pending;
+}
+
+/** A Drive file as a byte source; reads wait for a sign-in in progress. */
+export function driveSource({ id, name, size }) {
   return {
-    name: doc.name,
-    size: Number(doc.sizeBytes),
+    id,
+    name,
+    size,
     read: async (start, end) => {
       let res;
       try {
-        res = await fetch(`https://www.googleapis.com/drive/v3/files/${doc.id}?alt=media`, {
-          headers: { Authorization: `Bearer ${access}`, Range: `bytes=${start}-${end - 1}` },
+        await pending;
+        res = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {
+          headers: { Authorization: `Bearer ${token.value}`, Range: `bytes=${start}-${end - 1}` },
         });
       } catch {
-        throw new Error('the connection to Google Drive was lost');
+        throw Object.assign(new Error('the connection to Google Drive was lost'), { offline: true });
       }
-      if (!res.ok) throw new Error(`no access to "${doc.name}" in Google Drive`);
+      if (!res.ok) throw new Error(`no access to "${name}" in Google Drive`);
       return res.arrayBuffer();
     },
   };
 }
 
-function openPicker(access, onPicked) {
+function openPicker(onPicked) {
   const { picker } = google;
   new picker.PickerBuilder()
     .addView(new picker.DocsView(picker.ViewId.DOCS).setIncludeFolders(true))
     .addView(new picker.DocsView(picker.ViewId.DOCS).setOwnedByMe(false))
     .enableFeature(picker.Feature.MULTISELECT_ENABLED)
-    .setOAuthToken(access)
+    .setOAuthToken(token.value)
     .setDeveloperKey(config.apiKey)
     .setAppId(config.clientId.split('-')[0]) // the project number starts the client ID
     .setCallback((data) => {
-      if (data.action === picker.Action.PICKED) onPicked(data.docs, (doc) => source(doc, access));
+      if (data.action !== picker.Action.PICKED) return;
+      onPicked(data.docs, (doc) => {
+        requireContainerName(doc.name);
+        return driveSource({ id: doc.id, name: doc.name, size: Number(doc.sizeBytes) });
+      });
     })
     .build()
     .setVisible(true);
@@ -65,18 +96,10 @@ function openPicker(access, onPicked) {
 
 /**
  * Called within the parent's tap (the PIN's OK): Google's sign-in pop-up, unless
- * this session's token is still valid, then the Picker. Closing either adds
+ * this session's sign-in is still valid, then the Picker. Closing either adds
  * nothing. onPicked(docs, sourceOf) gets the picked files.
  */
 export function pickFromDrive(onPicked) {
-  if (token && Date.now() < token.expiresAt) return openPicker(token.value, onPicked);
-  google.accounts.oauth2.initTokenClient({
-    client_id: config.clientId,
-    scope: SCOPE,
-    callback: (response) => {
-      token = { value: response.access_token, expiresAt: Date.now() + (response.expires_in - 60) * 1000 };
-      openPicker(token.value, onPicked);
-    },
-    error_callback: () => {},
-  }).requestAccessToken();
+  if (signedIn()) return openPicker(onPicked);
+  signIn().then(() => openPicker(onPicked), () => {});
 }

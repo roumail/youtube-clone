@@ -1,5 +1,8 @@
-// The video library: Shaka offline storage.
+// This device's catalogue: stored videos (a copy in Shaka offline storage, added
+// with "Add video") and streamed videos (title and poster only; they play from
+// Google Drive, streamed.js).
 import { readHead, readParts, describeParts, registerParts, posterDataUrl } from './local-scheme.js';
+import { listStreamed, saveStreamed } from './streamed.js';
 
 // Never use Shaka's default track picker: on P3 screens it drops SDR video and
 // stores 0 tracks without an error. prepare.sh produces exactly one variant.
@@ -29,10 +32,46 @@ async function checkSpace(title, needed) {
   }
 }
 
-/** Stored videos that can actually be played, as Shaka StoredContent. */
+/**
+ * The catalogue, in library order: stored videos that can actually be played
+ * (Shaka StoredContent) and streamed ones; playsFrom says which ('device' / 'drive').
+ */
 export async function listVideos() {
-  const all = await withStorage((s) => s.list());
-  return all.filter(isUsable).sort(byLibraryOrder);
+  const stored = (await withStorage((s) => s.list())).filter(isUsable).map((c) => ({ ...c, playsFrom: 'device' }));
+  const streamed = (await listStreamed()).map((c) => ({ ...c, playsFrom: 'drive' }));
+  return [...stored, ...streamed].sort(byLibraryOrder);
+}
+
+// No duplicates: a title already in the catalogue, stored or streamed, is
+// refused before anything is stored (owner decision 2026-11-19).
+async function refuseDuplicate(title) {
+  const existing = await listVideos();
+  if (existing.some((c) => c.appMetadata.title.toLocaleLowerCase() === title.toLocaleLowerCase())) {
+    throw new Error(`"${title}" is already in the library`);
+  }
+}
+
+/**
+ * Add a video from Google Drive as streamed: reads kidsvideo.json, the part
+ * headers and the poster, never the audio or video. Needs no free space.
+ */
+export async function addStreamed(source) {
+  const { title, next } = await readHead(source);
+  await refuseDuplicate(title);
+  const { poster } = describeParts(await readParts(source, next));
+  const entry = {
+    offlineUri: `drive:${source.id}`,
+    file: { id: source.id, name: source.name, size: source.size },
+    appMetadata: { title, poster: await posterDataUrl(poster) },
+  };
+  await saveStreamed(entry);
+  return entry;
+}
+
+/** A streamed video's local: URI for the player, read from Google Drive now. */
+export async function streamUri(source) {
+  const { next } = await readHead(source);
+  return registerParts(await readParts(source, next));
 }
 
 /**
@@ -59,20 +98,14 @@ function byLibraryOrder(a, b) {
 }
 
 /**
- * Store one prepared video from a .kidsvideo byte source (a picked file, or a
- * file in Google Drive). Reports progress 0..1.
+ * Store one prepared video from a .kidsvideo byte source (a picked file). Reports progress 0..1.
  * Throws on any failure and leaves nothing behind: an entry that kept 0 tracks
  * is removed. Format, duplicates and space are checked from kidsvideo.json and
  * the file's size, before the parts are read.
  */
 export async function importVideo(source, onProgress) {
   const { title, next } = await readHead(source);
-  // No duplicates: a title already in the library is refused before anything
-  // is stored (owner decision 2026-11-19).
-  const existing = await listVideos();
-  if (existing.some((c) => c.appMetadata.title.toLocaleLowerCase() === title.toLocaleLowerCase())) {
-    throw new Error(`"${title}" is already in the library`);
-  }
+  await refuseDuplicate(title);
   await checkSpace(title, source.size);
   const parts = await readParts(source, next);
   const { poster } = describeParts(parts);
