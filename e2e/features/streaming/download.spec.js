@@ -30,7 +30,7 @@ async function download(page, title) {
 }
 
 test.describe('Feature: Download a streamed video', () => {
-  test.fixme('Scenario: a streamed video offers Download in the library; a stored one does not', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a streamed video offers Download in the library; a stored one does not', async ({ page, pinSet, seedLibrary }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is stored and "medium" is streamed', async () => {
       await goto(page, '#/library');
@@ -43,7 +43,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test.fixme('Scenario: downloading needs the PIN', async ({ page, pinSet }) => {
+  test('Scenario: downloading needs the PIN', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed', async () => {
       await goto(page, '#/library');
@@ -58,7 +58,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test.fixme('Scenario: a downloaded video is marked as downloaded and plays with no connection to Google Drive', async ({ page, pinSet }) => {
+  test('Scenario: a downloaded video is marked as downloaded and plays with no connection to Google Drive', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed', async () => {
       await goto(page, '#/library');
@@ -80,7 +80,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test.fixme('Scenario: a download shows its progress, and the video can be watched while it downloads', async ({ page, pinSet }) => {
+  test('Scenario: a download shows its progress, and the video can be watched while it downloads', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed', async () => {
       await goto(page, '#/library');
@@ -95,7 +95,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test.fixme('Scenario: a download that does not fit is refused before it starts', async ({ page, pinSet }) => {
+  test('Scenario: a download that does not fit is refused before it starts', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed and there is room for only half of it', async () => {
       await goto(page, '#/library');
@@ -111,7 +111,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test.fixme('Scenario: if the connection drops during a download, nothing is left half-downloaded', async ({ page, pinSet }) => {
+  test('Scenario: if the connection drops during a download, nothing is left half-downloaded', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed', async () => {
       await goto(page, '#/library');
@@ -127,7 +127,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test.fixme('Scenario: removing a download frees the space, and the video streams again', async ({ page, pinSet }) => {
+  test('Scenario: removing a download frees the space, and the video streams again', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed and downloaded, and settings is unlocked', async () => {
       await goto(page, '#/library');
@@ -151,7 +151,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test.fixme('Scenario: a download the browser has cleared falls back to streaming', async ({ page, pinSet }) => {
+  test('Scenario: a download the browser has cleared falls back to streaming', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" was downloaded, and the browser has since cleared the download', async () => {
       await goto(page, '#/library');
@@ -171,7 +171,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test.fixme('Scenario: hiding a downloaded video also removes its download', async ({ page, pinSet }) => {
+  test('Scenario: hiding a downloaded video also removes its download', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed and downloaded, and settings is unlocked', async () => {
       await goto(page, '#/library');

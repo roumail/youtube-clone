@@ -35,10 +35,14 @@ async function checkSpace(title, needed) {
 /**
  * The catalogue, in library order: stored videos that can actually be played
  * (Shaka StoredContent) and streamed ones; playsFrom says which ('device' / 'drive').
+ * A streamed video's download (a stored copy, appMetadata.downloadOf) is not
+ * listed on its own: it is the streamed entry's `download` (its offline URI).
  */
 export async function listVideos() {
-  const stored = (await withStorage((s) => s.list())).filter(isUsable).map((c) => ({ ...c, playsFrom: 'device' }));
-  const streamed = (await listStreamed()).map((c) => ({ ...c, playsFrom: 'drive' }));
+  const usable = (await withStorage((s) => s.list())).filter(isUsable);
+  const downloads = new Map(usable.filter((c) => c.appMetadata.downloadOf).map((c) => [c.appMetadata.downloadOf, c.offlineUri]));
+  const stored = usable.filter((c) => !c.appMetadata.downloadOf).map((c) => ({ ...c, playsFrom: 'device' }));
+  const streamed = (await listStreamed()).map((c) => ({ ...c, playsFrom: 'drive', download: downloads.get(c.offlineUri) }));
   return [...stored, ...streamed].sort(byLibraryOrder);
 }
 
@@ -98,14 +102,16 @@ function byLibraryOrder(a, b) {
 }
 
 /**
- * Store one prepared video from a .kidsvideo byte source (a picked file). Reports progress 0..1.
+ * Store one prepared video from a .kidsvideo byte source: a picked file, or a
+ * streamed video's file in Google Drive when downloading it (downloadOf: the
+ * streamed entry's URI). Reports progress 0..1.
  * Throws on any failure and leaves nothing behind: an entry that kept 0 tracks
  * is removed. Format, duplicates and space are checked from kidsvideo.json and
  * the file's size, before the parts are read.
  */
-export async function importVideo(source, onProgress) {
+export async function importVideo(source, onProgress, downloadOf) {
   const { title, next } = await readHead(source);
-  await refuseDuplicate(title);
+  if (!downloadOf) await refuseDuplicate(title); // a download belongs to its streamed entry
   await checkSpace(title, source.size);
   const parts = await readParts(source, next);
   const { poster } = describeParts(parts);
@@ -119,7 +125,7 @@ export async function importVideo(source, onProgress) {
         progressCallback: (_content, progress) => onProgress?.(progress),
       },
     });
-    const stored = await storage.store(uri, { title, poster: posterUrl }).promise;
+    const stored = await storage.store(uri, { title, poster: posterUrl, downloadOf }).promise;
     const kept = stored.tracks.filter((t) => t.type === 'variant').length;
     if (!kept || !stored.size) {
       await storage.remove(stored.offlineUri);

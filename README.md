@@ -30,7 +30,8 @@ Each video in a catalogue is either:
   browser storage. The PIN can be changed in Settings.
 - **Streaming from Google Drive:** "Add from Google Drive" (behind the PIN) signs
   in to Google and opens Google's file picker, including "Shared with me". Pick
-  one or several `.kidsvideo` files (folders can't be picked, only opened).
+  `.kidsvideo` files (folders can't be picked, only opened; on the Mac several
+  can be picked at once, on the iPad Google's picker takes one at a time).
   They're added as streamed: only their title and poster are read. The app can
   read only the files picked there. The button appears once the site is
   deployed with a Google project's values: see
@@ -47,9 +48,15 @@ Each video in a catalogue is either:
   Google Drive into Files. In the app: Add video → PIN → pick it there. Then
   delete it from Downloads: the app keeps its own copy, so leaving it there
   stores the video twice.
+- **Downloading a streamed video** (for a trip, or a bad connection): its tile
+  in the library has **Download** (behind the PIN). A downloaded video plays and
+  seeks with no internet, like a stored one. A download is meant to be
+  short-lived: Settings → **Remove download** frees the space, and if the
+  browser clears it, the video simply streams again.
 - **Removing and hiding** (Settings, behind the PIN): a stored video can be
   removed, which deletes its copy and frees the space. A streamed video can
-  only be hidden from this device; it stays on the shelf and can be added again.
+  only be hidden from this device (with its download, if any); it stays on the
+  shelf and can be added again.
 - **Deleting the home-screen app** (or clearing its data) empties its
   catalogue and deletes its stored copies. The shelf is the backup: add the
   videos again from it.

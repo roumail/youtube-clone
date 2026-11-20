@@ -20,7 +20,6 @@ async function withStore(mode, fn) {
   }
 }
 
-export const isStreamed = (offlineUri) => offlineUri.startsWith('drive:');
 export const listStreamed = () => withStore('readonly', (s) => s.getAll());
 export const saveStreamed = (entry) => withStore('readwrite', (s) => s.put(entry));
 export const hideStreamed = (offlineUri) => withStore('readwrite', (s) => s.delete(offlineUri));

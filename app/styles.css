@@ -73,6 +73,8 @@ button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 0; back
 .grid li img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; display: block; }
 .grid li span { padding: 10px 12px; font-weight: 600; }
 .grid li .tile-note { padding-top: 0; font-weight: 400; color: var(--muted); }
+.grid li [data-testid="download-button"] { margin: 0 12px 10px; justify-self: start; }
+.grid li[data-downloaded="true"] > span:first-of-type::after { content: " · downloaded"; font-weight: 400; color: var(--muted); }
 progress[data-testid="import-progress"] { width: 100%; margin: 8px 0; }
 [data-testid="import-status"] { color: var(--muted); min-height: 1.4em; }
 [data-import="error"] { color: var(--accent); }

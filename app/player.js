@@ -62,8 +62,9 @@ async function load(offlineUri, uriFor) {
   if (playerState.offlineUri !== offlineUri) return;
   try {
     const p = await shakaPlayer();
+    // Leaving the video meanwhile makes Shaka stop this load (it throws), so a
+    // finished load is always for the video still open.
     await p.load(await uriFor(), 0);
-    if (playerState.offlineUri !== offlineUri) return; // navigated away meanwhile
     video.pause();
     video.currentTime = 0;
     return true;
