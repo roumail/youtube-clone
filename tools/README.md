@@ -9,8 +9,10 @@ Kids Library/
   Bluey/Bluey - S01E03 - Keepy Uppy.kidsvideo
 ```
 
-A `.kidsvideo` is a plain, uncompressed `tar` of the 4 parts the app needs
-(`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). Send it to the iPad or
+A `.kidsvideo` (format 2) is a plain, uncompressed `tar`: a small
+`kidsvideo.json` first (format and title), then the 4 parts the app needs
+(`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). The app refuses files
+made by older versions of the tools; prepare those again. Send it to the iPad or
 iPhone (AirDrop, or any way that puts it in Files) and add it in the app; see
 the main README.
 

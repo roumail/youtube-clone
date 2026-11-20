@@ -8,6 +8,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PREPARE="$HERE/../tools/prepare.sh"
+KIDSVIDEO="${KIDSVIDEO:-$HERE/../tools/bin/kidsvideo}"
 OUT="$HERE/out"
 RAW="$OUT/raw"
 FFMPEG="${FFMPEG:-ffmpeg}"
@@ -96,18 +97,28 @@ ACCENTED_TITLE="The Longest Title Allowed - A Café About Many Long Words That K
 mkdir "$RAW/$ACCENTED_TITLE"
 cp "$OUT/tiny/"{video.mp4,audio.mp4,poster.jpg} "$RAW/$ACCENTED_TITLE/"
 cp "$OUT/tiny/tiny.mpd" "$RAW/$ACCENTED_TITLE/$ACCENTED_TITLE.mpd"
-if "${KIDSVIDEO:-$HERE/../tools/bin/kidsvideo}" pack "$RAW/$ACCENTED_TITLE" >/dev/null 2>&1; then
+if "$KIDSVIDEO" pack "$RAW/$ACCENTED_TITLE" >/dev/null 2>&1; then
   echo "kidsvideo pack accepted a title over 95 bytes" >&2; exit 1
 fi
 
+# Broken containers can't come from kidsvideo pack, so they're built with tar,
+# in format 2: kidsvideo.json first.
+format2() { printf '{"format":2,"title":"%s"}\n' "$1" > "$RAW/kidsvideo.json"; }
+
 # A container without its manifest (no .mpd).
+format2 no-manifest
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/no-manifest.kidsvideo" \
-  -C "$OUT/tiny" poster.jpg audio.mp4 video.mp4
+  -C "$RAW" kidsvideo.json -C "$OUT/tiny" poster.jpg audio.mp4 video.mp4
 
 # A container with a part missing (no audio.mp4).
 rm "$OUT/broken-missing-audio.kidsvideo"
+format2 broken-missing-audio
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/broken-missing-audio.kidsvideo" \
-  -C "$OUT/broken-missing-audio" broken-missing-audio.mpd poster.jpg video.mp4
+  -C "$RAW" kidsvideo.json -C "$OUT/broken-missing-audio" broken-missing-audio.mpd poster.jpg video.mp4
+
+# A container made by the tools before format 2: no kidsvideo.json.
+COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/old-format.kidsvideo" \
+  -C "$OUT/tiny" tiny.mpd poster.jpg audio.mp4 video.mp4
 
 # Real episodes declare SDR colour (BT.709). Shaka marks such video hdr=SDR,
 # which its default offline track picker drops on P3 screens. Fixtures must
@@ -121,8 +132,7 @@ mv "$OUT/unplayable/tiny.mpd" "$OUT/unplayable/unplayable.mpd"
 sed -i.bak 's/codecs="avc1\.[0-9A-Fa-f]*"/codecs="xyz1.000000"/' "$OUT/unplayable/unplayable.mpd" && rm "$OUT/unplayable/unplayable.mpd.bak"
 grep -q 'codecs="xyz1.000000"' "$OUT/unplayable/unplayable.mpd" \
   || { echo "unplayable fixture: codec not replaced" >&2; exit 1; }
-COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/unplayable.kidsvideo" \
-  -C "$OUT/unplayable" unplayable.mpd poster.jpg audio.mp4 video.mp4
+"$KIDSVIDEO" pack "$OUT/unplayable" >/dev/null
 
 # A film-like manifest: "tiny" whose declared (peak) bitrate is 100x its real
 # one, as with real films. Shaka's own size guess (bitrate x duration) is then
@@ -132,8 +142,7 @@ mv "$OUT/high-peak/tiny.mpd" "$OUT/high-peak/high-peak.mpd"
 perl -pi -e 's/bandwidth="(\d+)"/"bandwidth=\"" . ($1 * 100) . "\""/ge' "$OUT/high-peak/high-peak.mpd"
 cmp -s "$OUT/tiny/tiny.mpd" "$OUT/high-peak/high-peak.mpd" \
   && { echo "high-peak fixture: bandwidth not changed" >&2; exit 1; }
-COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/high-peak.kidsvideo" \
-  -C "$OUT/high-peak" high-peak.mpd poster.jpg audio.mp4 video.mp4
+"$KIDSVIDEO" pack "$OUT/high-peak" >/dev/null
 
 # Size target: at most 720p, video at most 1.2 Mbit/s on average, stereo audio
 # at most 96 kbit/s. "episode-like" is 1080p; "surround" has 5.1 audio.
