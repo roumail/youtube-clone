@@ -303,11 +303,14 @@ export async function fakeGoogle(page, files) {
   const dropped = new Set();
   const served = new Map();
   const token = 'fake-token';
+  // As with Google: picked files become readable only by the Cloud project the
+  // Picker was opened for, given by its project number (setAppId).
+  const projectNumber = '123456789012';
   await page.addInitScript(() => {
     window.__fakeGoogle = { signIn: 'accept', pick: [], signIns: 0 };
   });
   const context = page.context();
-  await context.route('**/google.json', (route) => route.fulfill({ json: { clientId: 'fake-client', apiKey: 'key1', appId: '1' } }));
+  await context.route('**/google.json', (route) => route.fulfill({ json: { clientId: `${projectNumber}-fake.apps.googleusercontent.com`, apiKey: 'key1' } }));
   await context.route('https://accounts.google.com/gsi/client', (route) => route.fulfill({
     contentType: 'text/javascript',
     body: `(${(accessToken) => {
@@ -341,6 +344,7 @@ export async function fakeGoogle(page, files) {
           let callback;
           return chainable((key, args) => {
             if (key === 'setCallback') [callback] = args;
+            if (key === 'setAppId') [window.__fakeGoogle.appId] = args;
             if (key !== 'build') return undefined;
             return { setVisible: (visible) => {
               if (!visible) return;
@@ -359,7 +363,8 @@ export async function fakeGoogle(page, files) {
     const request = route.request();
     const entry = shared.find(({ id }) => new URL(request.url()).pathname.endsWith(`/${id}`));
     const signedIn = (await request.headerValue('authorization')) === `Bearer ${token}`;
-    if (!entry || !signedIn || denied.has(entry.name)) {
+    const pickedForThisProject = (await page.evaluate(() => window.__fakeGoogle.appId)) === projectNumber;
+    if (!entry || !signedIn || !pickedForThisProject || denied.has(entry.name)) {
       return route.fulfill({ status: 403, json: { error: { code: 403, message: 'The user does not have sufficient permissions for this file.' } } });
     }
     if (dropped.has(entry.name)) return route.abort('connectionreset');

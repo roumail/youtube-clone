@@ -1,8 +1,8 @@
 // Google Drive as a source of .kidsvideo files: Google's sign-in (a token for
 // drive.file: only the files picked here), Google's Picker, and a byte source
 // that reads ranges of a picked file with that token.
-// Set up only when the deploy wrote google.json (the client ID, Picker API key
-// and project number); otherwise "Add from Google Drive" stays hidden.
+// Set up only when the deploy wrote google.json (the client ID and Picker API
+// key); otherwise "Add from Google Drive" stays hidden.
 import { requireContainerName } from './local-scheme.js';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -55,7 +55,7 @@ function openPicker(access, onPicked) {
     .enableFeature(picker.Feature.MULTISELECT_ENABLED)
     .setOAuthToken(access)
     .setDeveloperKey(config.apiKey)
-    .setAppId(config.appId)
+    .setAppId(config.clientId.split('-')[0]) // the project number starts the client ID
     .setCallback((data) => {
       if (data.action === picker.Action.PICKED) onPicked(data.docs, (doc) => source(doc, access));
     })

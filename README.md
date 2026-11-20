@@ -70,17 +70,17 @@ nothing else. The Google project lives on that account too.
    - **API key:** then Edit it. Application restrictions: Websites →
      `https://www.example.com/*` (your site). API restrictions: only Google
      Picker API.
-7. **Put three values in GitHub** (repo → Settings → Secrets and variables →
+7. **Put two values in GitHub** (repo → Settings → Secrets and variables →
    Actions), then redeploy the latest release (Actions → Deploy → Run workflow
    with its tag) so the site serves them:
 
    | Name | Where | Where to find it | Looks like |
    |---|---|---|---|
    | `GOOGLE_CLIENT_ID` | Variables | Credentials → OAuth 2.0 Client IDs → your client | `123456789012-abc123….apps.googleusercontent.com` |
-   | `GOOGLE_APP_ID` | Variables | Cloud overview → Project info → **Project number** (also the client ID's digits before the dash) | `123456789012`, digits only. Not the Project ID (`kids-library-123456`) |
    | `GOOGLE_API_KEY` | Secrets | Credentials → API keys → your key → Show key | `AIza` + 35 letters, digits, `-` and `_` |
 
-   The client ID and project number are public by design. The API key is
+   The client ID is public by design (its leading digits, the project number,
+   are what the Picker needs, so there's nothing else to copy). The API key is
    served to the browser too, but keep its only copies in GitHub and the Cloud
    console: don't paste it into notes, docs or the repo.
 8. **On the iPad and iPhone:** open the app online, close it in the app
