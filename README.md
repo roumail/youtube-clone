@@ -1,9 +1,20 @@
 # Kids video library
 
-An offline, PIN-gated video library for a family's Mac, iPad and iPhone: an
-installable web app (PWA). Videos are prepared once on the Mac, sent to the
-iPad and iPhone with AirDrop, and stored on each device. Pausing is free;
-playing needs the PIN every time; nothing plays by itself.
+A PIN-gated video library for a family's Mac, iPad and iPhone: an installable
+web app (PWA). Videos are prepared once on the Mac into `.kidsvideo` files.
+Pausing is free; playing needs the PIN every time; nothing plays by itself.
+
+**Two words used throughout:**
+- **The shelf:** where the prepared videos live, normally a "Kids Library"
+  folder in Google Drive. It holds everything.
+- **The catalogue:** what one device shows the child. A parent adds videos to
+  it, behind the PIN. Each device has its own.
+
+Each video in a catalogue is either:
+- **streamed:** added from Google Drive. The device keeps only its title and
+  poster; it plays from the shelf and needs the internet.
+- **stored:** added with "Add video" (from Files, e.g. after AirDrop). A copy
+  is kept on the device; it plays offline and uses the device's space.
 
 - **Live app:** https://www.rohailtaimour.com/youtube-clone/
 - **What it does:** the behaviour specs in `e2e/features/` are the source of truth.
@@ -15,22 +26,31 @@ playing needs the PIN every time; nothing plays by itself.
   (or Safari → Add to Dock). iPad and iPhone: Safari or Chrome → Share → Add to
   Home Screen. On iPad and iPhone every browser uses Apple's WebKit, so the
   choice of browser changes nothing.
-- **Each device has its own library and its own PIN**, kept in that device's
+- **Each device has its own catalogue and its own PIN**, kept in that device's
   browser storage. The PIN can be changed in Settings.
-- **Deleting the home-screen app** (or clearing its data) deletes its library.
-  Re-adding from the Mac's library folder is the recovery; the files there are
-  the backup.
-- **Forgotten PIN:** delete and re-add the home-screen app (this also clears
-  the library).
-- **Adding from Google Drive:** "Add from Google Drive" (behind the PIN) signs in
-  to Google and opens Google's file picker, including "Shared with me"; the
-  picked `.kidsvideo` files are downloaded and stored. The app can read only the
-  files picked there. The button appears once the site is deployed with a
-  Google project's values: see [Setting up Google Drive](#setting-up-google-drive).
-- **Adding a video on the iPad or iPhone:** AirDrop its `.kidsvideo` from the
-  Mac; it lands in Files → Downloads. In the app: Add video → PIN → pick it
-  there. Then delete it from Downloads: the app keeps its own copy, so leaving
-  it there stores the video twice.
+- **Streaming from Google Drive:** "Add from Google Drive" (behind the PIN) signs
+  in to Google and opens Google's file picker, including "Shared with me". Pick
+  one or several `.kidsvideo` files (folders can't be picked, only opened).
+  They're added as streamed: only their title and poster are read. The app can
+  read only the files picked there. The button appears once the site is
+  deployed with a Google project's values: see
+  [Setting up Google Drive](#setting-up-google-drive).
+- **Playing a streamed video** needs the internet and a Google sign-in, which
+  lasts about an hour: the play PIN signs in again when needed, and a video
+  pauses just before the sign-in runs out (play with the PIN to go on).
+- **Storing a video on the iPad or iPhone** (to watch offline): AirDrop its
+  `.kidsvideo` from the Mac (it lands in Files → Downloads), or download it from
+  Google Drive into Files. In the app: Add video → PIN → pick it there. Then
+  delete it from Downloads: the app keeps its own copy, so leaving it there
+  stores the video twice.
+- **Removing and hiding** (Settings, behind the PIN): a stored video can be
+  removed, which deletes its copy and frees the space. A streamed video can
+  only be hidden from this device; it stays on the shelf and can be added again.
+- **Deleting the home-screen app** (or clearing its data) empties its
+  catalogue and deletes its stored copies. The shelf is the backup: add the
+  videos again from it.
+- **Forgotten PIN:** delete and re-add the home-screen app (this also empties
+  the catalogue).
 - **Keep a child inside the app:** turn on iPad Guided Access.
 - **Honest limits.** The PIN and the watch-time limit stop a child, not a
   determined adult: the stored SHA-256 of a 4–6 digit PIN can be brute-forced by
@@ -43,14 +63,14 @@ Once per installation, about 20 minutes, in a browser on the Mac. Until it's
 done, "Add from Google Drive" stays hidden and everything else works.
 
 The devices sign in with a **device account**: a separate, regular (adult, not
-Family Link) Google account with Viewer access to the library folder and
-nothing else. The Google project lives on that account too.
+Family Link) Google account with Viewer access to the shelf (the library
+folder) and nothing else. The Google project lives on that account too.
 
 1. **Create the device account** in a separate browser profile (accounts.google.com
    → Create account → For my personal use, adult birth date) and turn on its
    2-Step Verification. Stay signed in only as this account for the next
    steps: Google's console uses whichever account is active.
-2. **Share the library folder** from the account that owns it: Share → add the
+2. **Share the shelf** (the library folder) from the account that owns it: Share → add the
    device account as Viewer. No folder settings need changing.
 3. **Check access** as the device account: drive.google.com → Shared with me
    shows the folder and offers Download on its files. Optionally: right-click the
@@ -108,16 +128,18 @@ need the same signing; AltStore/SideStore is fragile; Python (Kivy/BeeWare) adds
 an interpreter on top. A browser is on every device already, so: no App Store,
 no Xcode, no account, no expiry.
 
-**Shaka Player offline storage.** Shaka stores each video as many small
+**Shaka Player offline storage** (stored videos). Shaka stores each video as many small
 segments in IndexedDB and plays them through Media Source Extensions
 (`ManagedMediaSource` on iPadOS 17+). No single big file is ever handed to the
 `<video>` element, which avoids the iOS problems with large blob URLs (memory
 blow-up on iOS 15, broken playback on iOS 17.4.1, crashes with 100–500 MB
 files). It's production-grade, so nothing is hand-rolled on the storage side.
+A streamed video goes through the same player, reading byte ranges of its
+`.kidsvideo` straight from Google Drive as it plays.
 
 **Each video is prepared once on the Mac**, or on any computer with Docker
-(Shaka stores DASH, not plain `.mp4`), into one `.kidsvideo` file sent to the
-devices with AirDrop, so the iPad and iPhone never process anything. Tools: the pinned Shaka Packager
+(Shaka plays DASH, not plain `.mp4`), into one `.kidsvideo` file on the shelf,
+so the iPad and iPhone never process anything. Tools: the pinned Shaka Packager
 binary (repackages without re-encoding) and ffmpeg (re-encodes whatever is above
 the size target of 720p, 1.2 Mbit/s and stereo audio, and grabs the poster). No
 Python anywhere.

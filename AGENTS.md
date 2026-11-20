@@ -1,7 +1,9 @@
 # Working on this repo (for any coding agent / LLM)
 
-An offline, PIN-gated kids video library: a general-purpose installable web app
-(PWA) that any family can use on its Mac, iPad and iPhone. **The behaviour specs in `e2e/features/` are the
+A PIN-gated kids video library: a general-purpose installable web app (PWA)
+that any family can use on its Mac, iPad and iPhone. Videos are streamed from
+the shelf (Google Drive) or stored on the device; the words are defined in
+`README.md`. **The behaviour specs in `e2e/features/` are the
 source of truth.** What the app is and why it's built this way: `README.md`.
 This file says *how* to work here.
 
@@ -21,7 +23,7 @@ Out of scope unless the owner asks for it:
 - playlists, recommendations, history
 - playback speed, subtitles, volume UI (hardware buttons only)
 - next / previous buttons in the player (not wanted)
-- accounts, sync, cloud, multiple profiles
+- accounts, sync, multiple profiles; cloud beyond streaming from Google Drive
 - PiP, AirPlay, downloading from the internet, comments, likes
 
 ## How changes land
