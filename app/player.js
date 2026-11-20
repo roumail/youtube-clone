@@ -56,13 +56,14 @@ async function shakaPlayer() {
 }
 
 // Load into Shaka, paused at 0:00; uriFor() gives what to load. True if loaded.
+// Leaving the video meanwhile, or failing, gives a falsy result.
 async function load(offlineUri, uriFor) {
   await closing;
-  if (playerState.offlineUri !== offlineUri) return false;
+  if (playerState.offlineUri !== offlineUri) return;
   try {
     const p = await shakaPlayer();
     await p.load(await uriFor(), 0);
-    if (playerState.offlineUri !== offlineUri) return false; // navigated away meanwhile
+    if (playerState.offlineUri !== offlineUri) return; // navigated away meanwhile
     video.pause();
     video.currentTime = 0;
     return true;
