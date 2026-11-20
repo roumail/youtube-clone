@@ -94,35 +94,6 @@ test.describe('Feature: One row per add or download', () => {
     });
   });
 
-  test.fixme('Scenario: two downloads at once; Cancel on one stops only that one', async ({ page, pinSet }) => {
-    const google = await fakeGoogle(page, shelf());
-    let releaseTiny;
-    let releaseMedium;
-    await test.step('Given "tiny" and "medium" are streamed and both are being downloaded', async () => {
-      await goto(page, '#/library');
-      await addFromDrive(page, google, 'tiny.kidsvideo', 'medium.kidsvideo');
-      await expect(row(page, 'Added 2 of 2 videos.')).toBeVisible();
-      releaseTiny = google.holdReads('tiny.kidsvideo');
-      releaseMedium = google.holdReads('medium.kidsvideo');
-      await download(page, 'tiny');
-      await download(page, 'medium');
-      await expect(item(page, 'tiny')).toHaveAttribute('data-downloaded', 'downloading');
-      await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'downloading');
-    });
-    await test.step('When I tap Cancel in the row of "medium"', async () => {
-      await row(page, 'Downloading "medium"').getByTestId('cancel-download-button').tap();
-      releaseMedium();
-    });
-    await test.step('Then only "medium" is cancelled, and "tiny" still downloads to the end', async () => {
-      await expect(row(page, 'Download of "medium" cancelled.')).toHaveAttribute('data-import', 'cancelled');
-      await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'false');
-      await expect(row(page, 'Downloading "tiny"')).toHaveAttribute('data-import', 'storing');
-      releaseTiny();
-      await expect(row(page, 'Downloaded "tiny".')).toHaveAttribute('data-import', 'done');
-      await expect(item(page, 'tiny')).toHaveAttribute('data-downloaded', 'true');
-    });
-  });
-
   test.fixme('Scenario: a finished row clears itself after 10 seconds', async ({ page, pinSet }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shelf());
