@@ -156,7 +156,7 @@ test.describe('Feature: Streamed videos', () => {
     });
     await test.step('When the connection to Google Drive is gone and I open "medium"', async () => {
       google.dropConnection('medium.kidsvideo');
-      await openVideo(page, 'medium');
+      await page.getByTestId('library-item').filter({ hasText: 'medium' }).tap();
     });
     await test.step('Then it says it needs the internet, with no play button', async () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'error');
