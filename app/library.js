@@ -51,7 +51,7 @@ export async function listVideos() {
 async function refuseDuplicate(title) {
   const existing = await listVideos();
   if (existing.some((c) => c.appMetadata.title.toLocaleLowerCase() === title.toLocaleLowerCase())) {
-    throw new Error(`"${title}" is already in the library`);
+    throw Object.assign(new Error(`"${title}" is already in the library`), { duplicate: true });
   }
 }
 

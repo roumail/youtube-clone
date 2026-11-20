@@ -37,7 +37,7 @@ async function addFromDrive(page, google, ...names) {
 }
 
 test.describe('Feature: Add a whole folder from Google Drive', () => {
-  test.fixme('Scenario: picking a folder adds every .kidsvideo in it and its subfolders, as streamed', async ({ page, pinSet }) => {
+  test('Scenario: picking a folder adds every .kidsvideo in it and its subfolders, as streamed', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the catalogue is empty', async () => {
       await goto(page, '#/library');
@@ -55,7 +55,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test.fixme('Scenario: an episode added from a folder plays after the PIN', async ({ page, pinSet }) => {
+  test('Scenario: an episode added from a folder plays after the PIN', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the folder "Show" was added', async () => {
       await goto(page, '#/library');
@@ -73,7 +73,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test.fixme('Scenario: adding a folder again adds only what is new, and says how many were already there', async ({ page, pinSet }) => {
+  test('Scenario: adding a folder again adds only what is new, and says how many were already there', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given "Show - S01E01 - First" is already in the catalogue', async () => {
       await goto(page, '#/library');
@@ -84,12 +84,12 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
       await addFromDrive(page, google, 'Show');
     });
     await test.step('Then the other 3 are added, and the one already there is skipped, not an error', async () => {
-      await expect(page.getByTestId('import-status')).toHaveText('Added 3 of 4 videos from "Show"; 1 was already in the library.');
+      await expect(page.getByTestId('import-status')).toHaveText('Added 3 of 4 videos from "Show" (1 already in the library).');
       await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
     });
   });
 
-  test.fixme('Scenario: a folder with no .kidsvideo in it says so and adds nothing', async ({ page, pinSet }) => {
+  test('Scenario: a folder with no .kidsvideo in it says so and adds nothing', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the catalogue is empty', async () => {
       await goto(page, '#/library');
@@ -103,7 +103,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test.fixme('Scenario: a folder and a file picked together are both added', async ({ page, pinSet }) => {
+  test('Scenario: a folder and a file picked together are both added', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the catalogue is empty', async () => {
       await goto(page, '#/library');
@@ -117,7 +117,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test.fixme('Scenario: a video in the folder that cannot be added is named, and the rest are added', async ({ page, pinSet }) => {
+  test('Scenario: a video in the folder that cannot be added is named, and the rest are added', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given "Show - S01E02 - Second.kidsvideo" in the folder can no longer be read', async () => {
       await goto(page, '#/library');
@@ -132,7 +132,22 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test.fixme('Scenario: if the folder cannot be listed, it says so and adds nothing', async ({ page, pinSet }) => {
+  test('Scenario: a folder no longer shared says so and adds nothing', async ({ page, pinSet }) => {
+    const google = await fakeGoogle(page, episodes, folders);
+    await test.step('Given the folder "Show" is no longer shared with the account', async () => {
+      await goto(page, '#/library');
+      google.deny('Show');
+    });
+    await test.step('When I pick the folder "Show"', async () => {
+      await addFromDrive(page, google, 'Show');
+    });
+    await test.step('Then it says there is no access to it, and nothing is added', async () => {
+      await expect(page.getByTestId('import-status')).toHaveText('Couldn\'t add the folder "Show": no access to "Show" in Google Drive');
+      await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
+    });
+  });
+
+  test('Scenario: if the folder cannot be listed, it says so and adds nothing', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the connection to Google Drive drops when the folder is listed', async () => {
       await goto(page, '#/library');
@@ -147,7 +162,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test.fixme('Scenario: an added episode keeps working after the hour, through the usual sign-in', async ({ page, pinSet }) => {
+  test('Scenario: an added episode keeps working after the hour, through the usual sign-in', async ({ page, pinSet }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the folder "Show" was added, and an hour has passed', async () => {

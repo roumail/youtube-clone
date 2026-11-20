@@ -30,10 +30,12 @@ Each video in a catalogue is either:
   browser storage. The PIN can be changed in Settings.
 - **Streaming from Google Drive:** "Add from Google Drive" (behind the PIN) signs
   in to Google and opens Google's file picker, including "Shared with me". Pick
-  `.kidsvideo` files (folders can't be picked, only opened; on the Mac several
-  can be picked at once, on the iPad Google's picker takes one at a time).
-  They're added as streamed: only their title and poster are read. The app can
-  read only the files picked there. The button appears once the site is
+  `.kidsvideo` files or a whole folder (on the iPad Google's picker takes one
+  item at a time, so pick a series' folder): a folder adds every `.kidsvideo`
+  in it and its subfolders, skipping titles already there, so picking it again
+  later adds only new episodes. They're added as streamed: only their title and
+  poster are read. The app only reads Google Drive (read-only permission), and
+  the device account sees nothing but the shelf. The button appears once the site is
   deployed with a Google project's values: see
   [Setting up Google Drive](#setting-up-google-drive).
 - **Playing a streamed video** needs the internet and a Google sign-in. Google
@@ -92,8 +94,10 @@ folder) and nothing else. The Google project lives on that account too.
 5. **Consent screen:** APIs & Services → OAuth consent screen → Get started.
    App name and support email (the device account); Audience: External. Under
    Branding: home page = the app's address, authorized domain = its domain.
-   Data access: add only the scope `https://www.googleapis.com/auth/drive.file`.
-   Audience → Test users: add the device account, and leave the app in Testing.
+   Data access → Add or remove scopes: add `https://www.googleapis.com/auth/drive.readonly`
+   (a restricted scope; if it isn't in the list, paste it under "Manually add
+   scopes"), then Update and Save. Audience → Test users: add the device
+   account, and leave the app in Testing: test users need no Google review.
 6. **Credentials** (APIs & Services → Credentials → Create credentials):
    - **OAuth client ID:** Web application. Authorized JavaScript origins: the
      site's origin only, for example `https://www.example.com` (no path, no
@@ -116,14 +120,16 @@ folder) and nothing else. The Google project lives on that account too.
    console: don't paste it into notes, docs or the repo.
 8. **On the iPad and iPhone:** open the app online, close it in the app
    switcher and open it again; "Add from Google Drive" shows next to "Add
-   video". Add from Google Drive → PIN → sign in as the device account →
-   Shared with me (or the shortcut) → pick one or more `.kidsvideo` files. If
+   video". Add from Google Drive → PIN → sign in as the device account. The
+   first time, Google says it "hasn't verified this app" (it stays in Testing):
+   Continue, then allow "See and download all your Google Drive files". Then
+   Shared with me (or the shortcut) → pick `.kidsvideo` files or a folder. If
    the sign-in window doesn't open, check Settings → Safari → Block Pop-ups, or
    try from the site in a Safari tab.
 
 **Later.** The device account's myaccount.google.com → Security → Your
-connections to third-party apps lists the app with access to "only the specific
-files you use with this app"; access can be removed there.
+connections to third-party apps lists the app with read-only access to Google
+Drive; access can be removed there.
 
 **Replacing the API key** (copied somewhere it shouldn't be, or its quota being
 used up): Credentials → your key → Rotate key (or create a new key with the

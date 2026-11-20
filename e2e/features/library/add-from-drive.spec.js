@@ -2,10 +2,9 @@
 // .kidsvideo files in Google's Picker; they are added to this device's
 // catalogue and always stream from Google Drive (playing them:
 // e2e/features/streaming/). Only their title and poster are kept on the device;
-// a copy on the device comes from "Add video" (Files / AirDrop). The app only reads the files picked (drive.file): files only, several
-// at a time; a folder can't be picked (Google gives no access to what's in a
-// picked folder under drive.file), it only opens. Google is faked
-// at the network boundary (fakeGoogle in e2e/support.js). Not @ipad: once the
+// a copy on the device comes from "Add video" (Files / AirDrop). Several files
+// can be picked at once, and whole folders (add-folder-from-drive.spec.js).
+// Google is faked at the network boundary (fakeGoogle in e2e/support.js). Not @ipad: once the
 // service worker controls the page, Playwright's WebKit can't intercept the
 // Drive requests, so they would reach the real Google.
 import {
@@ -100,23 +99,6 @@ test.describe('Feature: Add from Google Drive', () => {
     });
     await test.step('When I tap "Add from Google Drive", enter the PIN and close the Google sign-in', async () => {
       await addFromDrive(page);
-    });
-    await test.step('Then nothing is added and nothing was downloaded', async () => {
-      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'idle');
-      await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
-      expect(google.bytesRead()).toBe(0);
-    });
-  });
-
-  test('Scenario: a folder can only be opened in the Picker, not picked, so it adds nothing', async ({ page, pinSet }) => {
-    const google = await fakeGoogle(page, shared(), ['Kipper the Dog']);
-    await test.step('Given the library is empty and Google Drive has a folder "Kipper the Dog"', async () => {
-      await goto(page, '#/library');
-      await google.willPick('Kipper the Dog');
-    });
-    await test.step('When I try to pick the folder "Kipper the Dog" and close the Picker', async () => {
-      await addFromDrive(page);
-      await expect.poll(() => google.signIns()).toBe(1);
     });
     await test.step('Then nothing is added and nothing was downloaded', async () => {
       await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'idle');
