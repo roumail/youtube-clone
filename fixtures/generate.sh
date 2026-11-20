@@ -76,6 +76,13 @@ for ep in "Show - S01E10 - Tenth" "Show - S01E02 - Second" "Show - S01E01 - Firs
   prepare "$RAW/$ep.mp4" "$OUT" >/dev/null
 done
 
+# For search: the episode name "Second" again, in another series and as a
+# standalone video, from copies of "tiny".
+for name in "Garden - S02E01 - Second" "Second"; do
+  cp "$RAW/tiny.mp4" "$RAW/$name.mp4"
+  prepare "$RAW/$name.mp4" "$OUT" >/dev/null
+done
+
 # A standalone video named exactly like the series "Show", from a copy of "tiny".
 cp "$RAW/tiny.mp4" "$RAW/Show.mp4"
 prepare "$RAW/Show.mp4" "$OUT" >/dev/null
