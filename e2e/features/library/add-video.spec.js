@@ -4,13 +4,13 @@ import { readFileSync } from 'node:fs';
 import { test, expect, goto, enterPin, expectPlaying, fixtureContainer, fixtureParts, PIN, WRONG_PIN } from '../../support.js';
 
 test.describe('Feature: Add a video', () => {
-  test('Scenario: PIN, pick the .kidsvideo, it appears in the library', async ({ page, pinSet }) => {
+  test('Scenario: PIN, pick the .kidsvideo, it appears in the library @ipad', async ({ page, pinSet }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
     });
     await test.step('When I tap "Add video"', async () => {
-      await page.getByTestId('add-video-button').click();
+      await page.getByTestId('add-video-button').tap();
     });
     await test.step('Then the PIN is required', async () => {
       await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'verify');
@@ -124,7 +124,7 @@ test.describe('Feature: Add a video', () => {
     });
     const chooser = page.waitForEvent('filechooser', { timeout: 4000 });
     await test.step('When I tap "Add video" and enter the correct PIN', async () => {
-      await page.getByTestId('add-video-button').click();
+      await page.getByTestId('add-video-button').tap();
       await enterPin(page, PIN);
     });
     await test.step('Then the file picker opens straight away', async () => {
