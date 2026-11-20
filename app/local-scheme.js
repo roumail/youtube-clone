@@ -1,79 +1,80 @@
-// Shaka "local:" scheme plugin: lets Shaka read a packaged video
-// from files the parent picked (Files on the iPad/iPhone, Finder on the Mac)
-// instead of HTTP.
+// Shaka "local:" scheme plugin: lets Shaka read a packaged video from a byte
+// source (a .kidsvideo the parent picked) instead of HTTP.
 //
-//   const uri = registerPickedFiles(fileList);   // -> "local://pick/My%20Video.mpd"
+//   const uri = registerParts(parts);   // -> "local://pick/My%20Video.mpd"
 //   await storage.store(uri, { title, poster }).promise;
 //
 // Relative segment URLs in the manifest ("video.mp4") resolve against
-// local://pick/, so every request maps to a picked file by name. Byte-range
-// requests (DASH on-demand profile) are served with File.slice, which is lazy:
-// only the requested bytes are read.
+// local://pick/, so every request maps to a part by name. Byte-range requests
+// (DASH on-demand profile) read just those bytes of the source.
 
 const HOST = 'local://pick/';
-let picked = new Map();
-
-export const PICK_SET = ['.mpd', 'video.mp4', 'audio.mp4', 'poster.jpg'];
+let registered = new Map();
 
 // ---------- single-file container (.kidsvideo) ----------
 // A .kidsvideo (format 2, tools/kidsvideo) is an uncompressed tar of
-// kidsvideo.json ({"format":2,…}, always first), "<Title>.mpd", video.mp4,
-// audio.mp4 and poster.jpg. We read only the 512-byte headers and hand out each
-// part as a lazy slice of the picked file: nothing is copied.
+// kidsvideo.json ({"format":2,"title":…}, always first), "<Title>.mpd",
+// video.mp4, audio.mp4 and poster.jpg. It is read through a byte source,
+// { name, size, read(start, end) }: only the 512-byte headers and
+// kidsvideo.json are read up front; each part is read later, as Shaka asks.
 export const CONTAINER_EXT = '.kidsvideo';
-const isContainer = (f) => f.name.toLowerCase().endsWith(CONTAINER_EXT);
 
-async function readContainer(file) {
+export function pickedSource([file]) {
+  if (!file.name.toLowerCase().endsWith(CONTAINER_EXT)) throw new Error(`${file.name} isn't a ${CONTAINER_EXT} file`);
+  return { name: file.name, size: file.size, read: (start, end) => file.slice(start, end).arrayBuffer() };
+}
+
+// The tar header at `offset`, or null at the end of the archive (or if it isn't one).
+async function header(source, offset) {
+  const h = new Uint8Array(await source.read(offset, offset + 512));
+  if (String.fromCharCode(...h.subarray(257, 262)) !== 'ustar') return null;
+  // bsdtar ends the size with a space, GNU tar with a NUL: parseInt stops at either.
+  const size = parseInt(String.fromCharCode(...h.subarray(124, 136)), 8);
+  const data = offset + 512;
+  return { name: new TextDecoder().decode(h.subarray(0, h.indexOf(0))), size, data, next: data + Math.ceil(size / 512) * 512 };
+}
+
+/** Format and title, from kidsvideo.json alone. Returns { title, next }, `next` being where the parts start. */
+export async function readHead(source) {
+  const h = await header(source, 0);
+  if (!h) throw new Error(`${source.name} isn't a readable ${CONTAINER_EXT} file`);
+  const meta = h.name === 'kidsvideo.json'
+    ? JSON.parse(new TextDecoder().decode(await source.read(h.data, h.data + h.size)))
+    : {};
+  if (meta.format !== 2) throw new Error(`${source.name} was made by an older version of the tools: prepare it again`);
+  return { title: meta.title, next: h.next };
+}
+
+/** The parts after kidsvideo.json, each { name, size, read(start, end) }. */
+export async function readParts(source, offset) {
   const parts = [];
-  let offset = 0;
-  while (offset + 512 <= file.size) {
-    const h = new Uint8Array(await file.slice(offset, offset + 512).arrayBuffer());
-    if (String.fromCharCode(...h.subarray(257, 262)) !== 'ustar') break; // end of archive, or not a tar
-    // bsdtar ends the size with a space, GNU tar with a NUL: parseInt stops at either.
-    const size = parseInt(String.fromCharCode(...h.subarray(124, 136)), 8);
-    const dataStart = offset + 512;
-    parts.push(new File([file.slice(dataStart, dataStart + size)], new TextDecoder().decode(h.subarray(0, h.indexOf(0)))));
-    offset = dataStart + Math.ceil(size / 512) * 512;
+  for (let h = await header(source, offset); h; h = await header(source, h.next)) {
+    const { data } = h;
+    parts.push({ name: h.name, size: h.size, read: (start, end) => source.read(data + start, data + end) });
   }
-  if (!parts.length) throw new Error(`${file.name} isn't a readable ${CONTAINER_EXT} file`);
-  const format = parts[0].name === 'kidsvideo.json' ? JSON.parse(await parts[0].text()).format : 0;
-  if (format !== 2) throw new Error(`${file.name} was made by an older version of the tools: prepare it again`);
-  return parts.slice(1);
+  return parts;
 }
 
-export async function expandPick([file]) {
-  if (!isContainer(file)) throw new Error(`${file.name} isn't a ${CONTAINER_EXT} file`);
-  return readContainer(file);
-}
-
-/** Check the picked files form one prepared video. Returns {manifest, poster, title} or throws. */
-export function describePick(files) {
-  const list = [...files];
-  const manifests = list.filter((f) => f.name.toLowerCase().endsWith('.mpd'));
+/** Check the parts form one prepared video. Returns {manifest, poster} or throws. */
+export function describeParts(parts) {
+  const manifests = parts.filter((p) => p.name.toLowerCase().endsWith('.mpd'));
   if (manifests.length !== 1) throw new Error(`expected exactly one .mpd file, got ${manifests.length}`);
-  const names = new Set(list.map((f) => f.name));
+  const names = new Set(parts.map((p) => p.name));
   const missing = ['video.mp4', 'audio.mp4', 'poster.jpg'].filter((n) => !names.has(n));
   if (missing.length) throw new Error(`missing: ${missing.join(', ')}`);
-  const manifest = manifests[0];
-  return {
-    manifest,
-    poster: list.find((f) => f.name === 'poster.jpg'),
-    title: manifest.name.replace(/\.mpd$/i, ''),
-  };
+  return { manifest: manifests[0], poster: parts.find((p) => p.name === 'poster.jpg') };
 }
 
-/** Make these files readable by Shaka; returns the local: URI of the manifest. */
-export function registerPickedFiles(files) {
-  const { manifest } = describePick(files);
-  picked = new Map([...files].map((f) => [f.name, f]));
-  return HOST + encodeURIComponent(manifest.name);
+/** Make these parts readable by Shaka; returns the local: URI of the manifest. */
+export function registerParts(parts) {
+  registered = new Map(parts.map((p) => [p.name, p]));
+  return HOST + encodeURIComponent(describeParts(parts).manifest.name);
 }
 
 function plugin(uri, request) {
-  const file = picked.get(decodeURIComponent(uri.slice(HOST.length)));
+  const part = registered.get(decodeURIComponent(uri.slice(HOST.length)));
   const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers?.Range ?? request.headers?.range ?? '');
-  const part = range ? file.slice(Number(range[1]), Number(range[2]) + 1) : file;
-  const op = part.arrayBuffer().then((data) => ({
+  const op = (range ? part.read(Number(range[1]), Number(range[2]) + 1) : part.read(0, part.size)).then((data) => ({
     uri, originalUri: uri, data, headers: {}, status: range ? 206 : 200, fromCache: false,
   }));
   return shaka.util.AbortableOperation.notAbortable(op);
@@ -84,11 +85,12 @@ export function installLocalScheme() {
     shaka.net.NetworkingEngine.PluginPriority.APPLICATION);
 }
 
-/** Read a picked image as a data: URL (stored in appMetadata.poster). */
-export function fileToDataUrl(file) {
+/** The poster part as a data: URL (stored in appMetadata.poster). */
+export async function posterDataUrl(poster) {
+  const blob = new Blob([await poster.read(0, poster.size)]);
   return new Promise((resolve) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result);
-    r.readAsDataURL(file);
+    r.readAsDataURL(blob);
   });
 }
