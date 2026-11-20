@@ -292,6 +292,95 @@ export async function slowPlayer(page) {
   };
 }
 
+// Google, faked at the network boundary: its sign-in script, its Picker script
+// and Drive's download endpoint. `files` maps each file name shared with the
+// signed-in account to a local file. By default sign-in succeeds and the Picker
+// picks nothing (closed). Call before the app loads.
+export async function fakeGoogle(page, files) {
+  const shared = Object.entries(files).map(([name, file], i) => ({ id: `drive-file-${i}`, name, file }));
+  const denied = new Set();
+  const dropped = new Set();
+  const served = new Map();
+  const token = 'fake-token';
+  await page.addInitScript(() => {
+    window.__fakeGoogle = { signIn: 'accept', pick: [], signIns: 0 };
+  });
+  await page.route('https://accounts.google.com/gsi/client', (route) => route.fulfill({
+    contentType: 'text/javascript',
+    body: `(${(accessToken) => {
+      window.google = window.google ?? {};
+      window.google.accounts = { oauth2: { initTokenClient: ({ callback, error_callback: failed }) => ({
+        requestAccessToken: () => {
+          const fake = window.__fakeGoogle;
+          fake.signIns += 1;
+          Promise.resolve().then(() => (fake.signIn === 'accept'
+            ? callback({ access_token: accessToken, expires_in: 3599, scope: 'https://www.googleapis.com/auth/drive.file' })
+            : failed?.({ type: 'popup_closed' })));
+        },
+      }) } };
+    }})(${JSON.stringify(token)})`,
+  }));
+  await page.route('https://apis.google.com/js/api.js', (route) => route.fulfill({
+    contentType: 'text/javascript',
+    body: `(${(docs) => {
+      // Any setter returns the same object, so calls chain like Google's builders.
+      const chainable = (onCall) => {
+        const self = new Proxy({}, { get: (target, key) => (key === 'then' ? undefined : (...args) => onCall(key, args) ?? self) });
+        return self;
+      };
+      window.google = window.google ?? {};
+      window.google.picker = {
+        Action: { PICKED: 'picked', CANCEL: 'cancel' },
+        Feature: { MULTISELECT_ENABLED: 'multiselect' },
+        ViewId: { DOCS: 'all' },
+        DocsView: function DocsView() { return chainable(() => undefined); },
+        PickerBuilder: function PickerBuilder() {
+          let callback;
+          return chainable((key, args) => {
+            if (key === 'setCallback') [callback] = args;
+            if (key !== 'build') return undefined;
+            return { setVisible: (visible) => {
+              if (!visible) return;
+              const names = window.__fakeGoogle.pick;
+              Promise.resolve().then(() => callback(names.length
+                ? { action: 'picked', docs: docs.filter((d) => names.includes(d.name)) }
+                : { action: 'cancel', docs: [] }));
+            } };
+          });
+        },
+      };
+      window.gapi = { load: (name, ready) => { (typeof ready === 'function' ? ready : ready.callback)(); } };
+    }})(${JSON.stringify(shared.map(({ id, name, file }) => ({ id, name, sizeBytes: String(statSync(file).size) })))})`,
+  }));
+  await page.route('https://www.googleapis.com/drive/v3/files/*', async (route) => {
+    const request = route.request();
+    const entry = shared.find(({ id }) => new URL(request.url()).pathname.endsWith(`/${id}`));
+    const signedIn = (await request.headerValue('authorization')) === `Bearer ${token}`;
+    if (!entry || !signedIn || denied.has(entry.name)) {
+      return route.fulfill({ status: 403, json: { error: { code: 403, message: 'The user does not have sufficient permissions for this file.' } } });
+    }
+    if (dropped.has(entry.name)) return route.abort('connectionreset');
+    const data = readFileSync(entry.file);
+    const range = /^bytes=(\d+)-(\d+)$/.exec((await request.headerValue('range')) ?? '');
+    const [start, end] = range ? [Number(range[1]), Math.min(Number(range[2]), data.length - 1)] : [0, data.length - 1];
+    served.set(entry.name, (served.get(entry.name) ?? 0) + end - start + 1);
+    if (!range) return route.fulfill({ status: 200, body: data, headers: { 'Content-Length': String(data.length) } });
+    return route.fulfill({
+      status: 206,
+      body: data.subarray(start, end + 1),
+      headers: { 'Content-Range': `bytes ${start}-${end}/${data.length}`, 'Content-Length': String(end - start + 1) },
+    });
+  });
+  return {
+    signInWillBeCancelled: () => page.evaluate(() => { window.__fakeGoogle.signIn = 'cancel'; }),
+    willPick: (...names) => page.evaluate((n) => { window.__fakeGoogle.pick = n; }, names),
+    deny: (name) => denied.add(name),
+    dropConnection: (name) => dropped.add(name),
+    signIns: () => page.evaluate(() => window.__fakeGoogle.signIns),
+    bytesRead: (name) => (name ? served.get(name) ?? 0 : [...served.values()].reduce((a, b) => a + b, 0)),
+  };
+}
+
 // Fire a Media Session action as the OS would (headphones, lock screen, media keys).
 export async function mediaSessionAction(page, action) {
   await page.evaluate((a) => window.__mediaSessionHandlers[a]?.({ action: a }), action);
