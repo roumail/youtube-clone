@@ -57,7 +57,12 @@ make_raw broken-missing-audio 3
   -c:v libx264 -profile:v main -g 10 -c:a aac -b:a 16k -t 3605 \
   "$RAW/long.mp4"
 
-for name in tiny medium broken-missing-audio episode-like long; do
+# "surround": "tiny" with 5.1 audio (6 channels at 384 kbit/s), as many films have.
+"$FFMPEG" -hide_banner -loglevel error -y -i "$RAW/tiny.mp4" \
+  -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=3" \
+  -map 0:v -map 1:a -c:v copy -c:a aac -ac 6 -b:a 384k -shortest "$RAW/surround.mp4"
+
+for name in tiny medium broken-missing-audio episode-like long surround; do
   "$PREPARE" "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 
@@ -129,6 +134,19 @@ cmp -s "$OUT/tiny/tiny.mpd" "$OUT/high-peak/high-peak.mpd" \
   && { echo "high-peak fixture: bandwidth not changed" >&2; exit 1; }
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$OUT/high-peak.kidsvideo" \
   -C "$OUT/high-peak" high-peak.mpd poster.jpg audio.mp4 video.mp4
+
+# Size target: at most 720p, video at most 1.2 Mbit/s on average, stereo audio
+# at most 96 kbit/s. "episode-like" is 1080p; "surround" has 5.1 audio.
+seconds() { sed -n 's/.*mediaPresentationDuration="PT\([0-9.]*\)S".*/\1/p' "$1"; }
+kbps() { awk -v bytes="$(wc -c < "$1")" -v s="$2" 'BEGIN { printf "%d", bytes * 8 / s / 1000 }'; }
+grep -q 'height="720"' "$OUT/episode-like/episode-like.mpd" \
+  || { echo "size target: episode-like (1080p) not scaled to 720p" >&2; exit 1; }
+(( $(kbps "$OUT/episode-like/video.mp4" "$(seconds "$OUT/episode-like/episode-like.mpd")") <= 1200 )) \
+  || { echo "size target: episode-like video above 1.2 Mbit/s" >&2; exit 1; }
+grep -q 'AudioChannelConfiguration[^>]*value="2"' "$OUT/surround/surround.mpd" \
+  || { echo "size target: surround audio not stereo" >&2; exit 1; }
+(( $(kbps "$OUT/surround/audio.mp4" "$(seconds "$OUT/surround/surround.mpd")") <= 110 )) \
+  || { echo "size target: surround audio above 96 kbit/s" >&2; exit 1; }
 
 grep -q 'lang="en"' "$OUT/episode-like/episode-like.mpd" \
   || { echo "prepare.sh did not pick the English audio track" >&2; exit 1; }

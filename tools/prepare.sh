@@ -11,8 +11,9 @@
 #
 # Audio: if there are several audio tracks, the first English one is used
 # (language tag en/eng/english); otherwise the first audio track.
-# Re-encodes only when the input isn't already H.264 + AAC in MP4/MOV;
-# otherwise it just repackages (fast). Skips videos already prepared.
+# Size target, to save space on the devices: video at most 720p and 1.2 Mbit/s
+# (H.264), audio stereo AAC at 96 kbit/s. A track already within it is copied;
+# anything else is re-encoded (slow, but done once). Skips videos already prepared.
 # Needs: ffmpeg + ffprobe on PATH, and tools/get-packager.sh run once.
 set -euo pipefail
 
@@ -33,7 +34,7 @@ NAME="$(basename "$INPUT")"; TITLE="${NAME%.*}"
 DEST="$ROOT/$TITLE"
 if [[ -f "$ROOT/$TITLE.kidsvideo" ]]; then echo "already prepared: $TITLE"; exit 0; fi
 
-probe() { "$FFPROBE" -v error -select_streams "$1" -show_entries stream=codec_name -of csv=p=0 "$INPUT" | head -1; }
+probe() { "$FFPROBE" -v error -select_streams "$1" -show_entries "stream=$2" -of csv=p=0 "$INPUT" | head -1; }
 
 # Which audio stream (absolute index): first English, else first audio.
 AUDIO_LIST="$("$FFPROBE" -v error -select_streams a -show_entries stream=index:stream_tags=language -of csv=p=0 "$INPUT")"
@@ -43,7 +44,11 @@ AIDX="$(awk -F, 'tolower($2) ~ /^(en|eng|english)$/ { print $1; exit }' <<<"$AUD
 ALANG="$(awk -F, -v i="$AIDX" '$1 == i { print ($2 == "" ? "unknown" : $2) }' <<<"$AUDIO_LIST")"
 echo "audio: stream $AIDX ($ALANG) of $(wc -l <<<"$AUDIO_LIST" | tr -d ' ') audio track(s)"
 
-VCODEC="$(probe v:0)"; ACODEC="$(probe "$AIDX")"
+VCODEC="$(probe v:0 codec_name)"; VHEIGHT="$(probe v:0 height)"; VRATE="$(probe v:0 bit_rate)"
+ACODEC="$(probe "$AIDX" codec_name)"; ACHANNELS="$(probe "$AIDX" channels)"; ARATE="$(probe "$AIDX" bit_rate)"
+# Unknown bitrates (some containers don't record them) count as above the target.
+video_small() { [[ "$VCODEC" == h264 && "$VHEIGHT" =~ ^[0-9]+$ && "$VRATE" =~ ^[0-9]+$ ]] && (( VHEIGHT <= 720 && VRATE <= 1200000 )); }
+audio_small() { [[ "$ACODEC" == aac && "$ACHANNELS" =~ ^[0-9]+$ && "$ARATE" =~ ^[0-9]+$ ]] && (( ACHANNELS <= 2 && ARATE <= 100000 )); }
 EXT="$(tr '[:upper:]' '[:lower:]' <<<"${NAME##*.}")"
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
@@ -75,12 +80,12 @@ draw_progress() { # stdin: ffmpeg -progress key=value lines; $1: total seconds
   done
 }
 SRC="$INPUT"
-if [[ "$VCODEC" != h264 || "$ACODEC" != aac || ! "$EXT" =~ ^(mp4|m4v|mov)$ ]]; then
-  echo "re-encoding ($EXT, video=$VCODEC, audio=$ACODEC) -> H.264/AAC"
-  VARGS=(-c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p)
-  AARGS=(-c:a aac -b:a 128k -ac 2)
-  [[ "$VCODEC" == h264 ]] && VARGS=(-c:v copy)
-  [[ "$ACODEC" == aac ]] && AARGS=(-c:a copy)
+if ! video_small || ! audio_small || [[ ! "$EXT" =~ ^(mp4|m4v|mov)$ ]]; then
+  echo "re-encoding ($EXT, video=$VCODEC ${VHEIGHT}p ${VRATE} bit/s, audio=$ACODEC ${ACHANNELS}ch ${ARATE} bit/s) -> at most 720p 1.2 Mbit/s, stereo 96 kbit/s"
+  VARGS=(-c:v libx264 -preset slow -crf 26 -maxrate 1200k -bufsize 2400k -vf "scale=-2:min(720\,ih)" -pix_fmt yuv420p)
+  AARGS=(-c:a aac -b:a 96k -ac 2)
+  video_small && VARGS=(-c:v copy)
+  audio_small && AARGS=(-c:a copy)
   ENC=("$FFMPEG" -hide_banner -loglevel error -y -i "$INPUT" -map 0:v:0 -map "0:$AIDX"
        "${VARGS[@]}" "${AARGS[@]}" -movflags +faststart)
   STARTED=$SECONDS
@@ -94,7 +99,7 @@ if [[ "$VCODEC" != h264 || "$ACODEC" != aac || ! "$EXT" =~ ^(mp4|m4v|mov)$ ]]; t
   SRC="$WORK/src.mp4"
   ASEL=audio   # the re-encoded file has exactly one audio track
 else
-  echo "already H.264/AAC: repackaging only"
+  echo "already within the size target: repackaging only"
   ASEL="$AIDX" # packager accepts a zero-based stream index
 fi
 
