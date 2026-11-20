@@ -107,19 +107,23 @@ if [[ -n "$TITLE" && ${#FILES[@]} -ne 1 ]]; then
 fi
 
 # --tmux: re-run this same job in a detached tmux session, so a long re-encode
-# survives closing the terminal. The file list is passed along (a detached
-# session can't read your pipe). Inside the session $TMUX is set, so no loop.
+# survives closing the terminal. The file list goes to a file next to the log,
+# which the session reads as its stdin (a detached session can't read your pipe,
+# and a whole season's paths don't fit in a tmux command). Inside the session
+# $TMUX is set, so no loop.
 if [[ "$USE_TMUX" == 1 && -z "${TMUX:-}" ]]; then
   command -v tmux >/dev/null || { echo "--tmux needs tmux (brew install tmux); or run without --tmux" >&2; exit 1; }
   session="kids-prepare-$(date +%m%d-%H%M%S)"
   mkdir -p "$ROOT/logs"
   log="$ROOT/logs/run_prepare-$session.log"
+  list="$ROOT/logs/run_prepare-$session.files"
+  printf '%s\n' "${FILES[@]}" > "$list"
   args=("$SELF" --dest "$DEST")
   [[ -n "$TITLE" ]] && args+=(--title "$TITLE")
   [[ -n "$SERIES" ]] && args+=(--series "$SERIES")
-  args+=("${FILES[@]}")
-  inner="$(printf '%q ' "${args[@]}") 2>&1 | tee $(printf '%q' "$log"); echo; echo '[finished — press Enter to close this window]'; read -r"
-  tmux new-session -d -s "$session" -c "$PWD" "bash -c $(printf '%q' "$inner")"
+  inner="$(printf '%q ' "${args[@]}") < $(printf '%q' "$list") 2>&1 | tee $(printf '%q' "$log"); echo; echo '[finished — press Enter to close this window]'; read -r </dev/tty"
+  tmux new-session -d -s "$session" -c "$PWD" "bash -c $(printf '%q' "$inner")" \
+    || { echo "could not start the tmux session; run without --tmux" >&2; exit 1; }
   echo "running detached in tmux session: $session  (${#FILES[@]} video(s))"
   echo "  watch it:   tmux attach -t $session     (leave it running again: Ctrl-b then d)"
   echo "  log:        $log"
