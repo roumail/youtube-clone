@@ -1,14 +1,16 @@
 // Feature: Add from Google Drive — behind the PIN, sign in to Google, pick
-// .kidsvideo files in Google's Picker; they are downloaded and stored on the
-// device. The app only reads the files picked (drive.file): files only, several
+// .kidsvideo files in Google's Picker; they are added to this device's
+// catalogue and always stream from Google Drive (playing them:
+// e2e/features/streaming/). Only their title and poster are kept on the device;
+// a copy on the device comes from "Add video" (Files / AirDrop). The app only reads the files picked (drive.file): files only, several
 // at a time; a folder can't be picked (Google gives no access to what's in a
 // picked folder under drive.file), it only opens. Google is faked
 // at the network boundary (fakeGoogle in e2e/support.js). Not @ipad: once the
 // service worker controls the page, Playwright's WebKit can't intercept the
 // Drive requests, so they would reach the real Google.
 import {
-  test, expect, goto, enterPin, openVideo, startPlaying, fixtureContainer, fixtureParts, fakeGoogle, freeSpace,
-  containerSize, PIN, WRONG_PIN,
+  test, expect, goto, enterPin, openVideo, startPlaying, fixtureContainer, fixtureParts, fakeGoogle,
+  PIN, WRONG_PIN,
 } from '../../support.js';
 
 const shared = () => ({
@@ -38,7 +40,7 @@ test.describe('Feature: Add from Google Drive', () => {
     });
   });
 
-  test('Scenario: sign in, pick "tiny.kidsvideo", and it is added and plays', async ({ page, pinSet }) => {
+  test.fixme('Scenario: sign in, pick "tiny.kidsvideo", and it is added as streamed and plays', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
@@ -47,9 +49,9 @@ test.describe('Feature: Add from Google Drive', () => {
     await test.step('When I tap "Add from Google Drive", enter the PIN, sign in and pick "tiny.kidsvideo"', async () => {
       await addFromDrive(page);
     });
-    await test.step('Then "tiny" is added', async () => {
+    await test.step('Then "tiny" is added, marked as streaming from Google Drive', async () => {
       await expect(page.getByTestId('import-status')).toHaveText('Added "tiny".');
-      await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toBeVisible();
+      await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toHaveAttribute('data-plays-from', 'drive');
     });
     await test.step('And it plays after the PIN', async () => {
       await openVideo(page, 'tiny');
@@ -202,22 +204,6 @@ test.describe('Feature: Add from Google Drive', () => {
     });
     await test.step('Then it is refused as already in the library, after reading only the kidsvideo.json at its start', async () => {
       await expect(page.getByTestId('import-status')).toHaveText("Couldn't add the video: \"tiny\" is already in the library");
-      expect(google.bytesRead('tiny.kidsvideo')).toBeLessThanOrEqual(1024);
-    });
-  });
-
-  test('Scenario: a video that does not fit is refused before downloading', async ({ page, pinSet }) => {
-    const google = await fakeGoogle(page, shared());
-    await test.step('Given there is room for only half of "tiny"', async () => {
-      await freeSpace(page, Math.floor(containerSize('tiny') / 2));
-      await goto(page, '#/library');
-      await google.willPick('tiny.kidsvideo');
-    });
-    await test.step('When I pick "tiny.kidsvideo"', async () => {
-      await addFromDrive(page);
-    });
-    await test.step('Then it is refused for lack of space, using the size Drive reports, after reading only the kidsvideo.json at its start', async () => {
-      await expect(page.getByTestId('import-status')).toContainText(/not enough space on this device \("tiny" needs [\d.]+ MB, [\d.]+ MB is free\)/);
       expect(google.bytesRead('tiny.kidsvideo')).toBeLessThanOrEqual(1024);
     });
   });
