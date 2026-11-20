@@ -51,8 +51,9 @@ files). It's production-grade, so nothing is hand-rolled on the storage side.
 **Each video is prepared once on the Mac**, or on any computer with Docker
 (Shaka stores DASH, not plain `.mp4`), into one `.kidsvideo` file sent to the
 devices with AirDrop, so the iPad and iPhone never process anything. Tools: the pinned Shaka Packager
-binary (repackages without re-encoding) and ffmpeg (re-encodes only when needed,
-grabs the poster). No Python anywhere.
+binary (repackages without re-encoding) and ffmpeg (re-encodes whatever is above
+the size target of 720p, 1.2 Mbit/s and stereo audio, and grabs the poster). No
+Python anywhere.
 
 **Stack:** plain HTML, CSS and JavaScript modules, no framework, no build step.
 The only app dependency is the vendored, pinned Shaka Player in `app/vendor/`.

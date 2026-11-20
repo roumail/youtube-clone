@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: fixtures/out
-          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'Dockerfile', '.dockerignore', 'tools/run_prepare.sh', 'tools/prepare.sh', 'tools/pack.sh', 'tools/get-packager.sh', '.github/workflows/ci.yml') }}
+          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'Dockerfile', '.dockerignore', 'tools/run_prepare.sh', 'tools/prepare.sh', 'tools/kidsvideo/go.mod', 'tools/kidsvideo/main.go', 'tools/get-packager.sh', '.github/workflows/ci.yml') }}
 
       - name: Restore the preparation image (keyed on its files)
         if: steps.fx-cache.outputs.cache-hit != 'true'
@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/kids-prepare.tar
-          key: prep-image-${{ hashFiles('Dockerfile', '.dockerignore', 'tools/run_prepare.sh', 'tools/prepare.sh', 'tools/pack.sh', 'tools/get-packager.sh') }}
+          key: prep-image-${{ hashFiles('Dockerfile', '.dockerignore', 'tools/run_prepare.sh', 'tools/prepare.sh', 'tools/kidsvideo/go.mod', 'tools/kidsvideo/main.go', 'tools/get-packager.sh') }}
 
       - name: Build the preparation image
         if: steps.fx-cache.outputs.cache-hit != 'true' && steps.img-cache.outputs.cache-hit != 'true'
@@ -56,7 +56,7 @@ jobs:
         if: steps.fx-cache.outputs.cache-hit != 'true'
         run: >-
           docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo
-          -e PACKAGER=/tools/bin/packager --entrypoint /repo/fixtures/generate.sh kids-prepare
+          -e PACKAGER=/tools/bin/packager -e KIDSVIDEO=/tools/bin/kidsvideo --entrypoint /repo/fixtures/generate.sh kids-prepare
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -77,6 +77,23 @@ jobs:
         env:
           BASE: ${{ github.base_ref }}
         run: tools/check-hygiene.sh --range "origin/${BASE}...HEAD"
+
+  # The container tool's own tests (tools/kidsvideo).
+  kidsvideo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.3
+          cache: false
+      - name: gofmt, go vet, go test
+        working-directory: tools/kidsvideo
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+          go test ./...
 
   # Every app/ line and branch the PR changes is covered by a scenario.
   diff-coverage:

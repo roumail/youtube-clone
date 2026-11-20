@@ -185,7 +185,7 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
-  // 95 bytes: the longest title tools/pack.sh accepts.
+  // 95 bytes: the longest title tools/kidsvideo accepts.
   test('Scenario: a video with the longest allowed title adds and plays', async ({ page, pinSet }) => {
     const title = 'The Longest Title Allowed - A Tale About Many Long Words That Keeps Going Until It Finally Ends';
     await test.step('Given the library is empty', async () => {
@@ -273,6 +273,22 @@ test.describe('Feature: Add a video', () => {
         const storage = new shaka.offline.Storage();
         try { return (await storage.list()).length; } finally { await storage.destroy(); }
       })).toBe(0);
+    });
+  });
+
+  test('Scenario: a .kidsvideo made by the older tools is refused, asking to prepare it again', async ({ page, pinSet }) => {
+    await test.step('Given the library is empty', async () => {
+      await goto(page, '#/library');
+    });
+    const chooser = page.waitForEvent('filechooser');
+    await test.step('When I pick "old-format.kidsvideo" (made before format 2: no kidsvideo.json inside)', async () => {
+      await page.getByTestId('add-video-button').click();
+      await enterPin(page, PIN);
+      await (await chooser).setFiles([fixtureContainer('old-format')]);
+    });
+    await test.step('Then the import says to prepare it again, and nothing is added', async () => {
+      await expect(page.getByTestId('import-status')).toHaveText("Couldn't add the video: old-format.kidsvideo was made by an older version of the tools: prepare it again");
+      await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
     });
   });
 });

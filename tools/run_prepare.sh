@@ -80,6 +80,12 @@ fi
 
 # Pinned Shaka Packager (no-op if already present).
 "$HERE/get-packager.sh" >/dev/null || { echo "could not install Shaka Packager" >&2; exit 1; }
+# kidsvideo (the container tool, tools/kidsvideo/): built here when Go is
+# installed; the Docker image already has it.
+if command -v go >/dev/null; then
+  (cd "$HERE/kidsvideo" && go build -trimpath -o "$HERE/bin/kidsvideo" .) || { echo "could not build tools/kidsvideo" >&2; exit 1; }
+fi
+[[ -x "$HERE/bin/kidsvideo" ]] || { echo "kidsvideo not found: install Go (brew install go) and run this again" >&2; exit 1; }
 
 # Expand folders into video files.
 FILES=()
