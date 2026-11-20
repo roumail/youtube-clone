@@ -1,5 +1,5 @@
 // The video library: Shaka offline storage.
-import { expandPick, describePick, registerPickedFiles, fileToDataUrl } from './local-scheme.js';
+import { pickedSource, readHead, readParts, describeParts, registerParts, posterDataUrl } from './local-scheme.js';
 
 // Never use Shaka's default track picker: on P3 screens it drops SDR video and
 // stores 0 tracks without an error. prepare.sh produces exactly one variant.
@@ -18,12 +18,11 @@ const isUsable = (c) => c.size > 0 && !c.isIncomplete;
 
 const sizeText = (bytes) => `${(bytes / 1e6).toFixed(1)} MB`;
 
-// Space is checked against the video's real size (its parts). Shaka's own check
-// guesses the size from the manifest's peak bitrate, which for films is several
-// times too big, and refuses videos that would fit.
-async function checkSpace(title, files) {
+// Space is checked against the video's real size (its .kidsvideo). Shaka's own
+// check guesses the size from the manifest's peak bitrate, which for films is
+// several times too big, and refuses videos that would fit.
+async function checkSpace(title, needed) {
   const estimate = await navigator.storage.estimate();
-  const needed = files.reduce((sum, f) => sum + f.size, 0);
   const free = Math.max(0, estimate.quota - estimate.usage);
   if (needed > free) {
     throw new Error(`not enough space on this device ("${title}" needs ${sizeText(needed)}, ${sizeText(free)} is free)`);
@@ -60,23 +59,25 @@ function byLibraryOrder(a, b) {
 }
 
 /**
- * Store one prepared video from the picked files (manifest, video, audio,
- * poster). Reports progress 0..1. Throws on any failure and leaves nothing
- * behind: an entry that kept 0 tracks is removed.
+ * Store one prepared video from a picked .kidsvideo. Reports progress 0..1.
+ * Throws on any failure and leaves nothing behind: an entry that kept 0 tracks
+ * is removed. Format, duplicates and space are checked from kidsvideo.json and
+ * the file's size, before the parts are read.
  */
 export async function importVideo(picked, onProgress) {
-  // Exactly one .kidsvideo file per video.
-  const files = await expandPick(picked);
-  const { title, poster } = describePick(files);
+  const source = pickedSource(picked);
+  const { title, next } = await readHead(source);
   // No duplicates: a title already in the library is refused before anything
   // is stored (owner decision 2026-11-19).
   const existing = await listVideos();
   if (existing.some((c) => c.appMetadata.title.toLocaleLowerCase() === title.toLocaleLowerCase())) {
     throw new Error(`"${title}" is already in the library`);
   }
-  await checkSpace(title, files);
-  const uri = registerPickedFiles(files);
-  const posterUrl = await fileToDataUrl(poster);
+  await checkSpace(title, source.size);
+  const parts = await readParts(source, next);
+  const { poster } = describeParts(parts);
+  const uri = registerParts(parts);
+  const posterUrl = await posterDataUrl(poster);
   return withStorage(async (storage) => {
     storage.configure({
       offline: {
