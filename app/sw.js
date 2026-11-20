@@ -4,7 +4,7 @@
 const CACHE = 'app-v2';
 const SHELL = [
   './', './index.html', './styles.css', './app.js', './library.js', './pin.js', './player.js',
-  './local-scheme.js', './features.js', './features/watch-time.js', './vendor/shaka-player-5.3.5.compiled.js',
+  './local-scheme.js', './drive.js', './features.js', './features/watch-time.js', './vendor/shaka-player-5.3.5.compiled.js',
   './manifest.webmanifest', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
 ];
 
@@ -26,6 +26,9 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const { request } = e;
+  // Google's scripts and Drive's video bytes (sent with the sign-in token) are
+  // not the app's: they go to the network untouched, never into this cache.
+  if (new URL(request.url).origin !== self.location.origin) return;
   e.respondWith((async () => {
     try {
       const fresh = await fetch(request, { cache: 'no-cache' });

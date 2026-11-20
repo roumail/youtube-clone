@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com https://docs.google.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>Kids Library</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -22,6 +22,7 @@
       <header>
         <h1>Library <span class="app-version" data-testid="app-version">dev</span></h1>
         <button type="button" data-testid="add-video-button">Add video</button>
+        <button type="button" data-testid="add-from-drive-button" hidden>Add from Google Drive</button>
         <button type="button" data-testid="settings-button">Settings</button>
       </header>
       <p class="import-help" data-testid="import-help">Adding a video? Pick its <strong>.kidsvideo</strong> file. Videos are prepared on the Mac first.</p>

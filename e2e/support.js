@@ -292,8 +292,9 @@ export async function slowPlayer(page) {
   };
 }
 
-// Google, faked at the network boundary: its sign-in script, its Picker script
-// and Drive's download endpoint. `files` maps each file name shared with the
+// Google, faked at the network boundary: the app's google.json, Google's
+// sign-in script, its Picker script and Drive's download endpoint (routed on
+// the context, so requests the service worker makes are caught too). `files` maps each file name shared with the
 // signed-in account to a local file. By default sign-in succeeds and the Picker
 // picks nothing (closed). Call before the app loads.
 export async function fakeGoogle(page, files) {
@@ -305,7 +306,9 @@ export async function fakeGoogle(page, files) {
   await page.addInitScript(() => {
     window.__fakeGoogle = { signIn: 'accept', pick: [], signIns: 0 };
   });
-  await page.route('https://accounts.google.com/gsi/client', (route) => route.fulfill({
+  const context = page.context();
+  await context.route('**/google.json', (route) => route.fulfill({ json: { clientId: 'fake-client', apiKey: 'key1', appId: '1' } }));
+  await context.route('https://accounts.google.com/gsi/client', (route) => route.fulfill({
     contentType: 'text/javascript',
     body: `(${(accessToken) => {
       window.google = window.google ?? {};
@@ -320,7 +323,7 @@ export async function fakeGoogle(page, files) {
       }) } };
     }})(${JSON.stringify(token)})`,
   }));
-  await page.route('https://apis.google.com/js/api.js', (route) => route.fulfill({
+  await context.route('https://apis.google.com/js/api.js', (route) => route.fulfill({
     contentType: 'text/javascript',
     body: `(${(docs) => {
       // Any setter returns the same object, so calls chain like Google's builders.
@@ -352,7 +355,7 @@ export async function fakeGoogle(page, files) {
       window.gapi = { load: (name, ready) => { (typeof ready === 'function' ? ready : ready.callback)(); } };
     }})(${JSON.stringify(shared.map(({ id, name, file }) => ({ id, name, sizeBytes: String(statSync(file).size) })))})`,
   }));
-  await page.route('https://www.googleapis.com/drive/v3/files/*', async (route) => {
+  await context.route('https://www.googleapis.com/drive/v3/files/*', async (route) => {
     const request = route.request();
     const entry = shared.find(({ id }) => new URL(request.url()).pathname.endsWith(`/${id}`));
     const signedIn = (await request.headerValue('authorization')) === `Bearer ${token}`;

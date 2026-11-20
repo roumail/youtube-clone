@@ -22,6 +22,12 @@ playing needs the PIN every time; nothing plays by itself.
   the backup.
 - **Forgotten PIN:** delete and re-add the home-screen app (this also clears
   the library).
+- **Adding from Google Drive:** "Add from Google Drive" (behind the PIN) signs in
+  to Google and opens Google's file picker, including "Shared with me"; the
+  picked `.kidsvideo` files are downloaded and stored. The app can read only the
+  files picked there. The button appears once the site is deployed with the
+  Google project's values (GitHub variables `GOOGLE_CLIENT_ID`, `GOOGLE_APP_ID`
+  and secret `GOOGLE_API_KEY`).
 - **Adding a video on the iPad or iPhone:** AirDrop its `.kidsvideo` from the
   Mac; it lands in Files → Downloads. In the app: Add video → PIN → pick it
   there. Then delete it from Downloads: the app keeps its own copy, so leaving
