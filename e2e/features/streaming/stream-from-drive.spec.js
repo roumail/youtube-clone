@@ -1,9 +1,9 @@
-// Feature: Stream from Google Drive — a video picked in Google Drive can be
-// streamed instead of stored: this device keeps only its title and poster in
-// its catalogue, and plays the video from the shelf (the Kids Library in
-// Google Drive) while the child watches. Streaming needs the internet; a
-// stored copy doesn't. After picking, the parent chooses per add: "Stream" or
-// "Keep a copy on this device" (what "Add from Google Drive" does today).
+// Feature: Streamed videos — a video added from Google Drive streams: this
+// device keeps only its title and poster in its catalogue and plays the video
+// from the shelf (the Kids Library in Google Drive) while the child watches.
+// Streaming needs the internet. A stored video (added with "Add video", from
+// Files / AirDrop) is a copy on the device and plays offline. The catalogue
+// shows which is which.
 // Google is faked at the network boundary (fakeGoogle in e2e/support.js).
 // Not @ipad, for the same reason as add-from-drive.spec.js.
 import { statSync } from 'node:fs';
@@ -28,26 +28,10 @@ async function streamFromDrive(page, google, ...names) {
   await google.willPick(...names);
   await page.getByTestId('add-from-drive-button').click();
   await enterPin(page, PIN);
-  await page.getByTestId('add-choice-stream').click();
+  await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
 }
 
-test.describe('Feature: Stream from Google Drive', () => {
-  test.fixme('Scenario: after picking, the parent chooses to stream or to keep a copy', async ({ page, pinSet }) => {
-    const google = await fakeGoogle(page, shared());
-    await test.step('Given the catalogue is empty', async () => {
-      await goto(page, '#/library');
-      await google.willPick('tiny.kidsvideo');
-    });
-    await test.step('When I add "tiny.kidsvideo" from Google Drive', async () => {
-      await page.getByTestId('add-from-drive-button').click();
-      await enterPin(page, PIN);
-    });
-    await test.step('Then I am asked: "Stream" or "Keep a copy on this device"', async () => {
-      await expect(page.getByTestId('add-choice-stream')).toBeVisible();
-      await expect(page.getByTestId('add-choice-keep')).toBeVisible();
-    });
-  });
-
+test.describe('Feature: Streamed videos', () => {
   test.fixme('Scenario: a streamed video is listed with title and poster, marked as streamed, after reading only its start', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the catalogue is empty', async () => {
@@ -57,7 +41,7 @@ test.describe('Feature: Stream from Google Drive', () => {
       await streamFromDrive(page, google, 'tiny.kidsvideo');
     });
     await test.step('Then "tiny" is listed with its poster and marked as streamed', async () => {
-      await expect(page.getByTestId('import-status')).toHaveText('Added "tiny" (streams from Google Drive).');
+      await expect(page.getByTestId('import-status')).toHaveText('Added "tiny".');
       const item = page.getByTestId('library-item').filter({ hasText: 'tiny' });
       await expect(item).toHaveAttribute('data-plays-from', 'drive');
       await expect(item.locator('img')).toBeVisible();
@@ -130,22 +114,30 @@ test.describe('Feature: Stream from Google Drive', () => {
     });
   });
 
-  test.fixme('Scenario: a film longer than an hour keeps playing when the Google sign-in runs out (known gap)', async ({ page, pinSet }) => {
-    // Google's sign-in in the browser lasts about an hour; renewing it in the
-    // middle of a film, without a tap, may be blocked on the iPad. Not solved yet.
+  test.fixme('Scenario: when the Google sign-in runs out during a video, it pauses; play with the PIN signs in again and goes on from there', async ({ page, pinSet }) => {
+    // Google's sign-in in the browser lasts about an hour, and renewing it needs
+    // a tap. So the video pauses just before it runs out, and the play PIN (a
+    // tap, needed for every resume anyway) renews it.
     await page.clock.install();
     const google = await fakeGoogle(page, shared());
+    let pausedAt;
     await test.step('Given "medium" is streamed and playing', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'medium.kidsvideo');
       await openVideo(page, 'medium');
       await startPlaying(page);
     });
-    await test.step('When the sign-in runs out while it plays', async () => {
-      await page.clock.fastForward('01:00:00');
+    await test.step('When the sign-in is about to run out', async () => {
+      await page.clock.fastForward('59:00');
     });
-    await test.step('Then it keeps playing', async () => {
-      await expectPlaying(page);
+    await test.step('Then it pauses', async () => {
+      await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
+      pausedAt = await page.getByTestId('player-video').evaluate((v) => v.currentTime);
+    });
+    await test.step('And play with the PIN shows Google\'s sign-in again, and it plays on from where it paused', async () => {
+      await startPlaying(page);
+      expect(await google.signIns()).toBe(2);
+      expect(await page.getByTestId('player-video').evaluate((v) => v.currentTime)).toBeGreaterThanOrEqual(pausedAt);
     });
   });
 
@@ -205,23 +197,50 @@ test.describe('Feature: Stream from Google Drive', () => {
     });
   });
 
-  test.fixme('Scenario: removing a streamed video only takes it off this device\'s catalogue', async ({ page, pinSet }) => {
+  test.fixme('Scenario: a streamed video can be hidden from this device; it stays in Google Drive', async ({ page, pinSet }) => {
+    // Nothing of a streamed video is stored, so there is nothing to remove:
+    // "Hide" only changes what this device shows. "Remove" is for stored videos
+    // and deletes the copy on the device (remove-video.spec.js).
     const google = await fakeGoogle(page, shared());
-    await test.step('Given "tiny" and "medium" are streamed', async () => {
+    await test.step('Given "tiny" and "medium" are streamed and settings is unlocked', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'tiny.kidsvideo', 'medium.kidsvideo');
-    });
-    await test.step('When I remove "tiny" in Settings', async () => {
       await page.getByTestId('settings-button').tap();
       await enterPin(page, PIN);
+    });
+    await test.step('Then a streamed video offers "Hide", not "Remove"', async () => {
+      const item = page.getByTestId('settings-video-item').filter({ hasText: 'tiny' });
+      await expect(item.getByTestId('hide-video-button')).toBeVisible();
+      await expect(item.getByTestId('remove-video-button')).toHaveCount(0);
+    });
+    await test.step('When I hide "tiny"', async () => {
       await page.getByTestId('settings-video-item').filter({ hasText: 'tiny' })
-        .getByTestId('remove-video-button').tap();
+        .getByTestId('hide-video-button').tap();
     });
     await test.step('Then only "medium" is listed, and Google Drive was only ever read', async () => {
       await page.getByTestId('screen-settings').getByTestId('back-button').tap();
       await expect(page.getByTestId('library-item')).toHaveCount(1);
       await expect(page.getByTestId('library-item').filter({ hasText: 'medium' })).toBeVisible();
       expect(google.requestsOtherThanReads()).toBe(0);
+    });
+  });
+
+  test.fixme('Scenario: a hidden video can be added again from Google Drive', async ({ page, pinSet }) => {
+    const google = await fakeGoogle(page, shared());
+    await test.step('Given "tiny" was streamed and then hidden', async () => {
+      await goto(page, '#/library');
+      await streamFromDrive(page, google, 'tiny.kidsvideo');
+      await page.getByTestId('settings-button').tap();
+      await enterPin(page, PIN);
+      await page.getByTestId('settings-video-item').filter({ hasText: 'tiny' })
+        .getByTestId('hide-video-button').tap();
+      await page.getByTestId('screen-settings').getByTestId('back-button').tap();
+    });
+    await test.step('When I add "tiny.kidsvideo" from Google Drive again', async () => {
+      await streamFromDrive(page, google, 'tiny.kidsvideo');
+    });
+    await test.step('Then it is listed again', async () => {
+      await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toHaveAttribute('data-plays-from', 'drive');
     });
   });
 
@@ -250,7 +269,7 @@ test.describe('Feature: Stream from Google Drive', () => {
       await streamFromDrive(page, google, 'tiny.kidsvideo');
     });
     await test.step('Then it is added', async () => {
-      await expect(page.getByTestId('import-status')).toHaveText('Added "tiny" (streams from Google Drive).');
+      await expect(page.getByTestId('import-status')).toHaveText('Added "tiny".');
     });
   });
 });
