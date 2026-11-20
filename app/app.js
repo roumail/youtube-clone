@@ -3,7 +3,7 @@
 // PIN, offline (service worker) and installability.
 import { installLocalScheme, pickedSource, CONTAINER_EXT } from './local-scheme.js';
 import {
-  initDrive, pickFromDrive, signedIn, signIn, signInEnds, canRead, driveSource,
+  initDrive, pickFromDrive, signedIn, signIn, signInEnds, driveSource,
 } from './drive.js';
 import {
   hasPin, verifyPinSync, savePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
@@ -34,6 +34,7 @@ const state = {
   returnTo: '#/library', // where the player's Back goes (the library or a series list)
   features: {}, // running optional features, by id (features.js)
   importStatus: { phase: 'idle', progress: 0, message: '' },
+  signingIn: null, // a Google sign-in started by the tap that opened a streamed video
 };
 
 function parseRoute(hash) {
@@ -83,7 +84,7 @@ function tile(testid, poster, ...texts) {
 // renews the Google sign-in on this tap if needed, so it is ready by play.
 function openFrom(c, from) {
   state.returnTo = from;
-  if (c.playsFrom === 'drive' && !signedIn()) signIn().catch(() => {}); // a failed sign-in shows in the player
+  state.signingIn = c.playsFrom === 'drive' && !signedIn() ? signIn() : null;
   go(`#/player/${encodeURIComponent(c.offlineUri)}`);
 }
 
@@ -487,9 +488,11 @@ function watchSignIn() {
   }
 }
 
-// What the player loads for a streamed video: its parts, read from Google Drive.
-async function streamFrom(entry) {
+// What the player loads for a streamed video: its parts, read from Google
+// Drive, once the sign-in started by the opening tap (if any) is done.
+async function streamFrom(entry, signing) {
   try {
+    await signing;
     return await streamUri(driveSource(entry.file));
   } catch (e) {
     throw Object.assign(e, {
@@ -595,7 +598,9 @@ function onRouteChange() {
     const entry = state.library.find((c) => c.offlineUri === id);
     // A streamed video loads now if signed in (or signing in, from the tap that
     // opened it); otherwise at play, after signing in.
-    if (entry?.playsFrom === 'drive') openVideo(id, true, () => streamFrom(entry), !canRead()).then(update);
+    const signing = state.signingIn;
+    state.signingIn = null;
+    if (entry?.playsFrom === 'drive') openVideo(id, true, () => streamFrom(entry, signing), !signing && !signedIn()).then(update);
     else openVideo(id, Boolean(entry)).then(update);
   }
   if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;

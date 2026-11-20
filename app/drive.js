@@ -34,8 +34,6 @@ export async function initDrive() {
 export const signedIn = () => Boolean(token) && Date.now() < token.expiresAt;
 /** When this session's sign-in ends (ms since 1970). */
 export const signInEnds = () => token.expiresAt;
-/** True if Drive can be read now, or as soon as the sign-in in progress is done. */
-export const canRead = () => signedIn() || Boolean(pending);
 
 /**
  * Google's sign-in pop-up. Call it within a tap. Resolves once

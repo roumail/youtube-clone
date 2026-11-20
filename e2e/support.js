@@ -304,6 +304,7 @@ export async function fakeGoogle(page, files, folders = []) {
   const dropped = new Set();
   const served = new Map();
   let otherThanReads = 0;
+  let pickedForThisProject = false; // Google remembers it across reloads
   const token = 'fake-token';
   // As with Google: picked files become readable only by the Cloud project the
   // Picker was opened for, given by its project number (setAppId).
@@ -377,7 +378,7 @@ export async function fakeGoogle(page, files, folders = []) {
     if (request.method() !== 'GET') otherThanReads += 1;
     const entry = shared.find(({ id }) => new URL(request.url()).pathname.endsWith(`/${id}`));
     const signedIn = (await request.headerValue('authorization')) === `Bearer ${token}`;
-    const pickedForThisProject = (await page.evaluate(() => window.__fakeGoogle.appId)) === projectNumber;
+    pickedForThisProject ||= (await page.evaluate(() => window.__fakeGoogle.appId)) === projectNumber;
     if (!entry || !signedIn || !pickedForThisProject || denied.has(entry.name)) {
       return route.fulfill({ status: 403, json: { error: { code: 403, message: 'The user does not have sufficient permissions for this file.' } } });
     }
