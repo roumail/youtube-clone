@@ -297,9 +297,11 @@ export async function slowPlayer(page) {
 // the context, so requests the service worker makes are caught too). `files` maps each file name shared with the
 // signed-in account to a local file. By default sign-in succeeds and the Picker
 // picks nothing (closed). Call before the app loads.
-// files: { name: path } shared with the account; folders: names of shared folders.
-export async function fakeGoogle(page, files, folders = []) {
+// files: { name: path } shared with the account; folders: { 'A' or 'A/B': [file names] },
+// shared folders and what is in them ('A/B' is folder B inside A).
+export async function fakeGoogle(page, files, folders = {}) {
   const shared = Object.entries(files).map(([name, file], i) => ({ id: `drive-file-${i}`, name, file }));
+  const folderList = Object.keys(folders).map((p, i) => ({ id: `drive-folder-${i}`, path: p, name: p.split('/').pop() }));
   const denied = new Set();
   const dropped = new Set();
   const served = new Map();
@@ -332,7 +334,7 @@ export async function fakeGoogle(page, files, folders = []) {
   }));
   await context.route('https://apis.google.com/js/api.js', (route) => route.fulfill({
     contentType: 'text/javascript',
-    body: `(${(docs, folderNames) => {
+    body: `(${(docs, topFolders) => {
       // Any setter returns the same object, so calls chain like Google's builders.
       const chainable = (onCall) => {
         const self = new Proxy({}, { get: (target, key) => (key === 'then' ? undefined : (...args) => onCall(key, args) ?? self) });
@@ -361,8 +363,8 @@ export async function fakeGoogle(page, files, folders = []) {
               const { pick: names, foldersSelectable } = window.__fakeGoogle;
               const picked = [
                 ...docs.filter((d) => names.includes(d.name)),
-                ...(foldersSelectable ? folderNames.filter((n) => names.includes(n))
-                  .map((n) => ({ id: `drive-folder-${n}`, name: n, mimeType: 'application/vnd.google-apps.folder' })) : []),
+                ...(foldersSelectable ? topFolders.filter((f) => names.includes(f.name))
+                  .map((f) => ({ ...f, mimeType: 'application/vnd.google-apps.folder' })) : []),
               ];
               Promise.resolve().then(() => callback(picked.length
                 ? { action: 'picked', docs: picked }
@@ -372,8 +374,27 @@ export async function fakeGoogle(page, files, folders = []) {
         },
       };
       window.gapi = { load: (name, ready) => { (typeof ready === 'function' ? ready : ready.callback)(); } };
-    }})(${JSON.stringify(shared.map(({ id, name, file }) => ({ id, name, sizeBytes: String(statSync(file).size) })))}, ${JSON.stringify(folders)})`,
+    }})(${JSON.stringify(shared.map(({ id, name, file }) => ({ id, name, sizeBytes: String(statSync(file).size) })))}, ${JSON.stringify(folderList.filter((f) => !f.path.includes('/')).map(({ id, name }) => ({ id, name })))})`,
   }));
+  // Listing a folder (files.list with q="'<id>' in parents"), two entries a page
+  // so that paging is used.
+  await context.route(/^https:\/\/www\.googleapis\.com\/drive\/v3\/files\?/, async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const folder = folderList.find((f) => params.get('q').includes(`'${f.id}' in parents`));
+    if (dropped.has(folder.name)) return route.abort('connectionreset');
+    if (denied.has(folder.name)) return route.fulfill({ status: 404, json: { error: { code: 404, message: 'File not found.' } } });
+    const children = [
+      ...folders[folder.path].map((n) => {
+        const entry = shared.find((f) => f.name === n);
+        return { id: entry.id, name: n, size: String(statSync(entry.file).size), mimeType: 'application/octet-stream' };
+      }),
+      ...folderList.filter((f) => f.path === `${folder.path}/${f.name}`)
+        .map(({ id, name }) => ({ id, name, mimeType: 'application/vnd.google-apps.folder' })),
+    ];
+    const start = Number(params.get('pageToken') || 0);
+    const next = start + 2 < children.length ? String(start + 2) : undefined;
+    return route.fulfill({ json: { files: children.slice(start, start + 2), nextPageToken: next } });
+  });
   await context.route('https://www.googleapis.com/drive/v3/files/*', async (route) => {
     const request = route.request();
     if (request.method() !== 'GET') otherThanReads += 1;

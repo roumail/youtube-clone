@@ -1,14 +1,16 @@
 // Google Drive, the shelf that streamed videos play from: Google's sign-in (a
-// token for drive.file: only the files picked here), Google's Picker, and a
-// byte source that reads ranges of a file with the current token.
+// read-only token: drive.readonly, so a picked folder can be listed), Google's
+// Picker, and a byte source that reads ranges of a file with the current token.
 // Set up only when the deploy wrote google.json (the client ID and Picker API
 // key); otherwise "Add from Google Drive" stays hidden.
 import { requireContainerName } from './local-scheme.js';
 
-const SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+export const FOLDER = 'application/vnd.google-apps.folder';
 let config;
-// The sign-in, { value, expiresAt }, kept across reopening the app until it runs out.
-const KEPT = 'kids-google-sign-in';
+// The sign-in, { value, expiresAt }, kept across reopening the app until it
+// runs out. (Named after the scope: a sign-in for an earlier scope is not reused.)
+const KEPT = 'kids-google-sign-in-readonly';
 let token = JSON.parse(localStorage.getItem(KEPT));
 let pending = null; // a sign-in in progress
 
@@ -56,33 +58,57 @@ export function signIn() {
   return pending;
 }
 
+// A Drive API request with the current sign-in (waiting for one in progress).
+// name: the file or folder, for the error.
+async function driveFetch(url, name, headers) {
+  await pending;
+  let res;
+  try {
+    res = await fetch(url, { headers: { Authorization: `Bearer ${token.value}`, ...headers } });
+  } catch {
+    throw Object.assign(new Error('the connection to Google Drive was lost'), { offline: true });
+  }
+  if (!res.ok) throw new Error(`no access to "${name}" in Google Drive`);
+  return res;
+}
+
 /** A Drive file as a byte source; reads wait for a sign-in in progress. */
 export function driveSource({ id, name, size }) {
   return {
     id,
     name,
     size,
-    read: async (start, end) => {
-      await pending;
-      let res;
-      try {
-        res = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {
-          headers: { Authorization: `Bearer ${token.value}`, Range: `bytes=${start}-${end - 1}` },
-        });
-      } catch {
-        throw Object.assign(new Error('the connection to Google Drive was lost'), { offline: true });
-      }
-      if (!res.ok) throw new Error(`no access to "${name}" in Google Drive`);
-      return res.arrayBuffer();
-    },
+    read: async (start, end) => (await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, name,
+      { Range: `bytes=${start}-${end - 1}` })).arrayBuffer(),
   };
+}
+
+/**
+ * The .kidsvideo files in a Drive folder and its subfolders, as Picker-like
+ * docs ({ id, name, sizeBytes }); other files are left out.
+ */
+export async function listFolder(folder) {
+  const found = [];
+  let pageToken = '';
+  do {
+    const q = encodeURIComponent(`'${folder.id}' in parents and trashed = false`);
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,size,mimeType)`
+      + `&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true&pageToken=${pageToken}`;
+    const page = await (await driveFetch(url, folder.name, {})).json();
+    for (const f of page.files) {
+      if (f.mimeType === FOLDER) found.push(...await listFolder(f));
+      else if (f.name.toLowerCase().endsWith('.kidsvideo')) found.push({ id: f.id, name: f.name, sizeBytes: f.size });
+    }
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return found;
 }
 
 function openPicker(onPicked) {
   const { picker } = google;
   new picker.PickerBuilder()
-    .addView(new picker.DocsView(picker.ViewId.DOCS).setIncludeFolders(true))
-    .addView(new picker.DocsView(picker.ViewId.DOCS).setOwnedByMe(false))
+    .addView(new picker.DocsView(picker.ViewId.DOCS).setIncludeFolders(true).setSelectFolderEnabled(true))
+    .addView(new picker.DocsView(picker.ViewId.DOCS).setOwnedByMe(false).setSelectFolderEnabled(true))
     .enableFeature(picker.Feature.MULTISELECT_ENABLED)
     .setOAuthToken(token.value)
     .setDeveloperKey(config.apiKey)

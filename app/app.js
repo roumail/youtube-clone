@@ -3,7 +3,7 @@
 // PIN, offline (service worker) and installability.
 import { installLocalScheme, pickedSource, CONTAINER_EXT } from './local-scheme.js';
 import {
-  initDrive, pickFromDrive, signedIn, signIn, signInEnds, driveSource,
+  initDrive, pickFromDrive, signedIn, signIn, signInEnds, driveSource, listFolder, FOLDER,
 } from './drive.js';
 import {
   hasPin, verifyPinSync, savePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
@@ -338,7 +338,7 @@ async function onPinSubmit(event) {
     downloadVideo(state.downloadTarget, signInIfNeeded());
   } else if (purpose === 'drive') {
     // Also within the tap: Google's sign-in opens a pop-up.
-    pickFromDrive((docs, sourceOf) => importItems(docs, sourceOf, addStreamed));
+    pickFromDrive(addFromDrive);
   } else if (purpose === 'settings') {
     state.settingsUnlocked = true;
   } else if (purpose === 'search') {
@@ -594,6 +594,50 @@ function onPinCancel() {
   state.newPin = null;
   if (purpose === 'settings') go('#/library');
   if (purpose === 'play') cancelPlay();
+  update();
+}
+
+// Picked in Google Drive: files are added as streamed; a picked folder adds
+// every .kidsvideo in it and its subfolders, skipping titles already there.
+async function addFromDrive(docs, sourceOf) {
+  const folders = docs.filter((d) => d.mimeType === FOLDER);
+  if (!folders.length) return importItems(docs, sourceOf, addStreamed);
+  const items = docs.filter((d) => d.mimeType !== FOLDER);
+  for (const folder of folders) {
+    state.importStatus = { phase: 'storing', progress: 0, message: `Looking in "${folder.name}"…` };
+    update();
+    try {
+      items.push(...await listFolder(folder));
+    } catch (e) {
+      state.importStatus = { phase: 'error', progress: 0, message: `Couldn't add the folder "${folder.name}": ${e.message}` };
+      return update();
+    }
+  }
+  if (!items.length) {
+    state.importStatus = { phase: 'error', progress: 0, message: `There are no .kidsvideo files in "${folders[0].name}".` };
+    return update();
+  }
+  const from = docs.length === 1 ? ` from "${folders[0].name}"` : '';
+  let added = 0;
+  let skipped = 0;
+  const failed = [];
+  for (const [i, item] of items.entries()) {
+    const name = item.name.slice(0, -CONTAINER_EXT.length);
+    state.importStatus = { phase: 'storing', progress: i / items.length, message: `Adding ${i + 1} of ${items.length}: ${name}…` };
+    update();
+    try {
+      await addStreamed(sourceOf(item));
+      added += 1;
+    } catch (e) {
+      if (e.duplicate) skipped += 1;
+      else failed.push(`${name} (${e.message})`);
+    }
+    await refreshLibrary();
+  }
+  const summary = `Added ${added} of ${items.length} videos${from}${skipped ? ` (${skipped} already in the library)` : ''}.`;
+  state.importStatus = failed.length
+    ? { phase: 'error', progress: 0, message: `${summary} Couldn't add: ${failed.join('; ')}.` }
+    : { phase: 'done', progress: 1, message: summary };
   update();
 }
 
