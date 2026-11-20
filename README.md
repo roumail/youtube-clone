@@ -35,9 +35,13 @@ Each video in a catalogue is either:
   read only the files picked there. The button appears once the site is
   deployed with a Google project's values: see
   [Setting up Google Drive](#setting-up-google-drive).
-- **Playing a streamed video** needs the internet and a Google sign-in, which
-  lasts about an hour: the play PIN signs in again when needed, and a video
-  pauses just before the sign-in runs out (play with the PIN to go on).
+- **Playing a streamed video** needs the internet and a Google sign-in. Google
+  gives a web app like this one (no server of its own) a sign-in that lasts
+  about an hour, and renewing it needs a tap. So it is renewed on the tap that
+  opens a streamed video, kept across reopening the app until it runs out, and
+  a video pauses just before it runs out (play with the PIN to go on). Once the
+  device account has approved the app, renewing asks nothing: Google's window
+  opens and closes by itself.
 - **Storing a video on the iPad or iPhone** (to watch offline): AirDrop its
   `.kidsvideo` from the Mac (it lands in Files → Downloads), or download it from
   Google Drive into Files. In the app: Add video → PIN → pick it there. Then

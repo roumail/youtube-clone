@@ -7,7 +7,9 @@ import { requireContainerName } from './local-scheme.js';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 let config;
-let token = null; // { value, expiresAt } for this session
+// The sign-in, { value, expiresAt }, kept across reopening the app until it runs out.
+const KEPT = 'kids-google-sign-in';
+let token = JSON.parse(localStorage.getItem(KEPT));
 let pending = null; // a sign-in in progress
 
 const loadScript = (src) => new Promise((resolve, reject) => {
@@ -32,9 +34,11 @@ export async function initDrive() {
 export const signedIn = () => Boolean(token) && Date.now() < token.expiresAt;
 /** When this session's sign-in ends (ms since 1970). */
 export const signInEnds = () => token.expiresAt;
+/** True if Drive can be read now, or as soon as the sign-in in progress is done. */
+export const canRead = () => signedIn() || Boolean(pending);
 
 /**
- * Google's sign-in pop-up. Call it within a tap (the PIN's OK). Resolves once
+ * Google's sign-in pop-up. Call it within a tap. Resolves once
  * signed in; rejects if the pop-up was closed or Google isn't reachable.
  */
 export function signIn() {
@@ -42,8 +46,10 @@ export function signIn() {
     google.accounts.oauth2.initTokenClient({
       client_id: config.clientId,
       scope: SCOPE,
+      prompt: '', // once the account has approved the app, Google asks nothing
       callback: (response) => {
         token = { value: response.access_token, expiresAt: Date.now() + (response.expires_in - 60) * 1000 };
+        localStorage.setItem(KEPT, JSON.stringify(token));
         resolve();
       },
       error_callback: () => reject(new Error('the Google sign-in was closed')),
@@ -59,9 +65,9 @@ export function driveSource({ id, name, size }) {
     name,
     size,
     read: async (start, end) => {
+      await pending;
       let res;
       try {
-        await pending;
         res = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {
           headers: { Authorization: `Bearer ${token.value}`, Range: `bytes=${start}-${end - 1}` },
         });

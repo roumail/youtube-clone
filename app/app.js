@@ -3,7 +3,7 @@
 // PIN, offline (service worker) and installability.
 import { installLocalScheme, pickedSource, CONTAINER_EXT } from './local-scheme.js';
 import {
-  initDrive, pickFromDrive, signedIn, signIn, signInEnds, driveSource,
+  initDrive, pickFromDrive, signedIn, signIn, signInEnds, canRead, driveSource,
 } from './drive.js';
 import {
   hasPin, verifyPinSync, savePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
@@ -79,9 +79,11 @@ function tile(testid, poster, ...texts) {
   return li;
 }
 
-// Opening a video remembers where Back should return to.
+// Opening a video remembers where Back should return to. A streamed video
+// renews the Google sign-in on this tap if needed, so it is ready by play.
 function openFrom(c, from) {
   state.returnTo = from;
+  if (c.playsFrom === 'drive' && !signedIn()) signIn().catch(() => {}); // a failed sign-in shows in the player
   go(`#/player/${encodeURIComponent(c.offlineUri)}`);
 }
 
@@ -591,8 +593,9 @@ function onRouteChange() {
   if (state.route.name === 'player') {
     const id = state.route.videoId;
     const entry = state.library.find((c) => c.offlineUri === id);
-    // A streamed video loads now if signed in; otherwise at play, after signing in.
-    if (entry?.playsFrom === 'drive') openVideo(id, true, () => streamFrom(entry), !signedIn()).then(update);
+    // A streamed video loads now if signed in (or signing in, from the tap that
+    // opened it); otherwise at play, after signing in.
+    if (entry?.playsFrom === 'drive') openVideo(id, true, () => streamFrom(entry), !canRead()).then(update);
     else openVideo(id, Boolean(entry)).then(update);
   }
   if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
