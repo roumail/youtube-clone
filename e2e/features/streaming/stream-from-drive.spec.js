@@ -164,6 +164,31 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
+  test('Scenario: reached without a tap after the sign-in ran out, a video no longer shared says so after the play PIN', async ({ page, pinSet }) => {
+    await page.clock.install();
+    const google = await fakeGoogle(page, shared());
+    let address;
+    await test.step('Given "tiny" is streamed and was opened once, and an hour has passed back on the library', async () => {
+      await goto(page, '#/library');
+      await streamFromDrive(page, google, 'tiny.kidsvideo');
+      await openVideo(page, 'tiny');
+      address = await page.evaluate(() => location.hash);
+      await page.getByTestId('screen-player').getByTestId('back-button').tap();
+      await page.clock.fastForward('01:00:00');
+    });
+    await test.step('When it is no longer shared, and the browser goes forward to it and I play with the PIN', async () => {
+      google.deny('tiny.kidsvideo');
+      await page.evaluate((hash) => { location.hash = hash; }, address);
+      await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
+      await page.getByTestId('play-button').tap();
+      await enterPin(page, PIN);
+    });
+    await test.step('Then, after signing in, it says there is no access to it in Google Drive', async () => {
+      await expect(playerState(page)).toHaveAttribute('data-state', 'error');
+      await expect(page.getByTestId('player-error')).toHaveText('no access to "tiny.kidsvideo" in Google Drive');
+    });
+  });
+
   test('Scenario: when the Google sign-in runs out during a video, it pauses; play with the PIN signs in again and goes on from there', async ({ page, pinSet }) => {
     // Google's sign-in in the browser lasts about an hour, and renewing it needs
     // a tap. So the video pauses just before it runs out, and the play PIN (a
