@@ -435,6 +435,8 @@ function initSeek() {
   const bar = $('seek-bar');
   for (const ev of ['timeupdate', 'durationchange', 'loadedmetadata', 'seeked', 'emptied']) v.addEventListener(ev, showPosition);
   bar.addEventListener('pointerdown', () => { dragging = true; });
+  // WebKit (iPad, iPhone) sends no change event when a finger taps the bar.
+  for (const ev of ['pointerup', 'pointercancel']) bar.addEventListener(ev, () => { dragging = false; showPosition(); });
   bar.addEventListener('input', () => { seekTo(Number(bar.value)); showPosition(); });
   bar.addEventListener('change', () => { dragging = false; seekTo(Number(bar.value)); showPosition(); update(); });
   document.addEventListener('keydown', (e) => {

@@ -168,4 +168,25 @@ test.describe('Feature: Seek', () => {
       expect(await position(page)).toBe(0);
     });
   });
+
+  // WebKit (iPad, iPhone) sends no change event when a finger taps the bar.
+  test('Scenario: after a finger taps the scrub bar, the time keeps following playback @ipad', async ({ page }) => {
+    const bar = page.getByTestId('seek-bar');
+    await test.step('Given "medium" is playing', async () => {
+      await startPlaying(page);
+    });
+    let tapped;
+    await test.step('When I tap the middle of the bar with a finger', async () => {
+      const box = await bar.boundingBox();
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      tapped = Number(await bar.inputValue());
+    });
+    await test.step('Then the video jumps there', async () => {
+      await expect.poll(() => position(page)).toBeGreaterThanOrEqual(tapped);
+    });
+    await test.step('And the bar and the time on screen keep following playback', async () => {
+      await expect.poll(async () => Number(await bar.inputValue())).toBeGreaterThan(tapped);
+      await expect(page.getByTestId('time-elapsed')).not.toHaveText(`00:${String(tapped).padStart(2, '0')}`);
+    });
+  });
 });
