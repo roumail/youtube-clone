@@ -58,6 +58,25 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
+  test.fixme('Scenario: search looks inside series: an episode is found by its own name', async ({ page, pinSet, seedLibrary }) => {
+    await test.step('Given three episodes of "Show" and "tiny" are stored', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('Show - S01E10 - Tenth', 'tiny', 'Show - S01E02 - Second', 'Show - S01E01 - First');
+    });
+    await test.step('When I unlock search and type "second", which is only in an episode\'s name', async () => {
+      await unlockSearch(page);
+      await page.keyboard.type('second');
+    });
+    await test.step('Then that episode is shown on its own, not the series tile', async () => {
+      await expect(items(page)).toHaveText([/S01E02 - Second/]);
+      await expect(page.getByTestId('series-item')).toHaveCount(0);
+    });
+    await test.step('And clearing the search shows "Show" as one series again', async () => {
+      await page.getByTestId('search-clear').click();
+      await expect(page.getByTestId('series-item')).toHaveText([/Show/]);
+    });
+  });
+
   test('Scenario: a wrong or cancelled PIN leaves search locked', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" and "medium" are stored', async () => {
       await goto(page, '#/library');
