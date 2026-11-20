@@ -4,6 +4,7 @@ playwright-report/
 test-results/
 .DS_Store
 tools/bin/
-prepared/
+originals/
+logs/
 .env
 coverage-report/

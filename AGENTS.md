@@ -41,7 +41,8 @@ Out of scope unless the owner asks for it:
 
 ## Safety rules (learned the hard way)
 - **Stage files by explicit path. Never `git add -A` / `git add .`** — the owner
-  keeps real, copyrighted videos in the working tree (`prepared/`, gitignored).
+  keeps real, copyrighted videos in the working tree (`originals/`, the source
+  videos, gitignored).
   Real media must never reach this public repo. Check `git status --short` and
   the commit stat before every push.
 - The owner may use the same working folder. Don't switch branches with
@@ -114,5 +115,5 @@ Out of scope unless the owner asks for it:
   (bash, perl, GNU tar) and their updates come from that Alpine release when
   the image is built.
 - Manual real-episode check in the owner's Chrome (not CI): adds and plays a
-  prepared episode in the live app: `node tools/real-episode-check.mjs "prepared/<Title>"`.
+  prepared episode in the live app: `node tools/real-episode-check.mjs "<Kids Library>/<Title>.kidsvideo"`.
 - Release (owner only): `tools/release.sh minor` (or `major`/`patch`/`1.0.0`, `--dry-run`).
