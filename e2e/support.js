@@ -297,7 +297,8 @@ export async function slowPlayer(page) {
 // the context, so requests the service worker makes are caught too). `files` maps each file name shared with the
 // signed-in account to a local file. By default sign-in succeeds and the Picker
 // picks nothing (closed). Call before the app loads.
-export async function fakeGoogle(page, files) {
+// files: { name: path } shared with the account; folders: names of shared folders.
+export async function fakeGoogle(page, files, folders = []) {
   const shared = Object.entries(files).map(([name, file], i) => ({ id: `drive-file-${i}`, name, file }));
   const denied = new Set();
   const dropped = new Set();
@@ -328,7 +329,7 @@ export async function fakeGoogle(page, files) {
   }));
   await context.route('https://apis.google.com/js/api.js', (route) => route.fulfill({
     contentType: 'text/javascript',
-    body: `(${(docs) => {
+    body: `(${(docs, folderNames) => {
       // Any setter returns the same object, so calls chain like Google's builders.
       const chainable = (onCall) => {
         const self = new Proxy({}, { get: (target, key) => (key === 'then' ? undefined : (...args) => onCall(key, args) ?? self) });
@@ -339,7 +340,13 @@ export async function fakeGoogle(page, files) {
         Action: { PICKED: 'picked', CANCEL: 'cancel' },
         Feature: { MULTISELECT_ENABLED: 'multiselect' },
         ViewId: { DOCS: 'all' },
-        DocsView: function DocsView() { return chainable(() => undefined); },
+        // As in Google's Picker, a folder can be selected only in a view with
+        // setSelectFolderEnabled(true); otherwise tapping it just opens it.
+        DocsView: function DocsView() {
+          return chainable((key, args) => {
+            if (key === 'setSelectFolderEnabled' && args[0]) window.__fakeGoogle.foldersSelectable = true;
+          });
+        },
         PickerBuilder: function PickerBuilder() {
           let callback;
           return chainable((key, args) => {
@@ -348,16 +355,21 @@ export async function fakeGoogle(page, files) {
             if (key !== 'build') return undefined;
             return { setVisible: (visible) => {
               if (!visible) return;
-              const names = window.__fakeGoogle.pick;
-              Promise.resolve().then(() => callback(names.length
-                ? { action: 'picked', docs: docs.filter((d) => names.includes(d.name)) }
+              const { pick: names, foldersSelectable } = window.__fakeGoogle;
+              const picked = [
+                ...docs.filter((d) => names.includes(d.name)),
+                ...(foldersSelectable ? folderNames.filter((n) => names.includes(n))
+                  .map((n) => ({ id: `drive-folder-${n}`, name: n, mimeType: 'application/vnd.google-apps.folder' })) : []),
+              ];
+              Promise.resolve().then(() => callback(picked.length
+                ? { action: 'picked', docs: picked }
                 : { action: 'cancel', docs: [] }));
             } };
           });
         },
       };
       window.gapi = { load: (name, ready) => { (typeof ready === 'function' ? ready : ready.callback)(); } };
-    }})(${JSON.stringify(shared.map(({ id, name, file }) => ({ id, name, sizeBytes: String(statSync(file).size) })))})`,
+    }})(${JSON.stringify(shared.map(({ id, name, file }) => ({ id, name, sizeBytes: String(statSync(file).size) })))}, ${JSON.stringify(folders)})`,
   }));
   await context.route('https://www.googleapis.com/drive/v3/files/*', async (route) => {
     const request = route.request();
