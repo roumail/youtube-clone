@@ -11,7 +11,7 @@ import {
 import {
   listVideos, importVideo, addStreamed, streamUri, removeVideo, parseTitle,
 } from './library.js';
-import { isStreamed, hideStreamed } from './streamed.js';
+import { hideStreamed } from './streamed.js';
 import {
   playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
   timeUp, seekTo, seekBy,
@@ -27,7 +27,7 @@ const state = {
   settingsUnlocked: false,
   search: '', // library search text (not saved); typing needs the PIN
   searchUnlocked: false, // until the search field loses focus
-  // PIN prompt: { purpose: 'setup' | 'import' | 'drive' | 'settings' | 'play' | 'change' | 'search',
+  // PIN prompt: { purpose: 'setup' | 'import' | 'drive' | 'download' | 'settings' | 'play' | 'change' | 'search',
   //              mode: 'setup' | 'confirm' | 'verify' | 'change', status: 'entry' | 'wrong', error }
   prompt: null,
   newPin: null, // first entry of a new PIN, until it is confirmed
@@ -35,6 +35,8 @@ const state = {
   features: {}, // running optional features, by id (features.js)
   importStatus: { phase: 'idle', progress: 0, message: '' },
   signingIn: null, // a Google sign-in started by the tap that opened a streamed video
+  downloadTarget: null, // the streamed video whose Download asked for the PIN
+  downloading: null, // the streamed video being downloaded (its URI)
 };
 
 function parseRoute(hash) {
@@ -84,7 +86,7 @@ function tile(testid, poster, ...texts) {
 // renews the Google sign-in on this tap if needed, so it is ready by play.
 function openFrom(c, from) {
   state.returnTo = from;
-  state.signingIn = c.playsFrom === 'drive' && !signedIn() ? signIn() : null;
+  state.signingIn = streamsNow(c) ? signInIfNeeded() : null;
   state.signingIn?.catch(() => {}); // a failed sign-in is shown by the player
   go(`#/player/${encodeURIComponent(c.offlineUri)}`);
 }
@@ -93,8 +95,27 @@ function videoTile(c) {
   const li = tile('library-item', c.appMetadata.poster, c.appMetadata.title);
   li.dataset.videoId = c.offlineUri;
   li.dataset.playsFrom = c.playsFrom;
+  downloadControls(li, c);
   li.addEventListener('click', () => openFrom(c, '#/library'));
   return li;
+}
+
+// A streamed video's tile says whether it is downloaded, and offers Download
+// (behind the PIN) while it isn't. Stored videos are already on the device.
+function downloadControls(li, c) {
+  if (c.playsFrom !== 'drive') return;
+  li.dataset.downloaded = c.download ? 'true' : (state.downloading === c.offlineUri ? 'downloading' : 'false');
+  if (li.dataset.downloaded !== 'false') return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.testid = 'download-button';
+  button.textContent = 'Download';
+  button.addEventListener('click', (event) => {
+    event.stopPropagation(); // not opening the video
+    state.downloadTarget = c;
+    askPin('download');
+  });
+  li.append(button);
 }
 
 function seriesTile(name, episodes) {
@@ -112,6 +133,7 @@ function episodeTile(c, hash) {
   const li = tile('episode-item', c.appMetadata?.poster, label);
   li.dataset.videoId = c.offlineUri;
   li.dataset.playsFrom = c.playsFrom;
+  downloadControls(li, c);
   li.addEventListener('click', () => openFrom(c, hash));
   return li;
 }
@@ -139,14 +161,22 @@ function settingsRow(c) {
   const title = document.createElement('span');
   title.textContent = c.appMetadata.title;
   // A stored video's copy can be removed; a streamed one has none, so it can
-  // only be hidden from this device (it stays in Google Drive).
+  // only be hidden from this device (it stays in Google Drive). A streamed
+  // video's download can be removed on its own.
   const streamed = c.playsFrom === 'drive';
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.dataset.testid = streamed ? 'hide-video-button' : 'remove-video-button';
-  button.textContent = streamed ? 'Hide' : 'Remove';
-  button.addEventListener('click', () => (streamed ? onHide : onRemove)(c.offlineUri));
-  li.append(title, button);
+  const button = (testid, text, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.testid = testid;
+    b.textContent = text;
+    b.addEventListener('click', onClick);
+    return b;
+  };
+  li.append(title);
+  if (c.download) li.append(button('remove-download-button', 'Remove download', () => onRemove(c.download)));
+  li.append(streamed
+    ? button('hide-video-button', 'Hide', () => onHide(c))
+    : button('remove-video-button', 'Remove', () => onRemove(c.offlineUri)));
   return li;
 }
 
@@ -301,6 +331,9 @@ async function onPinSubmit(event) {
   if (purpose === 'import') {
     // Still within the tap on "OK", so the browser allows opening the picker.
     $('import-input').click();
+  } else if (purpose === 'download') {
+    // Within the tap too: the download may need a new Google sign-in.
+    downloadVideo(state.downloadTarget, signInIfNeeded());
   } else if (purpose === 'drive') {
     // Also within the tap: Google's sign-in opens a pop-up.
     pickFromDrive((docs, sourceOf) => importItems(docs, sourceOf, addStreamed));
@@ -471,17 +504,23 @@ function initSeek() {
 
 // ---------- streamed videos ----------
 
+// A streamed video that isn't downloaded plays from Google Drive.
+const streamsNow = (c) => c.playsFrom === 'drive' && !c.download;
+const playing = () => state.library.find((c) => c.offlineUri === playerState.offlineUri);
+// Call within a tap: the sign-in in progress, or null if still signed in.
+const signInIfNeeded = () => (signedIn() ? null : signIn());
+
 // Within the play PIN's tap: a streamed video needs a valid Google sign-in.
 // Returns the sign-in in progress, or null when none is needed.
 function signInForPlay() {
-  return isStreamed(playerState.offlineUri) && !signedIn() ? signIn() : null;
+  return streamsNow(playing()) ? signInIfNeeded() : null;
 }
 
 // A streamed video pauses just before the sign-in ends; play with the PIN
 // signs in again (renewing it needs a tap).
 let signInTimer = null;
 function watchSignIn() {
-  if (playerState.status !== 'playing' || !isStreamed(playerState.offlineUri)) {
+  if (playerState.status !== 'playing' || !streamsNow(playing())) {
     clearTimeout(signInTimer);
     signInTimer = null;
   } else if (!signInTimer) {
@@ -581,8 +620,31 @@ async function onRemove(offlineUri) {
   update();
 }
 
-async function onHide(offlineUri) {
-  await hideStreamed(offlineUri);
+// Hiding a streamed video also removes its download, so nothing is left.
+async function onHide(c) {
+  await hideStreamed(c.offlineUri);
+  if (c.download) await removeVideo(c.download);
+  await refreshLibrary();
+  update();
+}
+
+// Download a streamed video: a stored copy for offline viewing, kept with it.
+async function downloadVideo(entry, signing) {
+  const { title } = entry.appMetadata;
+  state.downloading = entry.offlineUri;
+  state.importStatus = { phase: 'storing', progress: 0, message: `Downloading "${title}"…` };
+  update();
+  try {
+    await signing;
+    await importVideo(driveSource(entry.file), (p) => {
+      state.importStatus.progress = p;
+      update();
+    }, entry.offlineUri);
+    state.importStatus = { phase: 'done', progress: 1, message: `Downloaded "${title}".` };
+  } catch (e) {
+    state.importStatus = { phase: 'error', progress: 0, message: `Couldn't download the video: ${e.message}` };
+  }
+  state.downloading = null;
   await refreshLibrary();
   update();
 }
@@ -601,7 +663,9 @@ function onRouteChange() {
     // opened it); otherwise at play, after signing in.
     const signing = state.signingIn;
     state.signingIn = null;
-    if (entry?.playsFrom === 'drive') openVideo(id, true, () => streamFrom(entry, signing), !signing && !signedIn()).then(update);
+    // A downloaded one opens its stored copy.
+    if (entry && streamsNow(entry)) openVideo(id, true, () => streamFrom(entry, signing), !signing && !signedIn()).then(update);
+    else if (entry?.download) openVideo(id, true, async () => entry.download).then(update);
     else openVideo(id, Boolean(entry)).then(update);
   }
   if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
