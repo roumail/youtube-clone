@@ -16,9 +16,10 @@ let picked = new Map();
 export const PICK_SET = ['.mpd', 'video.mp4', 'audio.mp4', 'poster.jpg'];
 
 // ---------- single-file container (.kidsvideo) ----------
-// A .kidsvideo is an uncompressed tar of "<Title>.mpd", video.mp4, audio.mp4
-// and poster.jpg (tools/kidsvideo). We read only the 512-byte headers and hand
-// out each part as a lazy slice of the picked file: nothing is copied.
+// A .kidsvideo (format 2, tools/kidsvideo) is an uncompressed tar of
+// kidsvideo.json ({"format":2,…}, always first), "<Title>.mpd", video.mp4,
+// audio.mp4 and poster.jpg. We read only the 512-byte headers and hand out each
+// part as a lazy slice of the picked file: nothing is copied.
 export const CONTAINER_EXT = '.kidsvideo';
 const isContainer = (f) => f.name.toLowerCase().endsWith(CONTAINER_EXT);
 
@@ -35,7 +36,9 @@ async function readContainer(file) {
     offset = dataStart + Math.ceil(size / 512) * 512;
   }
   if (!parts.length) throw new Error(`${file.name} isn't a readable ${CONTAINER_EXT} file`);
-  return parts;
+  const format = parts[0].name === 'kidsvideo.json' ? JSON.parse(await parts[0].text()).format : 0;
+  if (format !== 2) throw new Error(`${file.name} was made by an older version of the tools: prepare it again`);
+  return parts.slice(1);
 }
 
 export async function expandPick([file]) {

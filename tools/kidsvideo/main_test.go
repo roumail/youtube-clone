@@ -3,6 +3,7 @@ package main
 import (
 	"archive/tar"
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,11 +71,16 @@ func TestPackWritesThePartsInOrderAsPlainUstarWithFixedTimesAndOwners(t *testing
 			break
 		}
 		names = append(names, h.Name)
+		if h.Name == "kidsvideo.json" {
+			if body, _ := io.ReadAll(r); string(body) != `{"format":2,"title":"Frozen 2"}`+"\n" {
+				t.Fatalf("kidsvideo.json %q", body)
+			}
+		}
 		if !h.ModTime.Equal(time.Unix(0, 0)) || h.Uid != 0 || h.Gid != 0 || h.Uname != "" || h.Gname != "" || h.Mode != 0o644 || h.Typeflag != tar.TypeReg {
 			t.Fatalf("%s: header %+v", h.Name, h)
 		}
 	}
-	want := []string{"Frozen 2.mpd", "poster.jpg", "audio.mp4", "video.mp4"}
+	want := []string{"kidsvideo.json", "Frozen 2.mpd", "poster.jpg", "audio.mp4", "video.mp4"}
 	if strings.Join(names, "|") != strings.Join(want, "|") {
 		t.Fatalf("parts %q, want %q", names, want)
 	}
@@ -131,8 +137,12 @@ func TestVerifyRefuses(t *testing.T) {
 		var buf bytes.Buffer
 		w := tar.NewWriter(&buf)
 		for _, p := range parts {
-			w.WriteHeader(&tar.Header{Name: p, Mode: 0o644, Size: 4, Format: tar.FormatUSTAR})
-			w.Write([]byte("data"))
+			data := []byte("data")
+			if p == "kidsvideo.json" {
+				data = []byte(`{"format":2,"title":"x"}`)
+			}
+			w.WriteHeader(&tar.Header{Name: p, Mode: 0o644, Size: int64(len(data)), Format: tar.FormatUSTAR})
+			w.Write(data)
 		}
 		w.Close()
 		return buf.Bytes()
@@ -144,8 +154,9 @@ func TestVerifyRefuses(t *testing.T) {
 	}{
 		{"not a .kidsvideo", "photo.jpg", func(t *testing.T) []byte { return []byte("jpeg") }, "photo.jpg isn't a .kidsvideo file"},
 		{"not a tar inside", "photo.kidsvideo", func(t *testing.T) []byte { return bytes.Repeat([]byte("x"), 2048) }, "photo.kidsvideo isn't a readable .kidsvideo file"},
-		{"no manifest", "x.kidsvideo", func(t *testing.T) []byte { return archive(t, "poster.jpg", "audio.mp4", "video.mp4") }, "expected exactly one .mpd file, got 0"},
-		{"a part missing", "x.kidsvideo", func(t *testing.T) []byte { return archive(t, "x.mpd", "poster.jpg", "video.mp4") }, "missing: audio.mp4"},
+		{"made by the old tools", "x.kidsvideo", func(t *testing.T) []byte { return archive(t, "x.mpd", "poster.jpg", "audio.mp4", "video.mp4") }, "x.kidsvideo was made by an older version of the tools: prepare it again"},
+		{"no manifest", "x.kidsvideo", func(t *testing.T) []byte { return archive(t, "kidsvideo.json", "poster.jpg", "audio.mp4", "video.mp4") }, "expected exactly one .mpd file, got 0"},
+		{"a part missing", "x.kidsvideo", func(t *testing.T) []byte { return archive(t, "kidsvideo.json", "x.mpd", "poster.jpg", "video.mp4") }, "missing: audio.mp4"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			file := filepath.Join(t.TempDir(), c.file)
