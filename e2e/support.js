@@ -305,6 +305,7 @@ export async function fakeGoogle(page, files, folders = []) {
   const served = new Map();
   let otherThanReads = 0;
   let pickedForThisProject = false; // Google remembers it across reloads
+  const held = new Map(); // file name -> a promise its reads wait for
   const token = 'fake-token';
   // As with Google: picked files become readable only by the Cloud project the
   // Picker was opened for, given by its project number (setAppId).
@@ -383,6 +384,7 @@ export async function fakeGoogle(page, files, folders = []) {
       return route.fulfill({ status: 403, json: { error: { code: 403, message: 'The user does not have sufficient permissions for this file.' } } });
     }
     if (dropped.has(entry.name)) return route.abort('connectionreset');
+    await held.get(entry.name);
     const data = readFileSync(entry.file);
     const range = /^bytes=(\d+)-(\d+)$/.exec((await request.headerValue('range')) ?? '');
     const [start, end] = range ? [Number(range[1]), Math.min(Number(range[2]), data.length - 1)] : [0, data.length - 1];
@@ -398,6 +400,12 @@ export async function fakeGoogle(page, files, folders = []) {
     signInWillBeCancelled: () => page.evaluate(() => { window.__fakeGoogle.signIn = 'cancel'; }),
     willPick: (...names) => page.evaluate((n) => { window.__fakeGoogle.pick = n; }, names),
     deny: (name) => denied.add(name),
+    // Reads of this file wait until the returned release() is called.
+    holdReads: (name) => {
+      let release;
+      held.set(name, new Promise((resolve) => { release = resolve; }));
+      return () => { held.delete(name); release(); };
+    },
     dropConnection: (name) => dropped.add(name),
     signIns: () => page.evaluate(() => window.__fakeGoogle.signIns),
     requestsOtherThanReads: () => otherThanReads,

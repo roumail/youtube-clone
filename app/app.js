@@ -37,6 +37,7 @@ const state = {
   signingIn: null, // a Google sign-in started by the tap that opened a streamed video
   downloadTarget: null, // the streamed video whose Download asked for the PIN
   downloading: null, // the streamed video being downloaded (its URI)
+  downloadCancel: null, // AbortController for that download
 };
 
 function parseRoute(hash) {
@@ -208,6 +209,7 @@ function render(s) {
   const bar = $('import-progress');
   bar.hidden = s.importStatus.phase !== 'storing';
   bar.value = s.importStatus.progress;
+  show('cancel-download-button', s.downloading !== null);
 
   // Series: its episodes, in season/episode order
   show('screen-series', s.route.name === 'series');
@@ -629,22 +631,34 @@ async function onHide(c) {
 }
 
 // Download a streamed video: a stored copy for offline viewing, kept with it.
+// Cancel stops it at its next read of Google Drive; nothing of it is kept.
 async function downloadVideo(entry, signing) {
   const { title } = entry.appMetadata;
+  const cancel = new AbortController();
   state.downloading = entry.offlineUri;
+  state.downloadCancel = cancel;
   state.importStatus = { phase: 'storing', progress: 0, message: `Downloading "${title}"…` };
   update();
+  const source = driveSource(entry.file);
+  const read = source.read;
+  source.read = (start, end) => {
+    cancel.signal.throwIfAborted();
+    return read(start, end);
+  };
   try {
     await signing;
-    await importVideo(driveSource(entry.file), (p) => {
+    await importVideo(source, (p) => {
       state.importStatus.progress = p;
       update();
     }, entry.offlineUri);
     state.importStatus = { phase: 'done', progress: 1, message: `Downloaded "${title}".` };
   } catch (e) {
-    state.importStatus = { phase: 'error', progress: 0, message: `Couldn't download the video: ${e.message}` };
+    state.importStatus = cancel.signal.aborted
+      ? { phase: 'idle', progress: 0, message: 'Download cancelled.' }
+      : { phase: 'error', progress: 0, message: `Couldn't download the video: ${e.message}` };
   }
   state.downloading = null;
+  state.downloadCancel = null;
   await refreshLibrary();
   update();
 }
@@ -710,6 +724,7 @@ async function boot() {
     importItems(files, pickedSource, importVideo);
   });
   $('add-from-drive-button').addEventListener('click', () => askPin('drive'));
+  $('cancel-download-button').addEventListener('click', () => state.downloadCancel.abort());
   $('play-button').addEventListener('click', onPlayRequested);
   $('pause-button').addEventListener('click', onPause);
   $('change-pin-button').addEventListener('click', () => askPin('change'));

@@ -3,7 +3,8 @@
 // connection, like a stored one. A download is short-lived and may be lost
 // (the browser can clear it, or the parent removes it); the video then simply
 // streams again. Only streamed videos offer Download: a stored video is
-// already on the device. Google is faked at the network boundary.
+// already on the device. A download can be cancelled while it runs.
+// Google is faked at the network boundary.
 // Not @ipad, for the same reason as add-from-drive.spec.js.
 import {
   test, expect, goto, enterPin, openVideo, startPlaying, expectPlaying, fixtureContainer, fakeGoogle, freeSpace,
@@ -92,6 +93,33 @@ test.describe('Feature: Download a streamed video', () => {
     await test.step('Then its progress is shown until it is done', async () => {
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', /downloading|true/);
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'true');
+    });
+  });
+
+  test('Scenario: a download can be cancelled; nothing of it is kept, and it still streams', async ({ page, pinSet }) => {
+    const google = await fakeGoogle(page, shared());
+    let release;
+    await test.step('Given "medium" is streamed', async () => {
+      await goto(page, '#/library');
+      await streamFromDrive(page, google, 'medium.kidsvideo');
+    });
+    await test.step('When I download it and tap Cancel while it downloads', async () => {
+      release = google.holdReads('medium.kidsvideo');
+      await download(page, 'medium');
+      await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'downloading');
+      await page.getByTestId('cancel-download-button').tap();
+      release();
+    });
+    await test.step('Then the download says it was cancelled, and nothing of it is kept', async () => {
+      await expect(page.getByTestId('import-status')).toHaveText('Download cancelled.');
+      await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'false');
+      await expect(page.getByTestId('cancel-download-button')).toBeHidden();
+      await expect.poll(() => page.evaluate(async () => {
+        const storage = new shaka.offline.Storage();
+        const n = (await storage.list()).length;
+        await storage.destroy();
+        return n;
+      })).toBe(0);
     });
   });
 
