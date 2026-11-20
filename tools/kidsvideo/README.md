@@ -5,7 +5,9 @@ the same way on a Mac and on Linux (and in the Docker image). It grows in
 stages; each stage replaces a shell script, which is deleted once that stage's
 tests pass on the synthetic fixtures (`fixtures/generate.sh`).
 
-**Built today:** stage 1. Stages 2–4 are specified, not built: their tests are
+**Built today:** stages 1 and 2 (tests: `main_test.go`, `prepare_test.go`, with
+ffprobe, ffmpeg and the packager faked; the real ones run in CI through
+`fixtures/generate.sh`). Stages 3–4 are specified, not built: their tests are
 in `prepare_spec_test.go` and skip with "not built yet" (the Go equivalent of
 the app's `test.fixme`). Building a stage means removing those skips and
 implementing until `go test` is green.
@@ -13,20 +15,22 @@ implementing until `go test` is green.
 | Stage | Command | Replaces | Status |
 |---|---|---|---|
 | 1 | `kidsvideo pack <parts-folder>`, `kidsvideo verify <file>` | `tools/pack.sh` | built |
-| 2 | `kidsvideo prepare <video> --dest DIR` | `tools/prepare.sh` | specified |
+| 2 | `kidsvideo prepare --dest DIR <video>` | `tools/prepare.sh` (deleted) | built |
 | 3 | `kidsvideo prepare <videos and folders…>` with titles and series | `tools/run_prepare.sh` | specified |
 | 4 | the pinned Shaka Packager, downloaded and checked by the tool | `tools/get-packager.sh` | specified |
 
 ## Stage 2: prepare one video
 
-`kidsvideo prepare <video> --dest DIR [--title T] [--dry-run]` writes
+`kidsvideo prepare [--title T] [--dry-run] --dest DIR <video>` writes
 `DIR/<Title>.kidsvideo` (format 2, as `pack` writes it). It calls `ffprobe`,
 `ffmpeg` and Shaka Packager as programs; it does not reimplement them.
 
 - **Audio track:** the first English one (language en / eng / english),
   otherwise the first. A video without audio is refused.
-- **Size target** (minimal storage): video H.264 at most 720p and 1.2 Mbit/s;
-  audio AAC stereo at 96 kbit/s. A track already within it is copied;
+- **Size target** (minimal storage, about 0.35 GB per hour): video H.264 at
+  most 540p and 0.7 Mbit/s; audio AAC stereo at 64 kbit/s. (Until v5.2 it was
+  720p / 1.2 Mbit/s / 96 kbit/s; files made then keep playing, so a library can
+  mix both.) A track already within it is copied;
   anything else is re-encoded. An unknown bitrate counts as above the target.
   A container other than mp4 / m4v / mov is always re-encoded.
 - **Parts:** `video.mp4` and `audio.mp4` from Shaka Packager, `<Title>.mpd`,
@@ -43,7 +47,7 @@ implementing until `go test` is green.
 
 `kidsvideo prepare [--dest DIR] [--title T] [--series NAME] <videos and folders…>`
 
-- **Inputs:** files and folders; folders are searched recursively for
+- **Inputs:** files and folders (until then, `tools/run_prepare.sh` does this and calls stage 2 per video); folders are searched recursively for
   .mp4 .m4v .mov .mkv .webm .avi. With no inputs, paths are read from stdin,
   one per line.
 - **Destination:** `--dest`, else `KIDS_LIBRARY` from the environment, else

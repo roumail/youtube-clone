@@ -12,9 +12,28 @@ Kids Library/
 A `.kidsvideo` (format 2) is a plain, uncompressed `tar`: a small
 `kidsvideo.json` first (format and title), then the 4 parts the app needs
 (`<Title>.mpd`, `video.mp4`, `audio.mp4`, `poster.jpg`). The app refuses files
-made by older versions of the tools; prepare those again. Send it to the iPad or
-iPhone (AirDrop, or any way that puts it in Files) and add it in the app; see
-the main README.
+made by older versions of the tools; prepare those again.
+
+## From a new video to the iPad
+
+The library folder is normally the shelf: a "Kids Library" folder in Google
+Drive, synced by Google Drive for desktop (see the main README).
+
+1. Put the source video in `originals/` in this repo folder (gitignored), e.g.
+   `originals/Films/`: it stays there, to prepare again later if needed.
+2. Prepare it (once, the setup below):
+   ```bash
+   tools/run_prepare.sh "originals/Films/<the file>"           # title from the file name
+   tools/run_prepare.sh --title "Frozen 2" "originals/Films/<the file>"
+   tools/run_prepare.sh --series "Kipper the Dog" "originals/Kipper the Dog"
+   ```
+   Add `--tmux` for a long film: it keeps running after the terminal closes.
+3. Google Drive for desktop uploads `Kids Library/<Title>.kidsvideo` (or
+   `Kids Library/<Series>/...`); its menu-bar icon says when it's done.
+4. In the app: Add from Google Drive → pick the file, or pick the series'
+   folder again: only the new episodes are added.
+
+Without Google Drive, AirDrop the file to the iPad or iPhone and use Add video.
 
 There are two ways to run the preparation: with Docker on any computer, or
 directly on a Mac or Linux machine. Both run the same `tools/run_prepare.sh`,
@@ -171,15 +190,16 @@ Kids Library/
   On the iPad, pick the episode's `.kidsvideo` file.
 
 ### What it does
-- For each video, runs `tools/prepare.sh`, which:
+- For each video, runs `kidsvideo prepare` (the Go tool in `tools/kidsvideo/`,
+  which `run_prepare.sh` builds when Go is installed), which:
   - picks the **English** audio track if there are several (otherwise the first);
-  - keeps each video small, to save space on the devices: at most 720p, video
-    at most 1.2 Mbit/s (H.264), stereo audio at 96 kbit/s, so at most about
-    0.6 GB per hour. A track already within that is copied (seconds); anything
-    else is re-encoded (a film can take a while, done once);
-  - writes one `<Title>.kidsvideo` file (via `tools/kidsvideo`, a small Go tool
-    that `run_prepare.sh` builds; `kidsvideo verify <file>` checks a file the way
-    the app reads it).
+  - keeps each video small, to save space: at most 540p, video at most
+    0.7 Mbit/s (H.264), stereo audio at 64 kbit/s, so about 0.35 GB per hour.
+    A track already within that is copied (seconds); anything else is
+    re-encoded (a film can take a while, done once). Videos prepared earlier at
+    720p keep playing: there's no need to prepare them again;
+  - writes one `<Title>.kidsvideo` file, all or nothing (`kidsvideo verify
+    <file>` checks a file the way the app reads it).
 - **Skips** videos already prepared in the destination, so re-running a batch
   is safe.
 - Keeps going if one video fails, and prints a summary at the end
@@ -197,11 +217,11 @@ data (home-folder paths, email addresses), `.env` files, video files and files
 over 2 MB. If `gitleaks` is installed (`brew install gitleaks`) it runs too.
 
 ## Lower-level tools
-- `tools/kidsvideo/` — the Go tool that packs and checks `.kidsvideo` files.
-  It is planned to take over `prepare.sh`, `run_prepare.sh` and
-  `get-packager.sh` in stages; see `tools/kidsvideo/README.md`.
-- `tools/prepare.sh <video> [output-root]` — prepares exactly one video
-  (default output: `./prepared`, gitignored). `run_prepare.sh` calls this.
+- `tools/bin/kidsvideo prepare [--title T] [--dry-run] --dest DIR <video>` —
+  prepares exactly one video; `--dry-run` says, per track, whether it would be
+  copied or re-encoded. `run_prepare.sh` calls this. The Go tool also packs and
+  checks `.kidsvideo` files, and is planned to take over `run_prepare.sh` and
+  `get-packager.sh` too; see `tools/kidsvideo/README.md`.
 - `tools/get-packager.sh` — downloads the pinned Shaka Packager into
   `tools/bin/` (gitignored).
 - `node tools/real-episode-check.mjs "<Kids Library>/<Title>.kidsvideo"` — adds and plays a

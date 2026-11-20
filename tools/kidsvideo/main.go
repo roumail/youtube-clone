@@ -4,6 +4,7 @@
 // reads the parts straight out of it (app/local-scheme.js) and refuses files
 // made by older tools, which have no kidsvideo.json.
 //
+//	kidsvideo prepare --dest DIR <video>     a source video -> "DIR/<Title>.kidsvideo" (prepare.go)
 //	kidsvideo pack <prepared-parts-folder>   "<dir>/Frozen 2" -> "<dir>/Frozen 2.kidsvideo"
 //	kidsvideo verify <file.kidsvideo>        checks it the way the app reads it
 //
@@ -40,9 +41,18 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
+const usage = "usage: kidsvideo prepare [--title T] [--dry-run] --dest DIR <video> | kidsvideo pack <prepared-parts-folder> | kidsvideo verify <file.kidsvideo>"
+
 func run(args []string, stdout, stderr io.Writer) int {
+	return runWith(args, stdout, stderr, realTools())
+}
+
+func runWith(args []string, stdout, stderr io.Writer, tools toolset) int {
+	if len(args) > 0 && args[0] == "prepare" {
+		return runPrepare(args[1:], stdout, stderr, tools)
+	}
 	if len(args) != 2 || (args[0] != "pack" && args[0] != "verify") {
-		fmt.Fprintln(stderr, "usage: kidsvideo pack <prepared-parts-folder> | kidsvideo verify <file.kidsvideo>")
+		fmt.Fprintln(stderr, usage)
 		return 2
 	}
 	var msg string

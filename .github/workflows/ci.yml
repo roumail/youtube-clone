@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: fixtures/out
-          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'Dockerfile', '.dockerignore', 'tools/run_prepare.sh', 'tools/prepare.sh', 'tools/kidsvideo/go.mod', 'tools/kidsvideo/main.go', 'tools/get-packager.sh', '.github/workflows/ci.yml') }}
+          key: fixtures-${{ hashFiles('fixtures/generate.sh', 'Dockerfile', '.dockerignore', 'tools/run_prepare.sh', 'tools/kidsvideo/go.mod', 'tools/kidsvideo/main.go', 'tools/kidsvideo/prepare.go', 'tools/get-packager.sh', '.github/workflows/ci.yml') }}
 
       - name: Restore the preparation image (keyed on its files)
         if: steps.fx-cache.outputs.cache-hit != 'true'
@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/kids-prepare.tar
-          key: prep-image-${{ hashFiles('Dockerfile', '.dockerignore', 'tools/run_prepare.sh', 'tools/prepare.sh', 'tools/kidsvideo/go.mod', 'tools/kidsvideo/main.go', 'tools/get-packager.sh') }}
+          key: prep-image-${{ hashFiles('Dockerfile', '.dockerignore', 'tools/run_prepare.sh', 'tools/kidsvideo/go.mod', 'tools/kidsvideo/main.go', 'tools/kidsvideo/prepare.go', 'tools/get-packager.sh') }}
 
       - name: Build the preparation image
         if: steps.fx-cache.outputs.cache-hit != 'true' && steps.img-cache.outputs.cache-hit != 'true'
@@ -52,7 +52,7 @@ jobs:
         if: steps.fx-cache.outputs.cache-hit != 'true' && steps.img-cache.outputs.cache-hit == 'true'
         run: docker load -i "$RUNNER_TEMP/kids-prepare.tar"
 
-      - name: Generate fixtures (via tools/prepare.sh, in the preparation image)
+      - name: Generate fixtures (via kidsvideo prepare, in the preparation image)
         if: steps.fx-cache.outputs.cache-hit != 'true'
         run: >-
           docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo

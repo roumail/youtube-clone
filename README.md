@@ -158,7 +158,8 @@ A streamed video goes through the same player, reading byte ranges of its
 (Shaka plays DASH, not plain `.mp4`), into one `.kidsvideo` file on the shelf,
 so the iPad and iPhone never process anything. Tools: the pinned Shaka Packager
 binary (repackages without re-encoding) and ffmpeg (re-encodes whatever is above
-the size target of 720p, 1.2 Mbit/s and stereo audio, and grabs the poster). No
+the size target of 540p, 0.7 Mbit/s and 64 kbit/s stereo audio, and grabs the
+poster); the Go tool `tools/kidsvideo` drives them and packs the file. No
 Python anywhere.
 
 **Stack:** plain HTML, CSS and JavaScript modules, no framework, no build step.
