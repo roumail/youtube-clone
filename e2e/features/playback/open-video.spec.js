@@ -17,7 +17,7 @@ test.describe('Feature: Open a video', () => {
     });
   });
 
-  test('Scenario: an opened video is paused at the start', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: an opened video is paused at the start @ipad', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
