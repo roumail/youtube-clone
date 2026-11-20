@@ -171,8 +171,10 @@ Kids Library/
 ### What it does
 - For each video, runs `tools/prepare.sh`, which:
   - picks the **English** audio track if there are several (otherwise the first);
-  - re-encodes only when needed (not H.264 + AAC, or not MP4/MOV), otherwise
-    just repackages, which is fast;
+  - keeps each video small, to save space on the devices: at most 720p, video
+    at most 1.2 Mbit/s (H.264), stereo audio at 96 kbit/s, so at most about
+    0.6 GB per hour. A track already within that is copied (seconds); anything
+    else is re-encoded (a film can take a while, done once);
   - writes one `<Title>.kidsvideo` file (via `tools/pack.sh`).
 - **Skips** videos already prepared in the destination, so re-running a batch
   is safe.
