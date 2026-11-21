@@ -47,6 +47,13 @@
       <ul class="grid" data-role="episode-grid"></ul>
     </section>
 
+    <!-- Selecting videos to play in a row: shown on the library and series screens. -->
+    <div class="selection-bar" data-testid="selection-bar" hidden>
+      <span data-testid="selection-count"></span>
+      <button type="button" data-testid="selection-cancel">Cancel</button>
+      <button type="button" data-testid="selection-play">Play</button>
+    </div>
+
     <section data-testid="screen-player" data-state="loading" hidden>
       <header><button type="button" data-testid="back-button">Back</button></header>
       <video data-testid="player-video" playsinline disablepictureinpicture disableremoteplayback></video>
