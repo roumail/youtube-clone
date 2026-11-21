@@ -64,7 +64,14 @@ make_raw broken-missing-audio 3
   -f lavfi -i "sine=frequency=440:sample_rate=48000:duration=3" \
   -map 0:v -map 1:a -c:v copy -c:a aac -ac 6 -b:a 384k -shortest "$RAW/surround.mp4"
 
-for name in tiny medium broken-missing-audio episode-like long surround; do
+# "prepared-earlier": "tiny" as kidsvideo prepare re-encoded it before CRF 28
+# with -tune animation (CRF 26, no tune). Within the size target, so prepare
+# copies it as it is: such videos must keep playing.
+"$FFMPEG" -hide_banner -loglevel error -y -i "$RAW/tiny.mp4" -map 0:v:0 -map 0:a:0 \
+  -c:v libx264 -preset slow -crf 26 -maxrate 700k -bufsize 1400k -pix_fmt yuv420p \
+  -c:a aac -b:a 64k -ac 2 -movflags +faststart "$RAW/prepared-earlier.mp4"
+
+for name in tiny medium broken-missing-audio episode-like long surround prepared-earlier; do
   prepare "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 
@@ -164,6 +171,14 @@ grep -q 'AudioChannelConfiguration[^>]*value="2"' "$OUT/surround/surround.mpd" \
   || { echo "size target: surround audio not stereo" >&2; exit 1; }
 (( $(kbps "$OUT/surround/audio.mp4" "$(seconds "$OUT/surround/surround.mpd")") <= 80 )) \
   || { echo "size target: surround audio above 64 kbit/s" >&2; exit 1; }
+
+# Encoder settings, as x264 records them in the video: "episode-like" is
+# re-encoded now (CRF 28, tuned for animation: psy_rd 0.40), "prepared-earlier"
+# kept its earlier CRF 26.
+grep -aq 'crf=28.0' "$OUT/episode-like/video.mp4" && grep -aq 'psy_rd=0.40' "$OUT/episode-like/video.mp4" \
+  || { echo "encoder: episode-like not re-encoded at CRF 28 tuned for animation" >&2; exit 1; }
+grep -aq 'crf=26.0' "$OUT/prepared-earlier/video.mp4" \
+  || { echo "encoder: prepared-earlier not kept at CRF 26" >&2; exit 1; }
 
 grep -q 'lang="en"' "$OUT/episode-like/episode-like.mpd" \
   || { echo "kidsvideo prepare did not pick the English audio track" >&2; exit 1; }
