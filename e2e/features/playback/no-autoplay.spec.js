@@ -1,4 +1,5 @@
-// Feature: No autoplay — nothing ever starts by itself.
+// Feature: No autoplay — a video played alone never starts another one.
+// (Only a playlist plays its next video: see playlist.spec.js.)
 import { test, expect, goto, openVideo, startPlaying, expectNotPlaying, playerState } from '../../support.js';
 
 test.describe('Feature: No autoplay', () => {

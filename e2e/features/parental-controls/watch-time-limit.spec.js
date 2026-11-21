@@ -136,6 +136,43 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
+  test.fixme('Scenario: when the budget runs out in a playlist, it stops, and the PIN with more time lets it go on', async ({ page, pinSet, seedLibrary }) => {
+    await enableWatchTime(page);
+    await test.step('Given a session with 1 second of budget left, and "medium" then "tiny" playing as a playlist', async () => {
+      await page.addInitScript(() => localStorage.setItem('watchTime.session', JSON.stringify({ budget: 1800, used: 1799 })));
+      await page.clock.install();
+      await goto(page, '#/library');
+      await seedLibrary('medium', 'tiny');
+      const medium = page.getByTestId('library-item').filter({ hasText: 'medium' });
+      await medium.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true, button: 0 });
+      await page.clock.runFor(600);
+      await medium.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true, button: 0 });
+      await medium.dispatchEvent('click');
+      await page.getByTestId('library-item').filter({ hasText: 'tiny' }).tap();
+      await page.getByTestId('selection-play').tap();
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
+      await expectPlaying(page);
+    });
+    await test.step('Then "medium" pauses with "Time is up"', async () => {
+      await expect(playerState(page)).toHaveAttribute('data-state', 'time-up');
+      await expectNotPlaying(page);
+    });
+    await test.step('When I tap play, enter the PIN and give 30 more minutes', async () => {
+      await page.getByTestId('play-button').click();
+      await enterPin(page, PIN);
+      await page.getByTestId('budget-option-30').click();
+      await expectPlaying(page);
+    });
+    await test.step('Then at the end of "medium", "tiny" plays next with no PIN asked', async () => {
+      await page.getByTestId('seek-bar').fill('58');
+      const tiny = await page.getByTestId('library-item').filter({ hasText: 'tiny' }).getAttribute('data-video-id');
+      await expect.poll(() => decodeURIComponent(page.url()).endsWith(`#/player/${tiny}`)).toBe(true);
+      await expectPlaying(page);
+      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+    });
+  });
+
   test('Scenario: one budget across all videos', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given I watched part of "medium" in a session and went back', async () => {
