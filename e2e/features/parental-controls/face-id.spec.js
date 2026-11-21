@@ -52,7 +52,7 @@ async function switchFaceIdOn(page) {
 }
 
 test.describe('Feature: Face ID / Touch ID (optional)', () => {
-  test.fixme('Scenario: off by default: the PIN prompt asks for the PIN only', async ({ page, pinSet }) => {
+  test('Scenario: off by default: the PIN prompt asks for the PIN only', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given a fresh install on a device with Face ID', async () => {
       await goto(page, '#/library');
@@ -67,7 +67,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: switching it on in Settings sets up Face ID, and it sticks', async ({ page, pinSet }) => {
+  test('Scenario: switching it on in Settings sets up Face ID, and it sticks', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Settings is unlocked with the PIN', async () => {
       await goto(page, '#/library');
@@ -89,7 +89,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: if setting it up fails or is cancelled, it stays off', async ({ page, pinSet }) => {
+  test('Scenario: if setting it up fails or is cancelled, it stays off', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Settings is unlocked, and Face ID will fail', async () => {
       await goto(page, '#/library');
@@ -115,7 +115,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     ['typing in search', async () => {}, (page) => page.getByTestId('search-input').click(),
       (page) => expect(page.getByTestId('search-input')).toHaveAttribute('data-state', 'unlocked')],
   ]) {
-    test.fixme(`Scenario: with it on, Face ID answers the PIN prompt for ${action}`, async ({ page, pinSet, seedLibrary }) => {
+    test(`Scenario: with it on, Face ID answers the PIN prompt for ${action}`, async ({ page, pinSet, seedLibrary }) => {
       const device = await faceIdDevice(page);
       await test.step('Given Face ID is on, and "tiny" is stored', async () => {
         await goto(page, '#/library');
@@ -135,7 +135,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   }
 
-  test.fixme('Scenario: when Face ID fails or is cancelled, the PIN still works, and Face ID can be tried again', async ({ page, pinSet }) => {
+  test('Scenario: when Face ID fails or is cancelled, the PIN still works, and Face ID can be tried again', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID is on, and it will fail', async () => {
       await goto(page, '#/library');
@@ -156,7 +156,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: a failed Face ID is not a wrong PIN', async ({ page, pinSet }) => {
+  test('Scenario: a failed Face ID is not a wrong PIN', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID is on, and it will fail', async () => {
       await goto(page, '#/library');
@@ -174,7 +174,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: during a lockout Face ID is not offered either', async ({ page, pinSet }) => {
+  test('Scenario: during a lockout Face ID is not offered either', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID is on, and the PIN prompt is locked out after 5 wrong PINs', async () => {
       await goto(page, '#/library');
@@ -192,7 +192,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: if the passkey was deleted from the device, the PIN works, and switching off and on sets it up again', async ({ page, pinSet }) => {
+  test('Scenario: if the passkey was deleted from the device, the PIN works, and switching off and on sets it up again', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID is on, and its passkey was then deleted (e.g. in Passwords)', async () => {
       await goto(page, '#/library');
@@ -217,7 +217,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: switching it off goes back to the PIN only', async ({ page, pinSet }) => {
+  test('Scenario: switching it off goes back to the PIN only', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID is on', async () => {
       await goto(page, '#/library');
@@ -238,7 +238,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: a device without Face ID or Touch ID does not offer it', async ({ page, pinSet }) => {
+  test('Scenario: a device without Face ID or Touch ID does not offer it', async ({ page, pinSet }) => {
     await test.step('Given a device without Face ID or Touch ID, and Settings is unlocked', async () => {
       await goto(page, '#/library');
       await openSettings(page);
@@ -248,7 +248,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: if the device refuses to start playback after Face ID, Play shows again', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: if the device refuses to start playback after Face ID, Play shows again', async ({ page, pinSet, seedLibrary }) => {
     await faceIdDevice(page);
     await test.step('Given Face ID is on, "tiny" is open, and the device will refuse the next start of playback', async () => {
       await goto(page, '#/library');

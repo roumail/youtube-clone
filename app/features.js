@@ -7,7 +7,29 @@ const FLAGS_KEY = 'features';
 export const FEATURES = [
   // On by default (owner decision 2026-11-19); a parent can switch it off.
   { id: 'watchTimeLimit', title: 'Watch-time limit', default: true, load: () => import('./features/watch-time.js') },
+  // Off by default; switching it on sets up Face ID / Touch ID on this device.
+  {
+    id: 'faceId',
+    title: 'Face ID / Touch ID',
+    default: false,
+    available: async () => !!(await window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable()),
+    load: () => import('./features/face-id.js'),
+  },
 ];
+
+/** Features this device can't offer (their switch isn't shown). */
+export async function unavailable() {
+  const out = new Set();
+  for (const f of FEATURES) {
+    if (!(await f.available?.() ?? true)) out.add(f.id);
+  }
+  return out;
+}
+
+/** Before a feature is switched on: its own setup, if it has one. Throws if that fails. */
+export async function setUp(id) {
+  await (await FEATURES.find((f) => f.id === id).load()).setUp?.();
+}
 
 const defaults = () => Object.fromEntries(FEATURES.map((f) => [f.id, !!f.default]));
 

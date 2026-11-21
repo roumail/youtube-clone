@@ -4,7 +4,7 @@
 const CACHE = 'app-v2';
 const SHELL = [
   './', './index.html', './styles.css', './app.js', './library.js', './pin.js', './player.js',
-  './local-scheme.js', './drive.js', './streamed.js', './features.js', './features/watch-time.js', './vendor/shaka-player-5.3.5.compiled.js',
+  './local-scheme.js', './drive.js', './streamed.js', './features.js', './features/watch-time.js', './features/face-id.js', './vendor/shaka-player-5.3.5.compiled.js',
   './manifest.webmanifest', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
 ];
 
