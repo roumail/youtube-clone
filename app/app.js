@@ -16,7 +16,9 @@ import {
   playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
   timeUp, seekTo, seekBy,
 } from './player.js';
-import { FEATURES, flags, setFlag, loadEnabled, start as startFeature } from './features.js';
+import {
+  FEATURES, flags, setFlag, loadEnabled, start as startFeature, unavailable as unavailableFeatures, setUp as setUpFeature,
+} from './features.js';
 
 const $ = (testid, root = document) => root.querySelector(`[data-testid="${testid}"]`);
 
@@ -33,6 +35,7 @@ const state = {
   newPin: null, // first entry of a new PIN, until it is confirmed
   returnTo: '#/library', // where the player's Back goes (the library or a series list)
   features: {}, // running optional features, by id (features.js)
+  unavailable: new Set(), // optional features this device can't offer
   jobs: [], // adds and downloads, one row each: { phase: 'storing' | 'done' | 'error' | 'cancelled', progress, message, cancel }
   signingIn: null, // a Google sign-in started by the tap that opened a streamed video
   downloadTarget: null, // the streamed video whose Download asked for the PIN
@@ -271,6 +274,7 @@ function askPin(purpose) {
   $('pin-input').value = '';
   update();
   $('pin-input').focus();
+  for (const f of Object.values(state.features)) f.promptOpened?.();
 }
 
 async function onPinSubmit(event) {
@@ -316,6 +320,11 @@ async function onPinSubmit(event) {
     return update();
   }
   recordSuccess();
+  return acceptPrompt(prompt);
+}
+
+// The prompt was answered: by the right PIN, or by an optional feature (Face ID).
+async function acceptPrompt(prompt) {
   const { purpose } = prompt;
   if (purpose === 'change') {
     Object.assign(prompt, { mode: 'change', status: 'entry', error: '' });
@@ -356,7 +365,7 @@ async function onPinSubmit(event) {
 function featureSettings(s) {
   const on = flags();
   const rows = [];
-  for (const f of FEATURES) {
+  for (const f of FEATURES.filter((x) => !s.unavailable.has(x.id))) {
     const label = document.createElement('label');
     label.className = 'feature-toggle';
     const box = document.createElement('input');
@@ -372,6 +381,13 @@ function featureSettings(s) {
 }
 
 async function onFeatureToggle(id, on) {
+  if (on) {
+    try {
+      await setUpFeature(id);
+    } catch {
+      return update(); // its setup failed or was cancelled: it stays off
+    }
+  }
   setFlag(id, on);
   if (on && !state.features[id]) state.features[id] = await startFeature(id, featureContext());
   if (!on && state.features[id]) { state.features[id].stop(); delete state.features[id]; }
@@ -379,7 +395,14 @@ async function onFeatureToggle(id, on) {
 }
 
 function featureContext() {
-  return { $, playerState, timeUp, changed: () => update() };
+  return {
+    $, playerState, timeUp, changed: () => update(),
+    prompt: () => pinPromptFor(state),
+    answerPrompt: () => {
+      recordSuccess();
+      return acceptPrompt(state.prompt);
+    },
+  };
 }
 
 // ---------- seek (M8) ----------
@@ -768,7 +791,7 @@ function onRouteChange() {
   }
   if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
   if (state.route.name === 'settings' && !state.settingsUnlocked && state.pinSet) {
-    state.prompt = { purpose: 'settings', mode: 'verify', status: 'entry', error: '' };
+    askPin('settings');
   } else if (state.prompt?.purpose === 'settings') {
     state.prompt = null;
   }
@@ -833,6 +856,7 @@ async function boot() {
   // One user, no UI: just ask the browser to keep the library.
   navigator.storage.persist();
 
+  state.unavailable = await unavailableFeatures();
   state.features = await loadEnabled(featureContext());
 
   state.pinSet = hasPin();

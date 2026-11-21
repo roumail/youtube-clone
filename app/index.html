@@ -103,6 +103,8 @@
         <input data-testid="pin-input" type="password" inputmode="numeric" autocomplete="off" maxlength="6">
         <p data-testid="pin-error" hidden></p>
         <div class="pin-actions">
+          <!-- Optional feature "faceId" (features/face-id.js) -->
+          <button type="button" data-testid="pin-faceid-button" hidden>Use Face ID</button>
           <button type="button" data-testid="pin-cancel">Cancel</button>
           <button type="submit" data-testid="pin-submit">OK</button>
         </div>
