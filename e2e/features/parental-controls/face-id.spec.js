@@ -51,6 +51,7 @@ async function openSettings(page) {
 async function switchFaceIdOn(page) {
   await openSettings(page);
   await toggle(page).check();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('features')).faceId)).toBe(true);
   await expect(toggle(page)).toBeChecked();
   await page.getByTestId('screen-settings').getByTestId('back-button').click();
 }
@@ -82,7 +83,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
     await test.step('Then it is on, with one passkey for this app on this device', async () => {
       await expect(toggle(page)).toBeChecked();
-      expect(await device.passkeys()).toBe(1);
+      await expect.poll(() => device.passkeys()).toBe(1);
     });
     await test.step('And after a reload it is still on, and Face ID opens Settings', async () => {
       await page.reload();
@@ -213,8 +214,10 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
     await test.step('And switching it off and on again sets up a new passkey that works', async () => {
       await toggle(page).uncheck();
+      await expect(toggle(page)).not.toBeChecked();
       await toggle(page).check();
-      expect(await device.passkeys()).toBe(1);
+      await expect.poll(() => device.passkeys()).toBe(1);
+      await expect(toggle(page)).toBeChecked();
       await page.getByTestId('screen-settings').getByTestId('back-button').click();
       await page.getByTestId('settings-button').click();
       await expect(page.getByTestId('screen-settings')).toBeVisible();

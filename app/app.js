@@ -791,7 +791,7 @@ function onRouteChange() {
   }
   if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
   if (state.route.name === 'settings' && !state.settingsUnlocked && state.pinSet) {
-    state.prompt = { purpose: 'settings', mode: 'verify', status: 'entry', error: '' };
+    askPin('settings');
   } else if (state.prompt?.purpose === 'settings') {
     state.prompt = null;
   }
