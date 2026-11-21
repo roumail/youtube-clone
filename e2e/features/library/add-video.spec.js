@@ -1,7 +1,9 @@
 // Feature: Add a video — behind the PIN; pick the video's one .kidsvideo file.
 // The title is the .mpd file name.
 import { readFileSync } from 'node:fs';
-import { test, expect, goto, enterPin, expectPlaying, fixtureContainer, fixtureParts, PIN, WRONG_PIN } from '../../support.js';
+import {
+  test, expect, goto, enterPin, expectPlaying, fixtureContainer, fixtureParts, openVideo, startPlaying, PIN, WRONG_PIN,
+} from '../../support.js';
 
 test.describe('Feature: Add a video', () => {
   test('Scenario: PIN, pick the .kidsvideo, it appears in the library @ipad', async ({ page, pinSet }) => {
@@ -41,6 +43,28 @@ test.describe('Feature: Add a video', () => {
     await test.step('Then both are listed', async () => {
       await expect(page.getByTestId('library-item')).toHaveCount(2);
     });
+  });
+
+  // Encoder settings change over time (now CRF 28 tuned for animation); videos
+  // prepared earlier stay in people's libraries and on the shelf.
+  test('Scenario: a video prepared now and one prepared earlier both add and play @ipad', async ({ page, pinSet }) => {
+    await test.step('Given the library is empty', async () => {
+      await goto(page, '#/library');
+    });
+    const chooser = page.waitForEvent('filechooser');
+    await test.step('When I add "episode-like" (prepared now) and "prepared-earlier"', async () => {
+      await page.getByTestId('add-video-button').tap();
+      await enterPin(page, PIN);
+      await (await chooser).setFiles([fixtureContainer('episode-like'), fixtureContainer('prepared-earlier')]);
+      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
+    });
+    for (const title of ['episode-like', 'prepared-earlier']) {
+      await test.step(`Then "${title}" plays`, async () => {
+        await goto(page, '#/library');
+        await openVideo(page, title);
+        await startPlaying(page);
+      });
+    }
   });
 
   test('Scenario: a wrong PIN opens no file picker', async ({ page, pinSet }) => {
