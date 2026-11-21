@@ -20,7 +20,7 @@ This file says *how* to work here.
 Each installation's users are the parents plus a child watching. The PIN prompt is the only access
 control; there are no logins, accounts or roles, and none are planned.
 Out of scope unless the owner asks for it:
-- playlists, recommendations, history
+- saved playlists, recommendations, history
 - playback speed, subtitles, volume UI (hardware buttons only)
 - next / previous buttons in the player (not wanted)
 - accounts, sync, multiple profiles; cloud beyond streaming from Google Drive

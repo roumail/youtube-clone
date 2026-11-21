@@ -2,7 +2,8 @@
 
 A PIN-gated video library for a family's Mac, iPad and iPhone: an installable
 web app (PWA). Videos are prepared once on the Mac into `.kidsvideo` files.
-Pausing is free; playing needs the PIN every time; nothing plays by itself.
+Pausing is free; playing needs the PIN every time; nothing plays by itself,
+except the next video of a playlist a parent started with the PIN.
 
 **Two words used throughout:**
 - **The shelf:** where the prepared videos live, normally a "Kids Library"
@@ -55,6 +56,11 @@ Each video in a catalogue is either:
   seeks with no internet, like a stored one. A download is meant to be
   short-lived: Settings → **Remove download** frees the space, and if the
   browser clears it, the video simply streams again.
+- **Playing several in a row** (a playlist): hold a video in the library or a
+  series to start selecting, tap more to tick them, then Play. They play in
+  the order ticked; the PIN is asked once, at the start, and each next video
+  starts by itself. Pausing and going on still need the PIN; back ends the
+  playlist. A tap on a video still plays it alone. Playlists aren't saved yet.
 - **Removing and hiding** (Settings, behind the PIN): a stored video can be
   removed, which deletes its copy and frees the space. A streamed video can
   only be hidden from this device (with its download, if any); it stays on the
