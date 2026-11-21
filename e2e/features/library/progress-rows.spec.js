@@ -36,7 +36,7 @@ async function download(page, title) {
 }
 
 test.describe('Feature: One row per add or download', () => {
-  test.fixme('Scenario: with nothing added or downloaded, there is no row', async ({ page, pinSet }) => {
+  test('Scenario: with nothing added or downloaded, there is no row', async ({ page, pinSet }) => {
     await test.step('Given the library is shown', async () => {
       await goto(page, '#/library');
     });
@@ -45,7 +45,7 @@ test.describe('Feature: One row per add or download', () => {
     });
   });
 
-  test.fixme('Scenario: two adds from Google Drive at once each get their own row', async ({ page, pinSet }) => {
+  test('Scenario: two adds from Google Drive at once each get their own row', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shelf(), folders);
     let release;
     await test.step('Given the folder "Show" is being added', async () => {
@@ -69,7 +69,7 @@ test.describe('Feature: One row per add or download', () => {
     });
   });
 
-  test.fixme('Scenario: an add and a download at once each get their own row', async ({ page, pinSet }) => {
+  test('Scenario: an add and a download at once each get their own row', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shelf());
     let release;
     await test.step('Given "medium" is streamed and being downloaded', async () => {
@@ -94,7 +94,7 @@ test.describe('Feature: One row per add or download', () => {
     });
   });
 
-  test.fixme('Scenario: a finished row clears itself after 10 seconds', async ({ page, pinSet }) => {
+  test('Scenario: a finished row clears itself after 10 seconds', async ({ page, pinSet }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shelf());
     await test.step('Given "tiny" was just added from Google Drive', async () => {
@@ -112,7 +112,7 @@ test.describe('Feature: One row per add or download', () => {
     });
   });
 
-  test.fixme('Scenario: a row that failed clears itself after a minute', async ({ page, pinSet }) => {
+  test('Scenario: a row that failed clears itself after a minute', async ({ page, pinSet }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shelf());
     await test.step('Given adding "tiny" from Google Drive just failed', async () => {

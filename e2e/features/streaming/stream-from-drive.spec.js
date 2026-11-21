@@ -29,11 +29,14 @@ const headerAndPoster = (name) => {
   return 64 * 1024 + statSync(poster).size;
 };
 
+// Waits for this add's own row (rows are listed oldest first).
 async function streamFromDrive(page, google, ...names) {
+  const rows = page.getByTestId('import-status');
+  const earlier = await rows.count();
   await google.willPick(...names);
   await page.getByTestId('add-from-drive-button').click();
   await enterPin(page, PIN);
-  await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', /done|error/);
+  await expect(rows.nth(earlier)).toHaveAttribute('data-import', /done|error/);
 }
 
 // Reopen the app, and wait until Google is loaded again.
