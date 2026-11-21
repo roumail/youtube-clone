@@ -1,15 +1,19 @@
 // Shaka "local:" scheme plugin: lets Shaka read a packaged video from a byte
 // source (a .kidsvideo the parent picked) instead of HTTP.
 //
-//   const uri = registerParts(parts);   // -> "local://pick/My%20Video.mpd"
+//   const uri = registerParts(parts);   // -> "local://v1/My%20Video.mpd"
 //   await storage.store(uri, { title, poster }).promise;
+//   releaseParts(uri);
 //
-// Relative segment URLs in the manifest ("video.mp4") resolve against
-// local://pick/, so every request maps to a part by name. Byte-range requests
-// (DASH on-demand profile) read just those bytes of the source.
+// Each registration has its own host (every video's parts have the same
+// names, and several can be read at once: adds, downloads, playback).
+// Relative segment URLs in the manifest ("video.mp4") resolve against it, so
+// every request maps to a part by name. Byte-range requests (DASH on-demand
+// profile) read just those bytes of the source.
 
-const HOST = 'local://pick/';
-let registered = new Map();
+const registered = new Map(); // host -> Map(part name -> part)
+let lastHost = 0;
+const parse = (uri) => /^local:\/\/([^/]+)\/(.*)$/.exec(uri); // [, host, part name]
 
 // ---------- single-file container (.kidsvideo) ----------
 // A .kidsvideo (format 2, tools/kidsvideo) is an uncompressed tar of
@@ -69,14 +73,24 @@ export function describeParts(parts) {
   return { manifest: manifests[0], poster: parts.find((p) => p.name === 'poster.jpg') };
 }
 
-/** Make these parts readable by Shaka; returns the local: URI of the manifest. */
-export function registerParts(parts) {
-  registered = new Map(parts.map((p) => [p.name, p]));
-  return HOST + encodeURIComponent(describeParts(parts).manifest.name);
+/**
+ * Make these parts readable by Shaka; returns the local: URI of the manifest.
+ * `host` reuses a fixed slot (the player's: only one video plays at a time);
+ * otherwise the parts get a new one, to be freed with releaseParts.
+ */
+export function registerParts(parts, host = `v${++lastHost}`) {
+  const { manifest } = describeParts(parts);
+  registered.set(host, new Map(parts.map((p) => [p.name, p])));
+  return `local://${host}/${encodeURIComponent(manifest.name)}`;
+}
+
+export function releaseParts(uri) {
+  registered.delete(parse(uri)[1]);
 }
 
 function plugin(uri, request) {
-  const part = registered.get(decodeURIComponent(uri.slice(HOST.length)));
+  const [, host, name] = parse(uri);
+  const part = registered.get(host).get(decodeURIComponent(name));
   const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers?.Range ?? request.headers?.range ?? '');
   const op = (range ? part.read(Number(range[1]), Number(range[2]) + 1) : part.read(0, part.size)).then((data) => ({
     uri, originalUri: uri, data, headers: {}, status: range ? 206 : 200, fromCache: false,

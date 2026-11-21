@@ -75,8 +75,9 @@ button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 0; back
 .grid li .tile-note { padding-top: 0; font-weight: 400; color: var(--muted); }
 .grid li [data-testid="download-button"] { margin: 0 12px 10px; justify-self: start; }
 .grid li[data-downloaded="true"] > span:first-of-type::after { content: " · downloaded"; font-weight: 400; color: var(--muted); }
-progress[data-testid="import-progress"] { width: 100%; margin: 8px 0; }
-[data-testid="import-status"] { color: var(--muted); min-height: 1.4em; }
+.jobs { list-style: none; margin: 0; padding: 0; }
+[data-testid="import-status"] { color: var(--muted); margin: 8px 0; }
+progress[data-testid="import-progress"] { display: block; width: 100%; margin: 4px 0; }
 [data-import="error"] { color: var(--accent); }
 [data-role="settings-list"] { list-style: none; padding: 0; display: grid; gap: 8px; }
 [data-role="settings-list"] li { display: flex; align-items: center; gap: 12px; background: #1d1d1d; padding: 8px 12px; border-radius: 10px; }

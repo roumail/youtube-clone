@@ -35,9 +35,8 @@
       <p class="search-empty" data-testid="search-empty" hidden>No videos match.</p>
       <ul class="grid" data-role="library-grid"></ul>
       <input type="file" data-testid="import-input" multiple hidden>
-      <progress data-testid="import-progress" max="1" value="0" hidden></progress>
-      <button type="button" data-testid="cancel-download-button" hidden>Cancel</button>
-      <div data-testid="import-status" data-import="idle" role="status"></div>
+      <!-- One row per add or download (data-testid="import-status"), made in app.js -->
+      <ul class="jobs" data-role="jobs"></ul>
     </section>
 
     <section data-testid="screen-series" hidden>

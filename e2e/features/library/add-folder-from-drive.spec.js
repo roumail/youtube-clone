@@ -84,8 +84,9 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
       await addFromDrive(page, google, 'Show');
     });
     await test.step('Then the other 3 are added, and the one already there is skipped, not an error', async () => {
-      await expect(page.getByTestId('import-status')).toHaveText('Added 3 of 4 videos from "Show" (1 already in the library).');
-      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
+      const row = page.getByTestId('import-status').filter({ hasText: 'from "Show"' });
+      await expect(row).toHaveText('Added 3 of 4 videos from "Show" (1 already in the library).');
+      await expect(row).toHaveAttribute('data-import', 'done');
     });
   });
 

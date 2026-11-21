@@ -113,7 +113,7 @@ test.describe('Feature: Download a streamed video', () => {
       release();
     });
     await test.step('Then the download says it was cancelled, and nothing of it is kept', async () => {
-      await expect(page.getByTestId('import-status')).toHaveText('Download cancelled.');
+      await expect(row(page, 'Download of "medium" cancelled.')).toHaveAttribute('data-import', 'cancelled');
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'false');
       await expect(page.getByTestId('cancel-download-button')).toBeHidden();
       await expect.poll(() => page.evaluate(async () => {
@@ -136,7 +136,7 @@ test.describe('Feature: Download a streamed video', () => {
       await download(page, 'medium');
     });
     await test.step('Then it is refused for lack of space, and it still streams', async () => {
-      await expect(page.getByTestId('import-status')).toContainText(/not enough space on this device \("medium" needs [\d.]+ MB, [\d.]+ MB is free\)/);
+      await expect(row(page, /not enough space on this device \("medium" needs [\d.]+ MB, [\d.]+ MB is free\)/)).toHaveAttribute('data-import', 'error');
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'false');
     });
   });
@@ -152,7 +152,7 @@ test.describe('Feature: Download a streamed video', () => {
       await download(page, 'medium');
     });
     await test.step('Then the download says the connection was lost, and it is not marked as downloaded', async () => {
-      await expect(page.getByTestId('import-status')).toContainText('the connection to Google Drive was lost');
+      await expect(row(page, 'Couldn\'t download "medium": the connection to Google Drive was lost')).toHaveAttribute('data-import', 'error');
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'false');
     });
   });
@@ -231,7 +231,7 @@ test.describe('Feature: Download a streamed video', () => {
   // is still running, so a Cancel or a failure that reaches the wrong
   // download shows up whichever order they were started in.
 
-  test.fixme('Scenario: two downloads at once both finish', async ({ page, pinSet }) => {
+  test('Scenario: two downloads at once both finish', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     let releaseTiny;
     let releaseMedium;
@@ -257,10 +257,19 @@ test.describe('Feature: Download a streamed video', () => {
       await expect(item(page, 'tiny')).toHaveAttribute('data-downloaded', 'true');
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'true');
     });
+    await test.step('And each download holds its own video, not the other one', async () => {
+      const lengths = await page.evaluate(async () => {
+        const storage = new shaka.offline.Storage();
+        const list = await storage.list();
+        await storage.destroy();
+        return Object.fromEntries(list.map((c) => [c.appMetadata.title, Math.round(c.duration)]));
+      });
+      expect(lengths).toEqual({ tiny: 3, medium: 60 });
+    });
   });
 
   for (const [cancelled, other, which] of [['tiny', 'medium', 'first'], ['medium', 'tiny', 'second']]) {
-    test.fixme(`Scenario: with two downloads at once, Cancel on the ${which} one stops only that one`, async ({ page, pinSet }) => {
+    test(`Scenario: with two downloads at once, Cancel on the ${which} one stops only that one`, async ({ page, pinSet }) => {
       const google = await fakeGoogle(page, shared());
       const release = {};
       await test.step('Given "tiny" and "medium" are streamed, and both are downloading, "tiny" started first', async () => {
@@ -291,7 +300,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   }
 
-  test.fixme('Scenario: with two downloads at once, a lost connection fails only the one it hits', async ({ page, pinSet }) => {
+  test('Scenario: with two downloads at once, a lost connection fails only the one it hits', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, shared());
     let releaseMedium;
     await test.step('Given "tiny" and "medium" are streamed, and "medium" is downloading', async () => {
