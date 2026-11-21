@@ -147,6 +147,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await medium.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true, button: 0 });
       await page.clock.runFor(600);
       await medium.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true, button: 0 });
+      await medium.dispatchEvent('click');
       await page.getByTestId('library-item').filter({ hasText: 'tiny' }).tap();
       await page.getByTestId('selection-play').tap();
       await page.getByTestId('play-button').click();
@@ -165,7 +166,8 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
     await test.step('Then at the end of "medium", "tiny" plays next with no PIN asked', async () => {
       await page.getByTestId('seek-bar').fill('58');
-      await expect.poll(() => decodeURIComponent(page.url())).toContain('tiny');
+      const tiny = await page.getByTestId('library-item').filter({ hasText: 'tiny' }).getAttribute('data-video-id');
+      await expect.poll(() => decodeURIComponent(page.url()).endsWith(`#/player/${tiny}`)).toBe(true);
       await expectPlaying(page);
       await expect(page.getByTestId('pin-prompt')).toBeHidden();
     });

@@ -20,10 +20,12 @@ import {
 const tile = (page, title) => page.getByTestId('library-item').filter({ hasText: title });
 
 // A held tap: the finger stays down for 600 ms (the app's hold is 500 ms).
+// Lifting it may still send a click (Chrome does), which must not count as a tap.
 async function hold(page, locator) {
   await locator.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true, button: 0 });
   await page.clock.runFor(600);
   await locator.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true, button: 0 });
+  await locator.dispatchEvent('click');
 }
 
 // Hold the first title, tap the rest: the playlist in that order.
@@ -32,7 +34,11 @@ async function select(page, first, ...rest) {
   for (const title of rest) await tile(page, title).tap();
 }
 
-const playingTitle = async (page) => decodeURIComponent(page.url());
+// The player's URL names the video by its catalogue id, which its library tile carries.
+async function isOpen(page, title) {
+  const id = await tile(page, title).getAttribute('data-video-id');
+  return decodeURIComponent(page.url()).endsWith(`#/player/${id}`);
+}
 
 test.describe('Feature: Play several (a playlist)', () => {
   test.beforeEach(async ({ page, pinSet, seedLibrary }) => {
@@ -152,7 +158,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
     await test.step('Then "medium" is open, paused at the start', async () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
-      expect(await playingTitle(page)).toContain('medium');
+      expect(await isOpen(page, 'medium')).toBe(true);
       await expectNotPlaying(page);
     });
     await test.step('When I tap play and enter the PIN', async () => {
@@ -172,12 +178,12 @@ test.describe('Feature: Play several (a playlist)', () => {
       await startPlaying(page);
     });
     await test.step('When "tiny" ends, then "Second" plays from the start, with no PIN asked', async () => {
-      await expect.poll(() => playingTitle(page)).toContain('Second');
+      await expect.poll(() => isOpen(page, 'Second')).toBe(true);
       await expectPlaying(page);
       await expect(page.getByTestId('pin-prompt')).toBeHidden();
     });
     await test.step('When "Second" ends, then "medium" plays, with no PIN asked', async () => {
-      await expect.poll(() => playingTitle(page)).toContain('medium');
+      await expect.poll(() => isOpen(page, 'medium')).toBe(true);
       await expect(page.getByTestId('time-total')).toHaveText('01:00');
       await expectPlaying(page);
       await expect(page.getByTestId('pin-prompt')).toBeHidden();
@@ -191,12 +197,12 @@ test.describe('Feature: Play several (a playlist)', () => {
       await startPlaying(page);
     });
     await test.step('When "Second" reaches its end', async () => {
-      await expect.poll(() => playingTitle(page)).toContain('Second');
+      await expect.poll(() => isOpen(page, 'Second')).toBe(true);
       await expect(playerState(page)).toHaveAttribute('data-state', 'ended');
     });
     await test.step('Then it stays on "Second", stopped', async () => {
       await expectNotPlaying(page);
-      expect(await playingTitle(page)).toContain('Second');
+      expect(await isOpen(page, 'Second')).toBe(true);
     });
     await test.step('And play asks for the PIN, as for any video at its end', async () => {
       await page.getByTestId('play-button').tap();
@@ -224,7 +230,7 @@ test.describe('Feature: Play several (a playlist)', () => {
       await page.getByTestId('seek-bar').fill('58');
     });
     await test.step('Then "tiny" plays next, with no PIN asked', async () => {
-      await expect.poll(() => playingTitle(page)).toContain('tiny');
+      await expect.poll(() => isOpen(page, 'tiny')).toBe(true);
       await expectPlaying(page);
       await expect(page.getByTestId('pin-prompt')).toBeHidden();
     });
@@ -235,7 +241,7 @@ test.describe('Feature: Play several (a playlist)', () => {
       await select(page, 'tiny', 'Second', 'medium');
       await page.getByTestId('selection-play').tap();
       await startPlaying(page);
-      await expect.poll(() => playingTitle(page)).toContain('Second');
+      await expect.poll(() => isOpen(page, 'Second')).toBe(true);
     });
     await test.step('When I tap back', async () => {
       await page.getByTestId('screen-player').getByTestId('back-button').tap();
@@ -254,7 +260,7 @@ test.describe('Feature: Play several (a playlist)', () => {
       await select(page, 'tiny', 'medium');
       await page.getByTestId('selection-play').tap();
       await startPlaying(page);
-      await expect.poll(() => playingTitle(page)).toContain('medium');
+      await expect.poll(() => isOpen(page, 'medium')).toBe(true);
     });
     await test.step('When I go back (the back gesture)', async () => {
       await page.goBack();
@@ -275,7 +281,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
     await test.step('Then "medium" is still the one playing', async () => {
       await expectPlaying(page);
-      expect(await playingTitle(page)).toContain('medium');
+      expect(await isOpen(page, 'medium')).toBe(true);
     });
   });
 
