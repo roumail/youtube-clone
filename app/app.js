@@ -131,14 +131,15 @@ function selectable(li, c, from) {
       li.append(number);
     }
   }
+  // A hold only starts selecting; while selecting, any press is a tap.
   li.addEventListener('pointerdown', () => {
     held = false;
     clearHold();
+    if (state.selection) return;
     holdTimer = setTimeout(() => {
       holdTimer = null;
       held = true;
-      if (!state.selection) state.selection = [];
-      if (!state.selection.includes(id)) state.selection.push(id);
+      state.selection = [id];
       update();
     }, HOLD_MS);
   });
