@@ -1,7 +1,7 @@
 // This device's catalogue: stored videos (a copy in Shaka offline storage, added
 // with "Add video") and streamed videos (title and poster only; they play from
 // Google Drive, streamed.js).
-import { readHead, readParts, describeParts, registerParts, posterDataUrl } from './local-scheme.js';
+import { readHead, readParts, describeParts, registerParts, releaseParts, posterDataUrl } from './local-scheme.js';
 import { listStreamed, saveStreamed } from './streamed.js';
 
 // Never use Shaka's default track picker: on P3 screens it drops SDR video and
@@ -75,7 +75,7 @@ export async function addStreamed(source) {
 /** A streamed video's local: URI for the player, read from Google Drive now. */
 export async function streamUri(source) {
   const { next } = await readHead(source);
-  return registerParts(await readParts(source, next));
+  return registerParts(await readParts(source, next), 'player');
 }
 
 /**
@@ -115,8 +115,16 @@ export async function importVideo(source, onProgress, downloadOf) {
   await checkSpace(title, source.size);
   const parts = await readParts(source, next);
   const { poster } = describeParts(parts);
-  const uri = registerParts(parts);
   const posterUrl = await posterDataUrl(poster);
+  const uri = registerParts(parts);
+  try {
+    return await storeParts(uri, title, posterUrl, onProgress, downloadOf);
+  } finally {
+    releaseParts(uri);
+  }
+}
+
+function storeParts(uri, title, posterUrl, onProgress, downloadOf) {
   return withStorage(async (storage) => {
     storage.configure({
       offline: {

@@ -86,7 +86,7 @@ test.describe('Feature: Add from Google Drive', () => {
       await addFromDrive(page);
     });
     await test.step('Then it is added, and I signed in only once', async () => {
-      await expect(page.getByTestId('import-status')).toHaveText('Added "medium".');
+      await expect(page.getByTestId('import-status').filter({ hasText: 'medium' })).toHaveText('Added "medium".');
       expect(await google.signIns()).toBe(1);
     });
   });
@@ -101,7 +101,7 @@ test.describe('Feature: Add from Google Drive', () => {
       await addFromDrive(page);
     });
     await test.step('Then nothing is added and nothing was downloaded', async () => {
-      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'idle');
+      await expect(page.getByTestId('import-status')).toHaveCount(0);
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
       expect(google.bytesRead()).toBe(0);
     });
@@ -117,7 +117,7 @@ test.describe('Feature: Add from Google Drive', () => {
       await expect.poll(() => google.signIns()).toBe(1);
     });
     await test.step('Then nothing is added and nothing was downloaded', async () => {
-      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'idle');
+      await expect(page.getByTestId('import-status')).toHaveCount(0);
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
       expect(google.bytesRead()).toBe(0);
     });
@@ -205,7 +205,7 @@ test.describe('Feature: Add from Google Drive', () => {
       await addFromDrive(page);
     });
     await test.step('Then I am asked to sign in again, and it is added', async () => {
-      await expect(page.getByTestId('import-status')).toHaveText('Added "medium".');
+      await expect(page.getByTestId('import-status').filter({ hasText: 'medium' })).toHaveText('Added "medium".');
       expect(await google.signIns()).toBe(2);
     });
   });

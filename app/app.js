@@ -33,11 +33,10 @@ const state = {
   newPin: null, // first entry of a new PIN, until it is confirmed
   returnTo: '#/library', // where the player's Back goes (the library or a series list)
   features: {}, // running optional features, by id (features.js)
-  importStatus: { phase: 'idle', progress: 0, message: '' },
+  jobs: [], // adds and downloads, one row each: { phase: 'storing' | 'done' | 'error' | 'cancelled', progress, message, cancel }
   signingIn: null, // a Google sign-in started by the tap that opened a streamed video
   downloadTarget: null, // the streamed video whose Download asked for the PIN
-  downloading: null, // the streamed video being downloaded (its URI)
-  downloadCancel: null, // AbortController for that download
+  downloading: new Set(), // the streamed videos being downloaded (their URIs)
 };
 
 function parseRoute(hash) {
@@ -105,7 +104,7 @@ function videoTile(c) {
 // (behind the PIN) while it isn't. Stored videos are already on the device.
 function downloadControls(li, c) {
   if (c.playsFrom !== 'drive') return;
-  li.dataset.downloaded = c.download ? 'true' : (state.downloading === c.offlineUri ? 'downloading' : 'false');
+  li.dataset.downloaded = c.download ? 'true' : (state.downloading.has(c.offlineUri) ? 'downloading' : 'false');
   if (li.dataset.downloaded !== 'false') return;
   const button = document.createElement('button');
   button.type = 'button';
@@ -202,14 +201,7 @@ function render(s) {
   show('search-clear', s.search !== '');
   show('search-empty', query !== '' && shown.length === 0);
 
-  // Import status
-  const st = $('import-status');
-  st.dataset.import = s.importStatus.phase;
-  st.textContent = s.importStatus.message;
-  const bar = $('import-progress');
-  bar.hidden = s.importStatus.phase !== 'storing';
-  bar.value = s.importStatus.progress;
-  show('cancel-download-button', s.downloading !== null);
+  renderJobs(s.jobs);
 
   // Series: its episodes, in season/episode order
   show('screen-series', s.route.name === 'series');
@@ -543,25 +535,91 @@ async function streamFrom(entry, signing) {
   }
 }
 
+// Adds and downloads: a row each, kept (not rebuilt) while it runs, so its
+// Cancel stays under the finger. A finished row clears itself after a while;
+// one that failed stays longer, so it can be read.
+const CLEAR_AFTER_MS = { done: 10_000, cancelled: 10_000, error: 60_000 };
+const jobRows = new Map(); // job -> { li, text, bar, cancel }
+
+function renderJobs(jobs) {
+  for (const [job, row] of jobRows) {
+    if (!jobs.includes(job)) {
+      row.li.remove();
+      jobRows.delete(job);
+    }
+  }
+  for (const job of jobs) {
+    let row = jobRows.get(job);
+    if (!row) {
+      const li = document.createElement('li');
+      li.dataset.testid = 'import-status';
+      li.setAttribute('role', 'status');
+      const text = document.createElement('span');
+      const bar = document.createElement('progress');
+      bar.dataset.testid = 'import-progress';
+      bar.max = 1;
+      li.append(text, bar);
+      document.querySelector('[data-role="jobs"]').append(li);
+      row = { li, text, bar, cancel: null };
+      jobRows.set(job, row);
+    }
+    row.li.dataset.import = job.phase;
+    row.text.textContent = job.message;
+    row.bar.hidden = job.phase !== 'storing';
+    row.bar.value = job.progress;
+    if (job.cancel && !row.cancel) {
+      row.cancel = document.createElement('button');
+      row.cancel.type = 'button';
+      row.cancel.dataset.testid = 'cancel-download-button';
+      row.cancel.textContent = 'Cancel';
+      const { cancel } = job;
+      row.cancel.addEventListener('click', () => cancel.abort());
+      row.li.append(row.cancel);
+    } else if (!job.cancel && row.cancel) {
+      row.cancel.remove();
+      row.cancel = null;
+    }
+  }
+}
+
+function startJob(message, cancel = null) {
+  const job = { phase: 'storing', progress: 0, message, cancel };
+  state.jobs.push(job);
+  update();
+  return job;
+}
+
+function endJob(job, phase, message) {
+  Object.assign(job, { phase, message, cancel: null });
+  setTimeout(() => {
+    state.jobs = state.jobs.filter((j) => j !== job);
+    update();
+  }, CLEAR_AFTER_MS[phase]);
+  update();
+}
+
+const onJobProgress = (job) => (p) => {
+  job.progress = p;
+  update();
+};
+
 // Several files picked at once: added one after another; a bad file doesn't
 // stop the rest, and the summary names what failed.
 async function importSeveral(items, sourceOf, add) {
   const total = items.length;
   let added = 0;
   const failed = [];
+  const job = startJob(`Adding ${total} videos…`);
   for (const [i, item] of items.entries()) {
     if (!item.name.toLowerCase().endsWith(CONTAINER_EXT)) {
       failed.push(`${item.name} (not a ${CONTAINER_EXT} file)`);
       continue;
     }
     const name = item.name.slice(0, -CONTAINER_EXT.length);
-    state.importStatus = { phase: 'storing', progress: 0, message: `Adding ${i + 1} of ${total}: ${name}…` };
+    Object.assign(job, { progress: 0, message: `Adding ${i + 1} of ${total}: ${name}…` });
     update();
     try {
-      await add(sourceOf(item), (p) => {
-        state.importStatus.progress = p;
-        update();
-      });
+      await add(sourceOf(item), onJobProgress(job));
       added += 1;
     } catch (e) {
       failed.push(`${name} (${e.message})`);
@@ -570,10 +628,8 @@ async function importSeveral(items, sourceOf, add) {
     update();
   }
   const summary = `Added ${added} of ${total} videos.`;
-  state.importStatus = failed.length
-    ? { phase: 'error', progress: 0, message: `${summary} Couldn't add: ${failed.join('; ')}.` }
-    : { phase: 'done', progress: 1, message: summary };
-  update();
+  if (failed.length) endJob(job, 'error', `${summary} Couldn't add: ${failed.join('; ')}.`);
+  else endJob(job, 'done', summary);
 }
 
 // Play (button or OS command): the PIN comes first, every time.
@@ -603,27 +659,24 @@ async function addFromDrive(docs, sourceOf) {
   const folders = docs.filter((d) => d.mimeType === FOLDER);
   if (!folders.length) return importItems(docs, sourceOf, addStreamed);
   const items = docs.filter((d) => d.mimeType !== FOLDER);
+  const job = startJob(`Looking in "${folders[0].name}"…`);
   for (const folder of folders) {
-    state.importStatus = { phase: 'storing', progress: 0, message: `Looking in "${folder.name}"…` };
+    job.message = `Looking in "${folder.name}"…`;
     update();
     try {
       items.push(...await listFolder(folder));
     } catch (e) {
-      state.importStatus = { phase: 'error', progress: 0, message: `Couldn't add the folder "${folder.name}": ${e.message}` };
-      return update();
+      return endJob(job, 'error', `Couldn't add the folder "${folder.name}": ${e.message}`);
     }
   }
-  if (!items.length) {
-    state.importStatus = { phase: 'error', progress: 0, message: `There are no .kidsvideo files in "${folders[0].name}".` };
-    return update();
-  }
+  if (!items.length) return endJob(job, 'error', `There are no .kidsvideo files in "${folders[0].name}".`);
   const from = docs.length === 1 ? ` from "${folders[0].name}"` : '';
   let added = 0;
   let skipped = 0;
   const failed = [];
   for (const [i, item] of items.entries()) {
     const name = item.name.slice(0, -CONTAINER_EXT.length);
-    state.importStatus = { phase: 'storing', progress: i / items.length, message: `Adding ${i + 1} of ${items.length}: ${name}…` };
+    Object.assign(job, { progress: i / items.length, message: `Adding ${i + 1} of ${items.length}: ${name}…` });
     update();
     try {
       await addStreamed(sourceOf(item));
@@ -635,26 +688,20 @@ async function addFromDrive(docs, sourceOf) {
     await refreshLibrary();
   }
   const summary = `Added ${added} of ${items.length} videos${from}${skipped ? ` (${skipped} already in the library)` : ''}.`;
-  state.importStatus = failed.length
-    ? { phase: 'error', progress: 0, message: `${summary} Couldn't add: ${failed.join('; ')}.` }
-    : { phase: 'done', progress: 1, message: summary };
-  update();
+  if (failed.length) endJob(job, 'error', `${summary} Couldn't add: ${failed.join('; ')}.`);
+  else endJob(job, 'done', summary);
 }
 
 // Picked files (stored: importVideo) or files in Google Drive (streamed:
 // addStreamed); sourceOf(item) gives its byte source.
 async function importItems(items, sourceOf, add) {
   if (items.length > 1) return importSeveral(items, sourceOf, add);
-  state.importStatus = { phase: 'storing', progress: 0, message: 'Adding video…' };
-  update();
+  const job = startJob('Adding video…');
   try {
-    const stored = await add(sourceOf(items[0]), (p) => {
-      state.importStatus.progress = p;
-      update();
-    });
-    state.importStatus = { phase: 'done', progress: 1, message: `Added "${stored.appMetadata.title}".` };
+    const stored = await add(sourceOf(items[0]), onJobProgress(job));
+    endJob(job, 'done', `Added "${stored.appMetadata.title}".`);
   } catch (e) {
-    state.importStatus = { phase: 'error', progress: 0, message: `Couldn't add the video: ${e.message}` };
+    endJob(job, 'error', `Couldn't add the video: ${e.message}`);
   }
   await refreshLibrary();
   update();
@@ -679,10 +726,8 @@ async function onHide(c) {
 async function downloadVideo(entry, signing) {
   const { title } = entry.appMetadata;
   const cancel = new AbortController();
-  state.downloading = entry.offlineUri;
-  state.downloadCancel = cancel;
-  state.importStatus = { phase: 'storing', progress: 0, message: `Downloading "${title}"…` };
-  update();
+  state.downloading.add(entry.offlineUri);
+  const job = startJob(`Downloading "${title}"…`, cancel);
   const source = driveSource(entry.file);
   const read = source.read;
   source.read = (start, end) => {
@@ -691,18 +736,13 @@ async function downloadVideo(entry, signing) {
   };
   try {
     await signing;
-    await importVideo(source, (p) => {
-      state.importStatus.progress = p;
-      update();
-    }, entry.offlineUri);
-    state.importStatus = { phase: 'done', progress: 1, message: `Downloaded "${title}".` };
+    await importVideo(source, onJobProgress(job), entry.offlineUri);
+    endJob(job, 'done', `Downloaded "${title}".`);
   } catch (e) {
-    state.importStatus = cancel.signal.aborted
-      ? { phase: 'idle', progress: 0, message: 'Download cancelled.' }
-      : { phase: 'error', progress: 0, message: `Couldn't download the video: ${e.message}` };
+    if (cancel.signal.aborted) endJob(job, 'cancelled', `Download of "${title}" cancelled.`);
+    else endJob(job, 'error', `Couldn't download "${title}": ${e.message}`);
   }
-  state.downloading = null;
-  state.downloadCancel = null;
+  state.downloading.delete(entry.offlineUri);
   await refreshLibrary();
   update();
 }
@@ -768,7 +808,6 @@ async function boot() {
     importItems(files, pickedSource, importVideo);
   });
   $('add-from-drive-button').addEventListener('click', () => askPin('drive'));
-  $('cancel-download-button').addEventListener('click', () => state.downloadCancel.abort());
   $('play-button').addEventListener('click', onPlayRequested);
   $('pause-button').addEventListener('click', onPause);
   $('change-pin-button').addEventListener('click', () => askPin('change'));
