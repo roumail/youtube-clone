@@ -34,6 +34,10 @@ async function faceIdDevice(page) {
   };
 }
 
+// WebAuthn needs a host name, not an IP address: these scenarios open the test
+// server (playwright.config.js, port 4173) as localhost instead of 127.0.0.1.
+test.use({ baseURL: 'http://localhost:4173/app/' });
+
 const prompt = (page) => page.getByTestId('pin-prompt');
 const faceIdButton = (page) => page.getByTestId('pin-faceid-button');
 const toggle = (page) => page.getByTestId('feature-toggle-faceId');
