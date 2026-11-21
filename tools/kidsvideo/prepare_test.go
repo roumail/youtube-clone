@@ -218,12 +218,14 @@ func TestPrepareCopiesATrackAlreadyWithinTheSizeTarget(t *testing.T) {
 }
 
 func TestPrepareReencodesToAtMost540pAnd700kbitsStereo64k(t *testing.T) {
+	// Quality: CRF 28 tuned for animation (smaller files; checked by eye
+	// against CRF 26 on real episodes and films).
 	s := newSetup(t, bigSource(), "Film.mp4")
 	if code, _, stderr := s.prepare(t); code != 0 {
 		t.Fatal(stderr)
 	}
 	args := strings.Join(reencodeArgs(t, s.fake), " ")
-	for _, want := range []string{"-c:v libx264", "-maxrate 700k", `scale=-2:min(540\,ih)`, "-c:a aac -b:a 64k -ac 2", "-map 0:1"} {
+	for _, want := range []string{"-c:v libx264", "-crf 28 -tune animation", "-maxrate 700k", `scale=-2:min(540\,ih)`, "-c:a aac -b:a 64k -ac 2", "-map 0:1"} {
 		if !strings.Contains(args, want) {
 			t.Fatalf("args %q lack %q", args, want)
 		}

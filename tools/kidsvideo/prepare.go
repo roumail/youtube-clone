@@ -177,7 +177,7 @@ func (p plan) encodeArgs(input, out string, progress bool) []string {
 	if p.copyVideo {
 		args = append(args, "-c:v", "copy")
 	} else {
-		args = append(args, "-c:v", "libx264", "-preset", "slow", "-crf", "26", "-maxrate", videoRate, "-bufsize", videoBuffer,
+		args = append(args, "-c:v", "libx264", "-preset", "slow", "-crf", "28", "-tune", "animation", "-maxrate", videoRate, "-bufsize", videoBuffer,
 			"-vf", fmt.Sprintf("scale=-2:min(%d\\,ih)", maxHeight), "-pix_fmt", "yuv420p")
 	}
 	if p.copyAudio {

@@ -196,8 +196,9 @@ Kids Library/
   - keeps each video small, to save space: at most 540p, video at most
     0.7 Mbit/s (H.264), stereo audio at 64 kbit/s, so about 0.35 GB per hour.
     A track already within that is copied (seconds); anything else is
-    re-encoded (a film can take a while, done once). Videos prepared earlier at
-    720p keep playing: there's no need to prepare them again;
+    re-encoded (a film can take a while, done once), at a quality tuned for
+    cartoons. Videos prepared earlier (at 720p, or at the earlier quality
+    setting) keep playing: there's no need to prepare them again;
   - writes one `<Title>.kidsvideo` file, all or nothing (`kidsvideo verify
     <file>` checks a file the way the app reads it).
 - **Skips** videos already prepared in the destination, so re-running a batch
