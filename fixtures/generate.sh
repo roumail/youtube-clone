@@ -175,9 +175,10 @@ grep -q 'AudioChannelConfiguration[^>]*value="2"' "$OUT/surround/surround.mpd" \
 # Encoder settings, as x264 records them in the video: "episode-like" is
 # re-encoded now (CRF 28, tuned for animation: psy_rd 0.40), "prepared-earlier"
 # kept its earlier CRF 26.
-grep -aq 'crf=28.0' "$OUT/episode-like/video.mp4" && grep -aq 'psy_rd=0.40' "$OUT/episode-like/video.mp4" \
+encoded_with() { perl -0777 -ne "exit(index(\$_, '$2') < 0)" "$1"; } # <video file> <x264 setting>
+encoded_with "$OUT/episode-like/video.mp4" 'crf=28.0' && encoded_with "$OUT/episode-like/video.mp4" 'psy_rd=0.40' \
   || { echo "encoder: episode-like not re-encoded at CRF 28 tuned for animation" >&2; exit 1; }
-grep -aq 'crf=26.0' "$OUT/prepared-earlier/video.mp4" \
+encoded_with "$OUT/prepared-earlier/video.mp4" 'crf=26.0' \
   || { echo "encoder: prepared-earlier not kept at CRF 26" >&2; exit 1; }
 
 grep -q 'lang="en"' "$OUT/episode-like/episode-like.mpd" \
