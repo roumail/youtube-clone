@@ -137,6 +137,10 @@ export async function allowPlay(ready) {
     if (loadLater && !(await loadLater())) return;
     loadLater = null;
   }
+  return start();
+}
+
+async function start() {
   if (video.ended) video.currentTime = 0;
   authorized = true;
   try {
@@ -145,6 +149,15 @@ export async function allowPlay(ready) {
     authorized = false;
     set('paused');
   }
+}
+
+/**
+ * A playlist moves on: its next video, just opened, plays without the PIN
+ * (given at the start of the playlist). One that didn't open stays as it is,
+ * and so does a streamed one waiting for a Google sign-in (that needs a tap).
+ */
+export function playOn() {
+  if (playerState.status === 'paused' && !loadLater) return start();
 }
 
 /** Seek (M8). Never starts playback: free for the child, no PIN needed. */

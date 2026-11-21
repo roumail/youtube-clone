@@ -136,7 +136,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test.fixme('Scenario: when the budget runs out in a playlist, it stops, and the PIN with more time lets it go on', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: when the budget runs out in a playlist, it stops, and the PIN with more time lets it go on', async ({ page, pinSet, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given a session with 1 second of budget left, and "medium" then "tiny" playing as a playlist', async () => {
       await page.addInitScript(() => localStorage.setItem('watchTime.session', JSON.stringify({ budget: 1800, used: 1799 })));

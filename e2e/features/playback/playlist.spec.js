@@ -47,7 +47,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     await seedLibrary('tiny', 'Second', 'medium', 'Show - S01E01 - First', 'Show - S01E02 - Second');
   });
 
-  test.fixme('Scenario: holding a video starts selecting and ticks it, without opening it or asking the PIN @ipad', async ({ page }) => {
+  test('Scenario: holding a video starts selecting and ticks it, without opening it or asking the PIN @ipad', async ({ page }) => {
     await test.step('When I hold "tiny"', async () => {
       await hold(page, tile(page, 'tiny'));
     });
@@ -60,7 +60,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: while selecting, a tap ticks a video and each shows its place', async ({ page }) => {
+  test('Scenario: while selecting, a tap ticks a video and each shows its place', async ({ page }) => {
     await test.step('When I hold "medium", then tap "tiny"', async () => {
       await select(page, 'medium', 'tiny');
     });
@@ -71,7 +71,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: a tap on a ticked video unticks it and the others move up', async ({ page }) => {
+  test('Scenario: a tap on a ticked video unticks it and the others move up', async ({ page }) => {
     await test.step('Given "tiny", "Second" and "medium" are ticked in that order', async () => {
       await select(page, 'tiny', 'Second', 'medium');
     });
@@ -85,7 +85,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: unticking the last ticked video stops selecting', async ({ page }) => {
+  test('Scenario: unticking the last ticked video stops selecting', async ({ page }) => {
     await test.step('Given only "tiny" is ticked', async () => {
       await select(page, 'tiny');
     });
@@ -99,7 +99,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: episodes in a series can be ticked along with other videos', async ({ page }) => {
+  test('Scenario: episodes in a series can be ticked along with other videos', async ({ page }) => {
     await test.step('Given "tiny" is ticked', async () => {
       await select(page, 'tiny');
     });
@@ -122,7 +122,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: holding an episode in a series starts selecting too', async ({ page }) => {
+  test('Scenario: holding an episode in a series starts selecting too', async ({ page }) => {
     await test.step('When I open the "Show" series and hold E01', async () => {
       await page.getByTestId('series-item').filter({ hasText: 'Show' }).tap();
       await hold(page, page.getByTestId('episode-item').filter({ hasText: 'S01E01' }));
@@ -133,7 +133,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: Cancel stops selecting and clears the ticks', async ({ page }) => {
+  test('Scenario: Cancel stops selecting and clears the ticks', async ({ page }) => {
     await test.step('Given "tiny" and "medium" are ticked', async () => {
       await select(page, 'tiny', 'medium');
     });
@@ -148,7 +148,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: playing the selection opens the first ticked video, paused; play asks for the PIN @ipad', async ({ page }) => {
+  test('Scenario: playing the selection opens the first ticked video, paused; play asks for the PIN @ipad', async ({ page }) => {
     await test.step('Given "medium" then "tiny" are ticked', async () => {
       await select(page, 'medium', 'tiny');
     });
@@ -171,7 +171,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: at the end of each video the next one plays by itself, without the PIN', async ({ page }) => {
+  test('Scenario: at the end of each video the next one plays by itself, without the PIN', async ({ page }) => {
     await test.step('Given "tiny" (3 s), "Second" (3 s) and "medium" are ticked in that order, and "tiny" is playing', async () => {
       await select(page, 'tiny', 'Second', 'medium');
       await page.getByTestId('selection-play').tap();
@@ -190,7 +190,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: at the end of the last video nothing else starts', async ({ page }) => {
+  test('Scenario: at the end of the last video nothing else starts', async ({ page }) => {
     await test.step('Given "tiny" then "Second" are playing as a playlist', async () => {
       await select(page, 'tiny', 'Second');
       await page.getByTestId('selection-play').tap();
@@ -210,7 +210,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: pausing in a playlist is free; resuming needs the PIN and the playlist goes on', async ({ page }) => {
+  test('Scenario: pausing in a playlist is free; resuming needs the PIN and the playlist goes on', async ({ page }) => {
     await test.step('Given "medium" then "tiny" are playing as a playlist, and I paused "medium"', async () => {
       await select(page, 'medium', 'tiny');
       await page.getByTestId('selection-play').tap();
@@ -236,7 +236,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: back ends the playlist: the library shows, with nothing playing and nothing ticked', async ({ page }) => {
+  test('Scenario: back ends the playlist: the library shows, with nothing playing and nothing ticked', async ({ page }) => {
     await test.step('Given "tiny", "Second" and "medium" are playing as a playlist, and "Second" is on', async () => {
       await select(page, 'tiny', 'Second', 'medium');
       await page.getByTestId('selection-play').tap();
@@ -255,7 +255,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: the back gesture from a later video goes straight to the library', async ({ page }) => {
+  test('Scenario: the back gesture from a later video goes straight to the library', async ({ page }) => {
     await test.step('Given "tiny" then "medium" are playing as a playlist, and "medium" is on', async () => {
       await select(page, 'tiny', 'medium');
       await page.getByTestId('selection-play').tap();
@@ -270,7 +270,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: headphone / lock-screen "next track" does nothing', async ({ page }) => {
+  test('Scenario: headphone / lock-screen "next track" does nothing', async ({ page }) => {
     await test.step('Given "medium" then "tiny" are playing as a playlist', async () => {
       await select(page, 'medium', 'tiny');
       await page.getByTestId('selection-play').tap();
@@ -285,7 +285,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: a video in the playlist that cannot open stops the playlist with its error', async ({ page }) => {
+  test('Scenario: a video in the playlist that cannot open stops the playlist with its error', async ({ page }) => {
     await test.step('Given "tiny" then "medium" are ticked, and the browser has since deleted "medium" from storage', async () => {
       await select(page, 'tiny', 'medium');
       await page.evaluate(() => new Promise((resolve, reject) => {
@@ -320,7 +320,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test.fixme('Scenario: a selection is not saved: after a reload nothing is ticked', async ({ page }) => {
+  test('Scenario: a selection is not saved: after a reload nothing is ticked', async ({ page }) => {
     await test.step('Given "tiny" and "medium" are ticked', async () => {
       await select(page, 'tiny', 'medium');
     });

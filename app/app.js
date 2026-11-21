@@ -14,7 +14,7 @@ import {
 import { hideStreamed } from './streamed.js';
 import {
   playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
-  timeUp, seekTo, seekBy,
+  timeUp, seekTo, seekBy, playOn,
 } from './player.js';
 import {
   FEATURES, flags, setFlag, loadEnabled, start as startFeature, unavailable as unavailableFeatures, setUp as setUpFeature,
@@ -40,6 +40,11 @@ const state = {
   signingIn: null, // a Google sign-in started by the tap that opened a streamed video
   downloadTarget: null, // the streamed video whose Download asked for the PIN
   downloading: new Set(), // the streamed videos being downloaded (their URIs)
+  // Videos ticked to play in a row (catalogue ids, in the order ticked); null
+  // while not selecting. Not saved.
+  selection: null,
+  // The playlist playing: { ids, index, advancing }; null for a video played alone.
+  playlist: null,
 };
 
 function parseRoute(hash) {
@@ -99,8 +104,81 @@ function videoTile(c) {
   li.dataset.videoId = c.offlineUri;
   li.dataset.playsFrom = c.playsFrom;
   downloadControls(li, c);
-  li.addEventListener('click', () => openFrom(c, '#/library'));
+  selectable(li, c, '#/library');
   return li;
+}
+
+// ---------- selecting (a playlist) ----------
+
+// A tap opens a video; holding it starts selecting and ticks it. While
+// selecting, a tap ticks or unticks. Lifting the finger after a hold may still
+// send a click, which is not a tap.
+const HOLD_MS = 500;
+let holdTimer = null;
+let held = false;
+const clearHold = () => { clearTimeout(holdTimer); holdTimer = null; };
+
+function selectable(li, c, from) {
+  const id = c.offlineUri;
+  if (state.selection) {
+    const place = state.selection.indexOf(id);
+    li.setAttribute('role', 'checkbox');
+    li.setAttribute('aria-checked', String(place >= 0));
+    if (place >= 0) {
+      const number = document.createElement('span');
+      number.dataset.testid = 'selection-number';
+      number.textContent = String(place + 1);
+      li.append(number);
+    }
+  }
+  // A hold only starts selecting; while selecting, any press is a tap.
+  li.addEventListener('pointerdown', () => {
+    held = false;
+    clearHold();
+    if (state.selection) return;
+    holdTimer = setTimeout(() => {
+      holdTimer = null;
+      held = true;
+      state.selection = [id];
+      update();
+    }, HOLD_MS);
+  });
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave']) li.addEventListener(type, clearHold);
+  li.addEventListener('contextmenu', (event) => event.preventDefault());
+  li.addEventListener('click', () => {
+    if (held) {
+      held = false;
+      return;
+    }
+    if (state.selection) toggleSelected(id);
+    else openFrom(c, from);
+  });
+}
+
+// Unticking the last ticked video stops selecting.
+function toggleSelected(id) {
+  const rest = state.selection.filter((x) => x !== id);
+  if (rest.length === state.selection.length) rest.push(id);
+  state.selection = rest.length ? rest : null;
+  update();
+}
+
+function playSelection() {
+  const ids = state.selection;
+  state.selection = null;
+  state.playlist = { ids, index: 0, advancing: false };
+  openFrom(state.library.find((c) => c.offlineUri === ids[0]), '#/library');
+}
+
+// At the end of a video in a playlist, the next one opens and plays by itself:
+// the PIN was given at the start. The last one stops, as any video does.
+// Replacing the history entry keeps Back (and the back gesture) going to the library.
+function onEnded() {
+  const list = state.playlist;
+  if (!list || list.index === list.ids.length - 1) return;
+  list.index += 1;
+  list.advancing = true;
+  location.replace(`#/player/${encodeURIComponent(list.ids[list.index])}`);
 }
 
 // A streamed video's tile says whether it is downloaded, and offers Download
@@ -137,7 +215,7 @@ function episodeTile(c, hash) {
   li.dataset.videoId = c.offlineUri;
   li.dataset.playsFrom = c.playsFrom;
   downloadControls(li, c);
-  li.addEventListener('click', () => openFrom(c, hash));
+  selectable(li, c, hash);
   return li;
 }
 
@@ -202,6 +280,15 @@ function render(s) {
   show('search-empty', query !== '' && shown.length === 0);
 
   renderJobs(s.jobs);
+
+  // Selecting: the bar, on the library and series screens
+  if (s.selection) $('screen-library').dataset.mode = 'select';
+  else delete $('screen-library').dataset.mode;
+  show('selection-bar', !!s.selection && ['library', 'series'].includes(s.route.name));
+  if (s.selection) {
+    $('selection-count').textContent = `${s.selection.length} selected`;
+    $('selection-play').textContent = `Play ${s.selection.length}`;
+  }
 
   // Series: its episodes, in season/episode order
   show('screen-series', s.route.name === 'series');
@@ -785,6 +872,10 @@ function onRouteChange() {
     if (state.prompt?.purpose === 'play') state.prompt = null;
     closeVideo().then(update);
   }
+  // Leaving the player ends a playlist.
+  if (state.route.name !== 'player') state.playlist = null;
+  const advancing = state.playlist?.advancing;
+  if (advancing) state.playlist.advancing = false;
   if (state.route.name === 'player') {
     const id = state.route.videoId;
     const entry = state.library.find((c) => c.offlineUri === id);
@@ -793,9 +884,14 @@ function onRouteChange() {
     const signing = state.signingIn;
     state.signingIn = null;
     // A downloaded one opens its stored copy.
-    if (entry && streamsNow(entry)) openVideo(id, true, () => streamFrom(entry, signing), !signing && !signedIn()).then(update);
-    else if (entry?.download) openVideo(id, true, async () => entry.download).then(update);
-    else openVideo(id, Boolean(entry)).then(update);
+    let opening;
+    if (entry && streamsNow(entry)) opening = openVideo(id, true, () => streamFrom(entry, signing), !signing && !signedIn());
+    else if (entry?.download) opening = openVideo(id, true, async () => entry.download);
+    else opening = openVideo(id, Boolean(entry));
+    opening.then(async () => {
+      if (advancing && state.route.videoId === id) await playOn();
+      update();
+    });
   }
   if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
   if (state.route.name === 'settings' && !state.settingsUnlocked && state.pinSet) {
@@ -842,10 +938,13 @@ async function boot() {
   $('play-button').addEventListener('click', () => onPlayRequested(true));
   $('pause-button').addEventListener('click', onPause);
   $('change-pin-button').addEventListener('click', () => askPin('change'));
+  $('selection-cancel').addEventListener('click', () => { state.selection = null; update(); });
+  $('selection-play').addEventListener('click', playSelection);
   initSearch();
   window.addEventListener('hashchange', onRouteChange);
 
   initPlayer($('player-video'), update);
+  $('player-video').addEventListener('ended', onEnded);
   initSeek();
   initVisibleArea();
   initControlsHide();
