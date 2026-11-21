@@ -69,7 +69,7 @@ test.describe('Feature: Search the library', () => {
   // library order (by series or video name; a video named like a series just
   // before it; episodes in season/episode order).
 
-  test.fixme('Scenario: an episode is found by its own name, shown on its own and named in full', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: an episode is found by its own name, shown on its own and named in full', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given three episodes of "Show" and "tiny" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('Show - S01E10 - Tenth', 'tiny', 'Show - S01E02 - Second', 'Show - S01E01 - First');
@@ -88,7 +88,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: a video named like a series is listed with the series\' episodes, itself first', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a video named like a series is listed with the series\' episodes, itself first', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given a standalone video "Show", two episodes of the series "Show", and "tiny" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('Show - S01E02 - Second', 'tiny', 'Show', 'Show - S01E01 - First');
@@ -103,7 +103,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: the same name in two series and on its own lists each video once', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the same name in two series and on its own lists each video once', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given "Second" is stored on its own, and as an episode of "Show" and of "Garden"', async () => {
       await goto(page, '#/library');
       await seedLibrary('Show - S01E02 - Second', 'Second', 'Garden - S02E01 - Second', 'Show - S01E01 - First');
@@ -117,7 +117,7 @@ test.describe('Feature: Search the library', () => {
     });
   });
 
-  test.fixme('Scenario: each result opens its own video, and back returns to the results', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: each result opens its own video, and back returns to the results', async ({ page, pinSet, seedLibrary }) => {
     await test.step('Given a standalone "Show" and the series "Show" are stored, and I searched for "show"', async () => {
       await goto(page, '#/library');
       await seedLibrary('Show', 'Show - S01E01 - First', 'Show - S01E02 - Second');
@@ -143,7 +143,7 @@ test.describe('Feature: Search the library', () => {
     }
   });
 
-  test.fixme('Scenario: a streamed video that is also downloaded is listed once', async ({ page, pinSet }) => {
+  test('Scenario: a streamed video that is also downloaded is listed once', async ({ page, pinSet }) => {
     const google = await fakeGoogle(page, { 'medium.kidsvideo': fixtureContainer('medium') });
     await test.step('Given "medium" is streamed from Google Drive and downloaded', async () => {
       await goto(page, '#/library');

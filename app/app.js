@@ -197,10 +197,7 @@ function render(s) {
   document.querySelector('[data-role="library-grid"]').replaceChildren(
     ...(query ? shown.map(videoTile) : libraryTiles(s.library)),
   );
-  const search = $('search-input');
-  search.dataset.state = s.searchUnlocked ? 'unlocked' : 'locked';
-  search.readOnly = !s.searchUnlocked;
-  if (search.value !== s.search) search.value = s.search;
+  renderSearchField(s);
   show('search-clear', s.search !== '');
   show('search-empty', query !== '' && shown.length === 0);
 
@@ -437,6 +434,15 @@ function initVisibleArea() {
 }
 // Library search: locked until the PIN, unlocked until
 // the field loses focus; clearing needs no PIN.
+// The search field alone: locking it on blur must not rebuild the results,
+// or a tap on a result would land on a tile that was just replaced.
+function renderSearchField(s) {
+  const search = $('search-input');
+  search.dataset.state = s.searchUnlocked ? 'unlocked' : 'locked';
+  search.readOnly = !s.searchUnlocked;
+  if (search.value !== s.search) search.value = s.search;
+}
+
 function initSearch() {
   const input = $('search-input');
   input.addEventListener('click', () => { if (!state.searchUnlocked) askPin('search'); });
@@ -447,7 +453,7 @@ function initSearch() {
   input.addEventListener('blur', () => {
     if (!state.searchUnlocked) return;
     state.searchUnlocked = false;
-    update();
+    renderSearchField(state);
   });
   $('search-clear').addEventListener('click', () => {
     state.search = '';
