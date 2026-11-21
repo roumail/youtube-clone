@@ -1,7 +1,8 @@
 // Feature "faceId": Face ID / Touch ID answers the PIN prompt. Switching it on
 // sets up a passkey for this app on this device (setUp); with it on, every PIN
 // prompt that asks for the current PIN starts Face ID as it opens, and passing
-// it counts as the right PIN. A failed or cancelled Face ID leaves the prompt
+// it counts as the right PIN. A prompt opened without a tap (play from the
+// device's media controls) waits for a tap on "Use Face ID" instead. A failed or cancelled Face ID leaves the prompt
 // open for the PIN, and "Use Face ID" tries again. Switching it off forgets
 // the passkey's id.
 const KEY = 'faceId.credentialId';
@@ -51,9 +52,10 @@ export function init(ctx) {
       button.hidden = p?.mode !== 'verify';
       button.disabled = p?.status === 'locked-out';
     },
-    // A prompt just opened: start Face ID at once (a disabled button ignores this).
-    promptOpened() {
-      button.click();
+    // A prompt just opened: after a tap, start Face ID at once (a disabled
+    // button ignores this); otherwise wait for a tap on "Use Face ID".
+    promptOpened(byTap) {
+      if (byTap) button.click();
     },
     stop() {
       listening.abort();
