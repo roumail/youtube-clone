@@ -1,7 +1,11 @@
 // Feature: Face ID / Touch ID — an optional parental feature behind a flag,
-// off by default and switched in Settings. When on, the PIN prompt starts
-// Face ID (Touch ID on a Mac) as soon as it opens; passing it answers the
-// prompt exactly like the right PIN. It lives in the PIN prompt alone: every
+// off by default and switched in Settings. When on, a PIN prompt opened by a
+// tap starts Face ID (Touch ID on a Mac) as soon as it opens; passing it
+// answers the prompt exactly like the right PIN. A prompt opened without a tap
+// (play from Control Center, the lock screen or a keyboard) doesn't start it
+// on its own: it waits for a tap on "Use Face ID". So Face ID always looks the
+// same: the device's passkey sheet, then Face ID, never an extra "Continue"
+// alert from the browser. It lives in the PIN prompt alone: every
 // action behind the PIN gets it the same way, with no exceptions per action.
 // The PIN stays: it is typed whenever Face ID fails or is cancelled, and the
 // prompt's rules (lockout, setup, changing the PIN) don't change.
@@ -13,6 +17,7 @@
 // as it does after the PIN (play-requires-pin.spec.js).
 import {
   test, expect, goto, enterPin, openVideo, expectPlaying, expectNotPlaying, playerState, PIN,
+  mediaSessionAction,
 } from '../../support.js';
 
 // A device with Face ID: a platform authenticator that passes unless told to fail.
@@ -139,6 +144,31 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
       });
     });
   }
+
+  test.fixme('Scenario: play from the device (not a tap) waits for a tap on "Use Face ID"', async ({ page, pinSet, seedLibrary }) => {
+    const device = await faceIdDevice(page);
+    await test.step('Given Face ID is on, and "tiny" is open', async () => {
+      await goto(page, '#/library');
+      await seedLibrary('tiny');
+      await switchFaceIdOn(page);
+      await openVideo(page, 'tiny');
+    });
+    const before = await device.uses();
+    await test.step('When play comes from the device (Control Center, lock screen or a keyboard)', async () => {
+      await mediaSessionAction(page, 'play');
+    });
+    await test.step('Then the PIN prompt opens, offering Face ID, and Face ID is not asked yet', async () => {
+      await expect(prompt(page)).toBeVisible();
+      await expect(faceIdButton(page)).toBeVisible();
+      await expectNotPlaying(page);
+      expect(await device.uses()).toBe(before);
+    });
+    await test.step('And when I tap "Use Face ID" and pass it, the video plays', async () => {
+      await faceIdButton(page).tap();
+      await expectPlaying(page);
+      expect(await device.uses()).toBe(before + 1);
+    });
+  });
 
   test('Scenario: when Face ID fails or is cancelled, the PIN still works, and Face ID can be tried again', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
