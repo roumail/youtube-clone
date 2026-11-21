@@ -145,7 +145,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     });
   }
 
-  test.fixme('Scenario: play from the device (not a tap) waits for a tap on "Use Face ID"', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: play from the device (not a tap) waits for a tap on "Use Face ID"', async ({ page, pinSet, seedLibrary }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID is on, and "tiny" is open', async () => {
       await goto(page, '#/library');

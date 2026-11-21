@@ -266,12 +266,14 @@ function scheduleLockoutEnd() {
   if (left > 0) setTimeout(update, left + 10);
 }
 
-function askPin(purpose) {
+// byTap: the prompt opens from a tap on the page (not from the device's
+// media controls); features may start something only a tap allows.
+function askPin(purpose, byTap = true) {
   state.prompt = { purpose, mode: 'verify', status: 'entry', error: '' };
   $('pin-input').value = '';
   update();
   $('pin-input').focus();
-  for (const f of Object.values(state.features)) f.promptOpened?.();
+  for (const f of Object.values(state.features)) f.promptOpened?.(byTap);
 }
 
 async function onPinSubmit(event) {
@@ -662,9 +664,9 @@ async function importSeveral(items, sourceOf, add) {
 }
 
 // Play (button or OS command): the PIN comes first, every time.
-function onPlayRequested() {
+function onPlayRequested(byTap) {
   if (state.route.name !== 'player' || state.prompt) return;
-  if (requestPlay()) askPin('play');
+  if (requestPlay()) askPin('play', byTap);
 }
 
 function onPause() {
@@ -837,7 +839,7 @@ async function boot() {
     importItems(files, pickedSource, importVideo);
   });
   $('add-from-drive-button').addEventListener('click', () => askPin('drive'));
-  $('play-button').addEventListener('click', onPlayRequested);
+  $('play-button').addEventListener('click', () => onPlayRequested(true));
   $('pause-button').addEventListener('click', onPause);
   $('change-pin-button').addEventListener('click', () => askPin('change'));
   initSearch();
@@ -854,7 +856,7 @@ async function boot() {
   });
   // OS media controls (lock screen, Control Center, headphones, media keys):
   // "play" goes through the PIN like the on-screen button; "pause" is free.
-  navigator.mediaSession.setActionHandler('play', onPlayRequested);
+  navigator.mediaSession.setActionHandler('play', () => onPlayRequested(false));
   navigator.mediaSession.setActionHandler('pause', onPause);
 
   // Offline + installable: cache the app shell (network-first, sw.js).
