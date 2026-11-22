@@ -30,7 +30,8 @@ const state = {
   search: '', // library search text (not saved); typing needs the PIN
   searchUnlocked: false, // until the search field loses focus
   // PIN prompt: { purpose: 'setup' | 'import' | 'drive' | 'download' | 'settings' | 'play' | 'change' | 'search',
-  //              mode: 'setup' | 'confirm' | 'verify' | 'change', status: 'entry' | 'wrong', error }
+  //              mode: 'setup' | 'confirm' | 'verify' | 'change', status: 'entry' | 'wrong' | 'faceid', error }
+  //              ('faceid': Face ID is being asked; the prompt stays out of sight)
   prompt: null,
   newPin: null, // first entry of a new PIN, until it is confirmed
   returnTo: '#/library', // where the player's Back goes (the library or a series list)
@@ -326,7 +327,7 @@ function render(s) {
 
   // PIN prompt (overlay over any screen)
   const prompt = pinPromptFor(s);
-  show('pin-prompt', !!prompt);
+  show('pin-prompt', !!prompt && prompt.status !== 'faceid');
   if (prompt) {
     $('pin-prompt').dataset.mode = prompt.mode;
     $('pin-prompt').dataset.state = prompt.status;
@@ -359,8 +360,9 @@ function askPin(purpose, byTap = true) {
   state.prompt = { purpose, mode: 'verify', status: 'entry', error: '' };
   $('pin-input').value = '';
   update();
-  $('pin-input').focus();
   for (const f of Object.values(state.features)) f.promptOpened?.(byTap);
+  // Face ID may have started: then the PIN field waits until it fails.
+  if (state.prompt.status !== 'faceid') $('pin-input').focus();
 }
 
 async function onPinSubmit(event) {
@@ -484,6 +486,13 @@ function featureContext() {
   return {
     $, playerState, timeUp, changed: () => update(),
     prompt: () => pinPromptFor(state),
+    // Face ID started (the prompt goes out of sight) or failed (the prompt
+    // shows again, ready for the PIN).
+    faceIdAsking: (asking) => {
+      Object.assign(state.prompt, { status: asking ? 'faceid' : 'entry', error: '' });
+      update();
+      $('pin-input').focus();
+    },
     answerPrompt: () => {
       recordSuccess();
       return acceptPrompt(state.prompt);

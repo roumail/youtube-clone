@@ -1,7 +1,10 @@
 // Feature: Face ID / Touch ID — an optional parental feature behind a flag,
 // off by default and switched in Settings. When on, a PIN prompt opened by a
 // tap starts Face ID (Touch ID on a Mac) as soon as it opens; passing it
-// answers the prompt exactly like the right PIN. A prompt opened without a tap
+// answers the prompt exactly like the right PIN. While Face ID is asked, the
+// prompt stays out of sight (no PIN field, no keyboard), so only the device's
+// own sheets show; it shows, ready for the PIN, only if Face ID fails.
+// A prompt opened without a tap
 // (play from Control Center, the lock screen or a keyboard) doesn't start it
 // on its own: it waits for a tap on "Use Face ID". So Face ID always looks the
 // same: the device's passkey sheet, then Face ID, never an extra "Continue"
@@ -46,6 +49,17 @@ test.use({ baseURL: 'http://localhost:4173/app/' });
 const prompt = (page) => page.getByTestId('pin-prompt');
 const faceIdButton = (page) => page.getByTestId('pin-faceid-button');
 const toggle = (page) => page.getByTestId('feature-toggle-faceId');
+
+// Records whether the PIN prompt is ever on screen from now on.
+async function watchPrompt(page) {
+  await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="pin-prompt"]');
+    window.promptWasShown = false;
+    new MutationObserver(() => { if (!el.hidden) window.promptWasShown = true; })
+      .observe(el, { attributes: true, attributeFilter: ['hidden'] });
+  });
+  return { wasShown: () => page.evaluate(() => window.promptWasShown) };
+}
 
 async function openSettings(page) {
   await page.getByTestId('settings-button').click();
@@ -125,7 +139,7 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     ['typing in search', async () => {}, (page) => page.getByTestId('search-input').click(),
       (page) => expect(page.getByTestId('search-input')).toHaveAttribute('data-state', 'unlocked')],
   ]) {
-    test(`Scenario: with it on, Face ID answers the PIN prompt for ${action}`, async ({ page, pinSet, seedLibrary }) => {
+    test(`Scenario: with it on, Face ID answers the PIN prompt for ${action}, without the prompt showing`, async ({ page, pinSet, seedLibrary }) => {
       const device = await faceIdDevice(page);
       await test.step('Given Face ID is on, and "tiny" is stored', async () => {
         await goto(page, '#/library');
@@ -134,13 +148,15 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
         await arrange(page);
       });
       const before = await device.uses();
+      const watched = await watchPrompt(page);
       await test.step(`When I start ${action} and pass Face ID`, async () => {
         await act(page);
       });
-      await test.step('Then it goes ahead without the PIN being typed', async () => {
+      await test.step('Then it goes ahead without the PIN being typed, and the PIN prompt never showed', async () => {
         await done(page);
         await expect(prompt(page)).toBeHidden();
         expect(await device.uses()).toBe(before + 1);
+        expect(await watched.wasShown()).toBe(false);
       });
     });
   }
@@ -180,8 +196,10 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     await test.step('When I tap Settings', async () => {
       await page.getByTestId('settings-button').click();
     });
-    await test.step('Then the PIN prompt stays open, offering Face ID again', async () => {
+    await test.step('Then the PIN prompt shows, ready for the PIN, offering Face ID again', async () => {
       await expect(prompt(page)).toBeVisible();
+      await expect(prompt(page)).toHaveAttribute('data-state', 'entry');
+      await expect(page.getByTestId('pin-input')).toBeFocused();
       await expect(faceIdButton(page)).toBeVisible();
     });
     await test.step('And when I tap "Use Face ID" and it passes this time, Settings opens', async () => {
