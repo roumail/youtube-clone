@@ -12,21 +12,21 @@ test.describe('Live site after deploy', () => {
     expect(live.version).toBe(process.env.EXPECTED_VERSION);
   });
 
-  test('Scenario: a fresh install boots to the PIN setup prompt', async ({ page }) => {
+  test('Scenario: a fresh install boots to the Face ID setup prompt', async ({ page }) => {
     await test.step('Given a fresh browser opens the public app', async () => {
       await goto(page, '#/library');
     });
-    await test.step('Then it asks to set a PIN', async () => {
-      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'setup');
+    await test.step('Then it asks to set up Face ID', async () => {
+      await expect(page.getByTestId('unlock-prompt')).toHaveAttribute('data-mode', 'setup');
     });
   });
 
-  test('Scenario: the app boots with a PIN and shows the library', async ({ page, pinSet }) => {
+  test('Scenario: the app boots with Face ID set up and shows the library', async ({ page, setUp }) => {
     await goto(page, '#/library');
     await expect(page.getByTestId('screen-library')).toBeVisible();
   });
 
-  test('Scenario: the library shows the released version', async ({ page, pinSet }) => {
+  test('Scenario: the library shows the released version', async ({ page, setUp }) => {
     await goto(page, '#/library');
     await expect(page.getByTestId('app-version')).toHaveText(process.env.EXPECTED_VERSION);
   });

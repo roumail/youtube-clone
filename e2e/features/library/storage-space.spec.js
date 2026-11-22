@@ -5,18 +5,18 @@
 // with its declared bitrate raised 100x. The free space is set through
 // navigator.storage.estimate, as the browser reports it.
 import {
-  test, expect, goto, enterPin, fixtureContainer, freeSpace, declaredSize, containerSize, PIN,
+  test, expect, goto, fixtureContainer, freeSpace, declaredSize, containerSize, tapContinue,
 } from '../../support.js';
 
 async function addVideo(page, name) {
   const chooser = page.waitForEvent('filechooser');
   await page.getByTestId('add-video-button').click();
-  await enterPin(page, PIN);
+  await tapContinue(page);
   await (await chooser).setFiles([fixtureContainer(name)]);
 }
 
 test.describe('Feature: Storage space', () => {
-  test('Scenario: a video that fits is added, even when its declared bitrate suggests it is much bigger', async ({ page, pinSet }) => {
+  test('Scenario: a video that fits is added, even when its declared bitrate suggests it is much bigger', async ({ page, setUp }) => {
     const free = containerSize('high-peak') * 2;
     await test.step('Given there is room for twice the video\'s real size, but not for the size its bitrate suggests', async () => {
       expect(declaredSize('high-peak')).toBeGreaterThan(free);
@@ -32,7 +32,7 @@ test.describe('Feature: Storage space', () => {
     });
   });
 
-  test('Scenario: a video that does not fit is refused up front and leaves nothing behind', async ({ page, pinSet }) => {
+  test('Scenario: a video that does not fit is refused up front and leaves nothing behind', async ({ page, setUp }) => {
     await test.step('Given there is room for only half of "tiny"', async () => {
       await freeSpace(page, Math.floor(containerSize('tiny') / 2));
       await goto(page, '#/library');

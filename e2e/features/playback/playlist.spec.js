@@ -1,20 +1,20 @@
 // Feature: Play several (a playlist) — a parent ticks several videos and they
-// play one after another, with the PIN asked once, at the start.
+// play one after another, with Face ID asked once, at the start.
 //
 // Two ways to play: tap a video to play it alone (it stops at its end, as
 // always), or hold a video to start selecting, tick more, and play them all.
 // Holding a tile (library or series) ticks it and starts selecting; a tap then
-// ticks or unticks. Ticking needs no PIN: nothing plays until the PIN is given.
+// ticks or unticks. Ticking needs no Face ID: nothing plays until Face ID passes.
 // Videos play in the order they were ticked. There are no next / previous
 // buttons: the playlist only moves on when a video ends.
 //
 // A playlist is an ordered list of catalogue ids (the ids in #/player/<id>).
 // It is not saved yet: it lives until the playlist ends, back is tapped, or the
 // app reloads. Saved playlists, if added later, are kept in this device's
-// browser storage like the PIN, as that same list of ids.
+// browser storage, as that same list of ids.
 import {
-  test, expect, goto, enterPin, startPlaying, expectPlaying, expectNotPlaying, playerState,
-  mediaSessionAction, PIN,
+  test, expect, goto, startPlaying, expectPlaying, expectNotPlaying, playerState,
+  mediaSessionAction,
 } from '../../support.js';
 
 const tile = (page, title) => page.getByTestId('library-item').filter({ hasText: title });
@@ -41,21 +41,21 @@ async function isOpen(page, title) {
 }
 
 test.describe('Feature: Play several (a playlist)', () => {
-  test.beforeEach(async ({ page, pinSet, seedLibrary }) => {
+  test.beforeEach(async ({ page, setUp, seedLibrary }) => {
     await page.clock.install();
     await goto(page, '#/library');
     await seedLibrary('tiny', 'Second', 'medium', 'Show - S01E01 - First', 'Show - S01E02 - Second');
   });
 
-  test('Scenario: holding a video starts selecting and ticks it, without opening it or asking the PIN @ipad', async ({ page }) => {
+  test('Scenario: holding a video starts selecting and ticks it, without opening it or asking for Face ID @ipad', async ({ page }) => {
     await test.step('When I hold "tiny"', async () => {
       await hold(page, tile(page, 'tiny'));
     });
-    await test.step('Then the library is selecting, "tiny" is ticked as 1, and no PIN or player is shown', async () => {
+    await test.step('Then the library is selecting, "tiny" is ticked as 1, and no prompt or player is shown', async () => {
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-mode', 'select');
       await expect(tile(page, 'tiny')).toHaveAttribute('aria-checked', 'true');
       await expect(tile(page, 'tiny').getByTestId('selection-number')).toHaveText('1');
-      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+      await expect(page.getByTestId('unlock-prompt')).toBeHidden();
       await expect(page.getByTestId('screen-player')).toBeHidden();
     });
   });
@@ -148,7 +148,7 @@ test.describe('Feature: Play several (a playlist)', () => {
     });
   });
 
-  test('Scenario: playing the selection opens the first ticked video, paused; play asks for the PIN @ipad', async ({ page }) => {
+  test('Scenario: playing the selection opens the first ticked video, paused; play asks for Face ID @ipad', async ({ page, faceId }) => {
     await test.step('Given "medium" then "tiny" are ticked', async () => {
       await select(page, 'medium', 'tiny');
     });
@@ -161,36 +161,39 @@ test.describe('Feature: Play several (a playlist)', () => {
       expect(await isOpen(page, 'medium')).toBe(true);
       await expectNotPlaying(page);
     });
-    await test.step('When I tap play and enter the PIN', async () => {
+    const before = await faceId.uses();
+    await test.step('When I tap play and pass Face ID', async () => {
       await page.getByTestId('play-button').tap();
-      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'verify');
-      await enterPin(page, PIN);
     });
     await test.step('Then "medium" plays', async () => {
       await expectPlaying(page);
+      expect(await faceId.uses()).toBe(before + 1);
     });
   });
 
-  test('Scenario: at the end of each video the next one plays by itself, without the PIN', async ({ page }) => {
+  test('Scenario: at the end of each video the next one plays by itself, without Face ID', async ({ page, faceId }) => {
     await test.step('Given "tiny" (3 s), "Second" (3 s) and "medium" are ticked in that order, and "tiny" is playing', async () => {
       await select(page, 'tiny', 'Second', 'medium');
       await page.getByTestId('selection-play').tap();
       await startPlaying(page);
     });
-    await test.step('When "tiny" ends, then "Second" plays from the start, with no PIN asked', async () => {
+    const uses = await faceId.uses();
+    await test.step('When "tiny" ends, then "Second" plays from the start, with no Face ID asked', async () => {
       await expect.poll(() => isOpen(page, 'Second')).toBe(true);
       await expectPlaying(page);
-      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+      await expect(page.getByTestId('unlock-prompt')).toBeHidden();
+      expect(await faceId.uses()).toBe(uses);
     });
-    await test.step('When "Second" ends, then "medium" plays, with no PIN asked', async () => {
+    await test.step('When "Second" ends, then "medium" plays, with no Face ID asked', async () => {
       await expect.poll(() => isOpen(page, 'medium')).toBe(true);
       await expect(page.getByTestId('time-total')).toHaveText('01:00');
       await expectPlaying(page);
-      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+      await expect(page.getByTestId('unlock-prompt')).toBeHidden();
+      expect(await faceId.uses()).toBe(uses);
     });
   });
 
-  test('Scenario: at the end of the last video nothing else starts', async ({ page }) => {
+  test('Scenario: at the end of the last video nothing else starts', async ({ page, faceId }) => {
     await test.step('Given "tiny" then "Second" are playing as a playlist', async () => {
       await select(page, 'tiny', 'Second');
       await page.getByTestId('selection-play').tap();
@@ -204,13 +207,14 @@ test.describe('Feature: Play several (a playlist)', () => {
       await expectNotPlaying(page);
       expect(await isOpen(page, 'Second')).toBe(true);
     });
-    await test.step('And play asks for the PIN, as for any video at its end', async () => {
+    await test.step('And play asks for Face ID, as for any video at its end', async () => {
+      const before = await faceId.uses();
       await page.getByTestId('play-button').tap();
-      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'verify');
+      await expect.poll(() => faceId.uses()).toBe(before + 1);
     });
   });
 
-  test('Scenario: pausing in a playlist is free; resuming needs the PIN and the playlist goes on', async ({ page }) => {
+  test('Scenario: pausing in a playlist is free; resuming needs Face ID and the playlist goes on', async ({ page, faceId }) => {
     await test.step('Given "medium" then "tiny" are playing as a playlist, and I paused "medium"', async () => {
       await select(page, 'medium', 'tiny');
       await page.getByTestId('selection-play').tap();
@@ -218,21 +222,18 @@ test.describe('Feature: Play several (a playlist)', () => {
       await page.getByTestId('pause-button').tap();
       await expectNotPlaying(page);
     });
-    await test.step('When I tap play', async () => {
+    const before = await faceId.uses();
+    await test.step('When I tap play, pass Face ID, and "medium" plays to its end', async () => {
       await page.getByTestId('play-button').tap();
-    });
-    await test.step('Then the PIN is asked for', async () => {
-      await expect(playerState(page)).toHaveAttribute('data-state', 'pin-required');
-    });
-    await test.step('When I enter it and "medium" plays to its end', async () => {
-      await enterPin(page, PIN);
       await expectPlaying(page);
+      expect(await faceId.uses()).toBe(before + 1);
       await page.getByTestId('seek-bar').fill('58');
     });
-    await test.step('Then "tiny" plays next, with no PIN asked', async () => {
+    await test.step('Then "tiny" plays next, with no Face ID asked', async () => {
       await expect.poll(() => isOpen(page, 'tiny')).toBe(true);
       await expectPlaying(page);
-      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+      await expect(page.getByTestId('unlock-prompt')).toBeHidden();
+      expect(await faceId.uses()).toBe(before + 1);
     });
   });
 

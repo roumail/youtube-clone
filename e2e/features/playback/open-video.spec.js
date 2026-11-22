@@ -2,7 +2,7 @@
 import { test, expect, goto, openVideo, expectNotPlaying, playerState } from '../../support.js';
 
 test.describe('Feature: Open a video', () => {
-  test('Scenario: tapping a video opens the player in the same app, not a new tab', async ({ page, context, pinSet, seedLibrary }) => {
+  test('Scenario: tapping a video opens the player in the same app, not a new tab', async ({ page, context, setUp, seedLibrary }) => {
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -17,7 +17,7 @@ test.describe('Feature: Open a video', () => {
     });
   });
 
-  test('Scenario: an opened video is paused at the start @ipad', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: an opened video is paused at the start @ipad', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -32,7 +32,7 @@ test.describe('Feature: Open a video', () => {
     });
   });
 
-  test('Scenario: the video element cannot bypass the app controls', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the video element cannot bypass the app controls', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny" is open', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -49,7 +49,7 @@ test.describe('Feature: Open a video', () => {
     });
   });
 
-  test('Scenario: the player fills the whole screen, in landscape and portrait', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the player fills the whole screen, in landscape and portrait', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny" is open', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -68,7 +68,7 @@ test.describe('Feature: Open a video', () => {
     }
   });
 
-  test('Scenario: a video whose stored data is gone shows an error instead of playing', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a video whose stored data is gone shows an error instead of playing', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny" is listed, but the browser has since deleted it from storage while the app was open', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -94,7 +94,7 @@ test.describe('Feature: Open a video', () => {
     });
   });
 
-  test('Scenario: an old link to a video no longer in the library shows the error, and back returns to the library', async ({ page, pinSet }) => {
+  test('Scenario: an old link to a video no longer in the library shows the error, and back returns to the library', async ({ page, setUp }) => {
     await test.step('When I open a link to a video that is not in the library', async () => {
       await goto(page, '#/player/offline%3Amanifest%2Fv5%2F1%2F999');
     });

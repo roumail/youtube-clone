@@ -6,7 +6,7 @@ import { test, expect, goto, startPlaying, expectNotPlaying } from '../../suppor
 const EPISODES = ['Show - S01E10 - Tenth', 'Show - S01E01 - First', 'Show - S01E02 - Second'];
 
 test.describe('Feature: Series', () => {
-  test.beforeEach(async ({ page, pinSet, seedLibrary }) => {
+  test.beforeEach(async ({ page, setUp, seedLibrary }) => {
     await goto(page, '#/library');
     await seedLibrary(...EPISODES, 'tiny');
   });
@@ -39,7 +39,7 @@ test.describe('Feature: Series', () => {
       await page.getByTestId('series-item').filter({ hasText: 'Show' }).click();
       await page.getByTestId('episode-item').filter({ hasText: 'S01E02' }).click();
     });
-    await test.step('Then the player shows it paused (play still needs the PIN)', async () => {
+    await test.step('Then the player shows it paused (play still needs Face ID)', async () => {
       await expect(page.getByTestId('screen-player')).toHaveAttribute('data-state', 'paused');
       await expectNotPlaying(page);
     });

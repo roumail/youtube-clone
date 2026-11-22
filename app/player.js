@@ -1,5 +1,5 @@
 // The player: Shaka on our own <video>, custom controls only.
-// Pause is free; playback only ever starts through allowPlay() (after the PIN).
+// Pause is free; playback only ever starts through allowPlay() (after unlocking).
 // Anything else that starts playback (script, OS media keys, browser quirks)
 // is paused immediately.
 
@@ -32,7 +32,7 @@ export function initPlayer(videoEl, changed) {
   video.disableRemotePlayback = true;
 
   video.addEventListener('play', () => {
-    if (!authorized) video.pause(); // safety net: play outside the PIN flow
+    if (!authorized) video.pause(); // safety net: play outside the unlock flow
   });
   video.addEventListener('playing', () => {
     if (authorized) set('playing');
@@ -109,7 +109,7 @@ export function closeVideo() {
   return closing;
 }
 
-/** Play was requested (button or OS command): the PIN comes first. */
+/** Play was requested (button or OS command): unlocking comes first. */
 export function requestPlay() {
   if (!['paused', 'ended', 'time-up'].includes(playerState.status)) return false;
   set('pin-required');
@@ -121,7 +121,7 @@ export function cancelPlay() {
 }
 
 /**
- * The correct PIN was entered: start (or resume) playback. ready, if given, is
+ * Unlocked: start (or resume) playback. ready, if given, is
  * waited for first (a Google sign-in for a streamed video).
  */
 export async function allowPlay(ready) {
@@ -152,7 +152,7 @@ async function start() {
 }
 
 /**
- * A playlist moves on: its next video, just opened, plays without the PIN
+ * A playlist moves on: its next video, just opened, plays without unlocking
  * (given at the start of the playlist). One that didn't open stays as it is,
  * and so does a streamed one waiting for a Google sign-in (that needs a tap).
  */
@@ -160,7 +160,7 @@ export function playOn() {
   if (playerState.status === 'paused' && !loadLater) return start();
 }
 
-/** Seek (M8). Never starts playback: free for the child, no PIN needed. */
+/** Seek (M8). Never starts playback: free for the child, no unlocking needed. */
 export function seekTo(seconds) {
   if (!video || !Number.isFinite(video.duration)) return;
   video.currentTime = Math.max(0, Math.min(video.duration, seconds));

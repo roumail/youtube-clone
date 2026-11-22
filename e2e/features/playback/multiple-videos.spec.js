@@ -4,7 +4,7 @@ import {
 } from '../../support.js';
 
 test.describe('Feature: Several videos', () => {
-  test.beforeEach(async ({ page, pinSet, seedLibrary }) => {
+  test.beforeEach(async ({ page, setUp, seedLibrary }) => {
     await goto(page, '#/library');
     await seedLibrary('tiny', 'medium', 'episode-like');
   });
@@ -24,7 +24,7 @@ test.describe('Feature: Several videos', () => {
     });
   });
 
-  test('Scenario: opening another video after watching one starts paused and needs the PIN', async ({ page }) => {
+  test('Scenario: opening another video after watching one starts paused and needs Face ID', async ({ page, faceId }) => {
     await test.step('Given I watched "medium" and went back', async () => {
       await openVideo(page, 'medium');
       await startPlaying(page);
@@ -33,10 +33,11 @@ test.describe('Feature: Several videos', () => {
     await test.step('When I open "episode-like"', async () => {
       await openVideo(page, 'episode-like');
     });
-    await test.step('Then it is paused, and play asks for the PIN', async () => {
+    await test.step('Then it is paused, and play asks for Face ID', async () => {
       await expectNotPlaying(page);
+      const before = await faceId.uses();
       await page.getByTestId('play-button').click();
-      await expect(playerState(page)).toHaveAttribute('data-state', 'pin-required');
+      await expect.poll(() => faceId.uses()).toBe(before + 1);
     });
   });
 

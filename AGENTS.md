@@ -1,6 +1,6 @@
 # Working on this repo (for any coding agent / LLM)
 
-A PIN-gated kids video library: a general-purpose installable web app (PWA)
+A kids video library unlocked with Face ID / Touch ID: a general-purpose installable web app (PWA)
 that any family can use on its Mac, iPad and iPhone. Videos are streamed from
 the shelf (Google Drive) or stored on the device; the words are defined in
 `README.md`. **The behaviour specs in `e2e/features/` are the
@@ -17,8 +17,8 @@ This file says *how* to work here.
 - Open questions: ask the owner; don't guess.
 
 ## Scope (feature-minimal)
-Each installation's users are the parents plus a child watching. The PIN prompt is the only access
-control; there are no logins, accounts or roles, and none are planned.
+Each installation's users are the parents plus a child watching. Face ID / Touch ID (the device's,
+falling back to its passcode) is the only access control; there are no logins, accounts or roles, and none are planned.
 Out of scope unless the owner asks for it:
 - saved playlists, recommendations, history
 - playback speed, subtitles, volume UI (hardware buttons only)
@@ -77,7 +77,8 @@ Out of scope unless the owner asks for it:
 - Arrange through `seedLibrary` (Shaka `store()` with the app's track picker);
   only the import scenarios go through the file picker.
 - **No test hooks in the app.** The environment is simulated with init scripts
-  in `e2e/support.js`: P3 screen (every test), Media Session handlers,
+  in `e2e/support.js`: P3 screen and Face ID (every test; Chromium's virtual
+  authenticator, simulated in WebKit), Media Session handlers,
   visibility, the iPhone keyboard, free storage space.
 - Projects: Chromium at iPad size with touch; `@ipad` scenarios also run in
   WebKit (iPad profile); `@iphone` scenarios run only in WebKit iPhone profiles.
@@ -95,7 +96,7 @@ Out of scope unless the owner asks for it:
   stores 0 tracks without an error. A store with 0 tracks is a failure.
 - `<video>`: no `controls`, no `autoplay`, `playsinline`,
   `disablePictureInPicture`, `disableRemotePlayback`. Pause is free; every
-  play/resume needs the PIN.
+  play/resume needs Face ID.
 - No frameworks, no build step for the app. The only app dependency is the
   vendored, pinned Shaka Player in `app/vendor/`.
 

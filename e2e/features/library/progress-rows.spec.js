@@ -8,9 +8,7 @@
 // or recently finished there is no row.
 // Google is faked at the network boundary. Not @ipad, for the same reason as
 // add-from-drive.spec.js.
-import {
-  test, expect, goto, enterPin, fixtureContainer, fakeGoogle, PIN,
-} from '../../support.js';
+import { test, expect, goto, fixtureContainer, fakeGoogle, tapContinue, signInDue } from '../../support.js';
 
 const shelf = () => ({
   'Show - S01E01 - First.kidsvideo': fixtureContainer('Show - S01E01 - First'),
@@ -24,19 +22,22 @@ const rows = (page) => page.getByTestId('import-status');
 const row = (page, text) => rows(page).filter({ hasText: text });
 const item = (page, title) => page.getByTestId('library-item').filter({ hasText: title });
 
+// After Face ID; the first time, the Google sign-in is due, so "Continue" is
+// tapped for it (unlock.spec.js).
 async function addFromDrive(page, google, ...names) {
   await google.willPick(...names);
+  const signingIn = await signInDue(page);
   await page.getByTestId('add-from-drive-button').click();
-  await enterPin(page, PIN);
+  if (signingIn) await tapContinue(page);
 }
 
+// After Face ID; signed in already (by the add), so no "Continue".
 async function download(page, title) {
   await item(page, title).getByTestId('download-button').tap();
-  await enterPin(page, PIN);
 }
 
 test.describe('Feature: One row per add or download', () => {
-  test('Scenario: with nothing added or downloaded, there is no row', async ({ page, pinSet }) => {
+  test('Scenario: with nothing added or downloaded, there is no row', async ({ page, setUp }) => {
     await test.step('Given the library is shown', async () => {
       await goto(page, '#/library');
     });
@@ -45,7 +46,7 @@ test.describe('Feature: One row per add or download', () => {
     });
   });
 
-  test('Scenario: two adds from Google Drive at once each get their own row', async ({ page, pinSet }) => {
+  test('Scenario: two adds from Google Drive at once each get their own row', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shelf(), folders);
     let release;
     await test.step('Given the folder "Show" is being added', async () => {
@@ -69,7 +70,7 @@ test.describe('Feature: One row per add or download', () => {
     });
   });
 
-  test('Scenario: an add and a download at once each get their own row', async ({ page, pinSet }) => {
+  test('Scenario: an add and a download at once each get their own row', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shelf());
     let release;
     await test.step('Given "medium" is streamed and being downloaded', async () => {
@@ -94,7 +95,7 @@ test.describe('Feature: One row per add or download', () => {
     });
   });
 
-  test('Scenario: a finished row clears itself after 10 seconds', async ({ page, pinSet }) => {
+  test('Scenario: a finished row clears itself after 10 seconds', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shelf());
     await test.step('Given "tiny" was just added from Google Drive', async () => {
@@ -112,7 +113,7 @@ test.describe('Feature: One row per add or download', () => {
     });
   });
 
-  test('Scenario: a row that failed clears itself after a minute', async ({ page, pinSet }) => {
+  test('Scenario: a row that failed clears itself after a minute', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shelf());
     await test.step('Given adding "tiny" from Google Drive just failed', async () => {

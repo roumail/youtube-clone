@@ -6,15 +6,17 @@
 // shows which is which.
 // Google's sign-in lasts about an hour and renewing it needs a tap (Safari only
 // opens Google's window from one). It is renewed on the tap that opens a
-// streamed video, so play then starts straight from the play PIN's tap; it is
-// kept across reopening the app until it runs out. Once the device account has
+// streamed video, so play then starts straight after Face ID; it is kept
+// across reopening the app until it runs out. When play itself needs a new
+// sign-in (it ran out), Face ID is followed by a tap on "Continue", which
+// opens Google's window (unlock.spec.js). Once the device account has
 // approved the app, renewing asks nothing: Google's window opens and closes.
 // Google is faked at the network boundary (fakeGoogle in e2e/support.js).
 // Not @ipad, for the same reason as add-from-drive.spec.js.
 import { statSync } from 'node:fs';
 import {
-  test, expect, goto, enterPin, openVideo, startPlaying, expectPlaying, fixtureContainer, fixtureParts, fakeGoogle,
-  freeSpace, containerSize, playerState, PIN,
+  test, expect, goto, openVideo, startPlaying, expectPlaying, fixtureContainer, fixtureParts,
+  fakeGoogle, freeSpace, containerSize, playerState, tapContinue, signInDue,
 } from '../../support.js';
 
 const shared = () => ({
@@ -34,9 +36,17 @@ async function streamFromDrive(page, google, ...names) {
   const rows = page.getByTestId('import-status');
   const earlier = await rows.count();
   await google.willPick(...names);
+  const signingIn = await signInDue(page);
   await page.getByTestId('add-from-drive-button').click();
-  await enterPin(page, PIN);
+  if (signingIn) await tapContinue(page);
   await expect(rows.nth(earlier)).toHaveAttribute('data-import', /done|error/);
+}
+
+// Play when the sign-in has run out: Face ID, then "Continue" signs in, then it plays.
+async function playSigningIn(page) {
+  await page.getByTestId('play-button').tap();
+  await tapContinue(page);
+  await expectPlaying(page);
 }
 
 // Reopen the app, and wait until Google is loaded again.
@@ -46,7 +56,7 @@ async function reopen(page) {
 }
 
 test.describe('Feature: Streamed videos', () => {
-  test('Scenario: a streamed video is listed with title and poster, marked as streamed, after reading only its start', async ({ page, pinSet }) => {
+  test('Scenario: a streamed video is listed with title and poster, marked as streamed, after reading only its start', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the catalogue is empty', async () => {
       await goto(page, '#/library');
@@ -65,7 +75,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: a stored video is marked as stored', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a stored video is marked as stored', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny" is stored on this device', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -75,14 +85,14 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: a streamed video plays after the PIN, reading from Google Drive as it plays', async ({ page, pinSet }) => {
+  test('Scenario: a streamed video plays after Face ID, reading from Google Drive as it plays', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is streamed', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'tiny.kidsvideo');
     });
     const before = google.bytesRead('tiny.kidsvideo');
-    await test.step('When I open it and play with the PIN', async () => {
+    await test.step('When I open it and play with Face ID', async () => {
       await openVideo(page, 'tiny');
       await startPlaying(page);
     });
@@ -91,7 +101,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: seeking in a streamed video plays from the new position', async ({ page, pinSet }) => {
+  test('Scenario: seeking in a streamed video plays from the new position', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed and playing', async () => {
       await goto(page, '#/library');
@@ -109,7 +119,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: opening a streamed video after the sign-in has run out signs in again on that tap; it plays after the PIN as usual', async ({ page, pinSet }) => {
+  test('Scenario: opening a streamed video after the sign-in has run out signs in again on that tap; it plays after Face ID as usual', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is streamed, and an hour has passed', async () => {
@@ -123,20 +133,20 @@ test.describe('Feature: Streamed videos', () => {
     await test.step('Then Google\'s sign-in was shown again on that tap', async () => {
       expect(await google.signIns()).toBe(2);
     });
-    await test.step('And it plays after the PIN, without signing in again', async () => {
+    await test.step('And it plays after Face ID, without signing in again', async () => {
       await startPlaying(page);
       expect(await google.signIns()).toBe(2);
     });
   });
 
-  test('Scenario: reopening the app within the hour does not ask to sign in again', async ({ page, pinSet }) => {
+  test('Scenario: reopening the app within the hour does not ask to sign in again', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is streamed, and the app was reopened since', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'tiny.kidsvideo');
       await reopen(page);
     });
-    await test.step('When I open it and play with the PIN', async () => {
+    await test.step('When I open it and play with Face ID', async () => {
       await openVideo(page, 'tiny');
       await startPlaying(page);
     });
@@ -145,7 +155,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: a streamed video reached without a tap (the browser\'s back or forward) after the sign-in ran out signs in at the play PIN', async ({ page, pinSet }) => {
+  test('Scenario: a streamed video reached without a tap (the browser\'s back or forward) after the sign-in ran out signs in when played', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shared());
     let address;
@@ -160,14 +170,14 @@ test.describe('Feature: Streamed videos', () => {
     await test.step('When the browser goes forward to it again', async () => {
       await page.evaluate((hash) => { location.hash = hash; }, address);
     });
-    await test.step('Then it opens paused, and play with the PIN signs in, then plays', async () => {
+    await test.step('Then it opens paused, and play (Face ID, then "Continue") signs in, then plays', async () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
-      await startPlaying(page);
+      await playSigningIn(page);
       expect(await google.signIns()).toBe(2);
     });
   });
 
-  test('Scenario: reached without a tap after the sign-in ran out, a video no longer shared says so after the play PIN', async ({ page, pinSet }) => {
+  test('Scenario: reached without a tap after the sign-in ran out, a video no longer shared says so when played', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shared());
     let address;
@@ -179,12 +189,12 @@ test.describe('Feature: Streamed videos', () => {
       await page.getByTestId('screen-player').getByTestId('back-button').tap();
       await page.clock.fastForward('01:00:00');
     });
-    await test.step('When it is no longer shared, and the browser goes forward to it and I play with the PIN', async () => {
+    await test.step('When it is no longer shared, and the browser goes forward to it and I play (Face ID, then "Continue")', async () => {
       google.deny('tiny.kidsvideo');
       await page.evaluate((hash) => { location.hash = hash; }, address);
       await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
       await page.getByTestId('play-button').tap();
-      await enterPin(page, PIN);
+      await tapContinue(page);
     });
     await test.step('Then, after signing in, it says there is no access to it in Google Drive', async () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'error');
@@ -192,10 +202,10 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: when the Google sign-in runs out during a video, it pauses; play with the PIN signs in again and goes on from there', async ({ page, pinSet }) => {
+  test('Scenario: when the Google sign-in runs out during a video, it pauses; play signs in again and goes on from there', async ({ page, setUp }) => {
     // Google's sign-in in the browser lasts about an hour, and renewing it needs
-    // a tap. So the video pauses just before it runs out, and the play PIN (a
-    // tap, needed for every resume anyway) renews it.
+    // a tap. So the video pauses just before it runs out, and play renews it:
+    // Face ID (needed for every resume anyway), then a tap on "Continue".
     await page.clock.install();
     const google = await fakeGoogle(page, shared());
     let pausedAt;
@@ -212,14 +222,14 @@ test.describe('Feature: Streamed videos', () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
       pausedAt = await page.getByTestId('player-video').evaluate((v) => v.currentTime);
     });
-    await test.step('And play with the PIN shows Google\'s sign-in again, and it plays on from where it paused', async () => {
-      await startPlaying(page);
+    await test.step('And play (Face ID, then "Continue") shows Google\'s sign-in again, and it plays on from where it paused', async () => {
+      await playSigningIn(page);
       expect(await google.signIns()).toBe(2);
       expect(await page.getByTestId('player-video').evaluate((v) => v.currentTime)).toBeGreaterThanOrEqual(pausedAt);
     });
   });
 
-  test('Scenario: with no connection to Google Drive, a streamed video says it needs the internet; a stored one still plays', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: with no connection to Google Drive, a streamed video says it needs the internet; a stored one still plays', async ({ page, setUp, seedLibrary }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is stored and "medium" is streamed', async () => {
       await goto(page, '#/library');
@@ -242,7 +252,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: a streamed video the account can no longer read says so when opened', async ({ page, pinSet }) => {
+  test('Scenario: a streamed video the account can no longer read says so when opened', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is streamed, and an hour has passed', async () => {
@@ -261,7 +271,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: closing Google\'s sign-in when opening a streamed video says so', async ({ page, pinSet }) => {
+  test('Scenario: closing Google\'s sign-in when opening a streamed video says so', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is streamed, and an hour has passed', async () => {
@@ -279,7 +289,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: closing Google\'s sign-in at the play PIN leaves the video unplayed and says so', async ({ page, pinSet }) => {
+  test('Scenario: closing Google\'s sign-in when playing leaves the video unplayed and says so', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed and paused because the sign-in ran out', async () => {
@@ -290,10 +300,10 @@ test.describe('Feature: Streamed videos', () => {
       await page.clock.fastForward('59:00');
       await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
     });
-    await test.step('When I play with the PIN and close Google\'s sign-in', async () => {
+    await test.step('When I play (Face ID, then "Continue") and close Google\'s sign-in', async () => {
       await google.signInWillBeCancelled();
       await page.getByTestId('play-button').tap();
-      await enterPin(page, PIN);
+      await tapContinue(page);
     });
     await test.step('Then it does not play, and says the sign-in was closed', async () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'error');
@@ -301,7 +311,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test.fixme('Scenario: a streamed video plays with no Google sign-in at all (parked)', async ({ page, pinSet }) => {
+  test.fixme('Scenario: a streamed video plays with no Google sign-in at all (parked)', async ({ page, setUp }) => {
     // Parked 2026-11-20, to revisit: sharing the shelf's files as "anyone with
     // the link" would let them stream with the API key alone, no sign-in. Ruled
     // out for now: the videos would be viewable by anyone who gets a link.
@@ -312,7 +322,7 @@ test.describe('Feature: Streamed videos', () => {
       await streamFromDrive(page, google, 'tiny.kidsvideo');
       await reopen(page);
     });
-    await test.step('When a day has passed and I open it and play with the PIN', async () => {
+    await test.step('When a day has passed and I open it and play with Face ID', async () => {
       await page.clock.fastForward('24:00:00');
       await openVideo(page, 'tiny');
       await startPlaying(page);
@@ -322,7 +332,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: streamed videos stay in the catalogue after a reload', async ({ page, pinSet }) => {
+  test('Scenario: streamed videos stay in the catalogue after a reload', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is streamed', async () => {
       await goto(page, '#/library');
@@ -336,7 +346,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: a streamed video can be hidden from this device; it stays in Google Drive', async ({ page, pinSet }) => {
+  test('Scenario: a streamed video can be hidden from this device; it stays in Google Drive', async ({ page, setUp }) => {
     // Nothing of a streamed video is stored, so there is nothing to remove:
     // "Hide" only changes what this device shows. "Remove" is for stored videos
     // and deletes the copy on the device (remove-video.spec.js).
@@ -345,7 +355,7 @@ test.describe('Feature: Streamed videos', () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'tiny.kidsvideo', 'medium.kidsvideo');
       await page.getByTestId('settings-button').tap();
-      await enterPin(page, PIN);
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
     await test.step('Then a streamed video offers "Hide", not "Remove"', async () => {
       const item = page.getByTestId('settings-video-item').filter({ hasText: 'tiny' });
@@ -364,13 +374,13 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: a hidden video can be added again from Google Drive', async ({ page, pinSet }) => {
+  test('Scenario: a hidden video can be added again from Google Drive', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" was streamed and then hidden', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'tiny.kidsvideo');
       await page.getByTestId('settings-button').tap();
-      await enterPin(page, PIN);
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
       await page.getByTestId('settings-video-item').filter({ hasText: 'tiny' })
         .getByTestId('hide-video-button').tap();
       await page.getByTestId('screen-settings').getByTestId('back-button').tap();
@@ -383,7 +393,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: a title already in the catalogue is refused, stored or streamed', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a title already in the catalogue is refused, stored or streamed', async ({ page, setUp, seedLibrary }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
@@ -398,7 +408,7 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: streaming needs no free space for the video itself', async ({ page, pinSet }) => {
+  test('Scenario: streaming needs no free space for the video itself', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given there is room for only half of "tiny"', async () => {
       await freeSpace(page, Math.floor(containerSize('tiny') / 2));
