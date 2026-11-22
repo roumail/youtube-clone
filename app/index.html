@@ -100,6 +100,7 @@
         <h1>Settings</h1>
       </header>
       <button type="button" data-testid="change-pin-button">Change PIN</button>
+      <button type="button" data-testid="remove-pin-button" hidden>Remove PIN</button>
       <div class="feature-settings" data-role="feature-settings"></div>
       <ul data-role="settings-list"></ul>
     </section>
@@ -112,6 +113,10 @@
         <div class="pin-actions">
           <!-- Optional feature "faceId" (features/face-id.js) -->
           <button type="button" data-testid="pin-faceid-button" hidden>Use Face ID</button>
+          <button type="button" data-testid="pin-faceid-setup-button" hidden>Set up Face ID again</button>
+          <!-- First run on a device with Face ID / Touch ID -->
+          <button type="button" data-testid="setup-faceid-button" hidden>Set up Face ID</button>
+          <button type="button" data-testid="setup-pin-button" hidden>Use a PIN instead</button>
           <button type="button" data-testid="pin-cancel">Cancel</button>
           <button type="submit" data-testid="pin-submit">OK</button>
         </div>

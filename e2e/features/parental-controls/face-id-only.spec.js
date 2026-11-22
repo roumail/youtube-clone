@@ -69,7 +69,7 @@ async function faceIdOnly(page) {
 }
 
 test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
-  test.fixme('Scenario: on first run, a device with Face ID sets up Face ID, and no PIN is asked', async ({ page }) => {
+  test('Scenario: on first run, a device with Face ID sets up Face ID, and no PIN is asked', async ({ page }) => {
     const device = await faceIdDevice(page);
     await test.step('Given a fresh install on a device with Face ID', async () => {
       await goto(page, '#/library');
@@ -90,7 +90,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: on first run, "Use a PIN instead" sets a PIN as before, with Face ID off', async ({ page }) => {
+  test('Scenario: on first run, "Use a PIN instead" sets a PIN as before, with Face ID off', async ({ page }) => {
     const device = await faceIdDevice(page);
     await test.step('Given a fresh install on a device with Face ID', async () => {
       await goto(page, '#/library');
@@ -108,7 +108,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: if setting up Face ID on first run fails or is cancelled, first run offers both again', async ({ page }) => {
+  test('Scenario: if setting up Face ID on first run fails or is cancelled, first run offers both again', async ({ page }) => {
     const device = await faceIdDevice(page);
     await test.step('Given a fresh install on a device with Face ID, and Face ID will fail', async () => {
       await goto(page, '#/library');
@@ -133,7 +133,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     ['typing in search', async () => {}, (page) => page.getByTestId('search-input').click(),
       (page) => expect(page.getByTestId('search-input')).toHaveAttribute('data-state', 'unlocked')],
   ]) {
-    test.fixme(`Scenario: with Face ID alone, Face ID unlocks ${action}, and the app shows no prompt`, async ({ page, seedLibrary }) => {
+    test(`Scenario: with Face ID alone, Face ID unlocks ${action}, and the app shows no prompt`, async ({ page, seedLibrary }) => {
       const device = await faceIdDevice(page);
       await test.step('Given Face ID alone is set up, and "tiny" is stored', async () => {
         await faceIdOnly(page);
@@ -153,7 +153,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   }
 
-  test.fixme('Scenario: with Face ID alone, a failed or cancelled Face ID shows the prompt without a PIN field, and Face ID can be tried again', async ({ page }) => {
+  test('Scenario: with Face ID alone, a failed or cancelled Face ID shows the prompt without a PIN field, and Face ID can be tried again', async ({ page }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID alone is set up, and Face ID will fail', async () => {
       await faceIdOnly(page);
@@ -176,7 +176,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: with Face ID alone, Cancel closes the prompt and nothing is unlocked', async ({ page }) => {
+  test('Scenario: with Face ID alone, Cancel closes the prompt and nothing is unlocked', async ({ page }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID alone is set up, Face ID failed, and the unlock prompt shows', async () => {
       await faceIdOnly(page);
@@ -194,7 +194,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: with Face ID alone, play from the device waits for a tap on "Use Face ID"', async ({ page, seedLibrary }) => {
+  test('Scenario: with Face ID alone, play from the device waits for a tap on "Use Face ID"', async ({ page, seedLibrary }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID alone is set up, and "tiny" is open', async () => {
       await faceIdOnly(page);
@@ -218,7 +218,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: with Face ID alone, if the passkey was deleted, "Set up Face ID again" makes a new one that works', async ({ page }) => {
+  test('Scenario: with Face ID alone, if the passkey was deleted, "Set up Face ID again" makes a new one that works', async ({ page }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID alone is set up, and its passkey was then deleted (e.g. in Passwords)', async () => {
       await faceIdOnly(page);
@@ -241,7 +241,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: with Face ID alone, Settings offers "Set a PIN", and the PIN then works when Face ID fails', async ({ page }) => {
+  test('Scenario: with Face ID alone, Settings offers "Set a PIN", and the PIN then works when Face ID fails', async ({ page }) => {
     const device = await faceIdDevice(page);
     await test.step('Given Face ID alone is set up, and Settings is open', async () => {
       await faceIdOnly(page);
@@ -268,7 +268,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: with Face ID alone, switching Face ID off first asks for a new PIN', async ({ page }) => {
+  test('Scenario: with Face ID alone, switching Face ID off first asks for a new PIN', async ({ page }) => {
     await faceIdDevice(page);
     await test.step('Given Face ID alone is set up, and Settings is open', async () => {
       await faceIdOnly(page);
@@ -297,7 +297,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: with a PIN and Face ID on, "Remove PIN" in Settings leaves Face ID alone', async ({ page, pinSet }) => {
+  test('Scenario: with a PIN and Face ID on, "Remove PIN" in Settings leaves Face ID alone', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given a PIN is set, Face ID is on, and Settings is open', async () => {
       await goto(page, '#/library');
@@ -319,7 +319,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: "Remove PIN" is offered only while Face ID is on', async ({ page, pinSet }) => {
+  test('Scenario: "Remove PIN" is offered only while Face ID is on', async ({ page, pinSet }) => {
     await faceIdDevice(page);
     await test.step('Given a PIN is set, Face ID is off, and Settings is open', async () => {
       await goto(page, '#/library');
@@ -332,7 +332,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
     });
   });
 
-  test.fixme('Scenario: an install that already has a PIN keeps it, with no first-run choice', async ({ page, pinSet }) => {
+  test('Scenario: an install that already has a PIN keeps it, with no first-run choice', async ({ page, pinSet }) => {
     const device = await faceIdDevice(page);
     await test.step('Given a PIN is set, Face ID is off, on a device with Face ID', async () => {
       await goto(page, '#/library');
