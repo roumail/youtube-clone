@@ -53,6 +53,7 @@ test.describe('Feature: One row per add or download', () => {
       await goto(page, '#/library');
       release = google.holdReads('Show - S01E01 - First.kidsvideo');
       await addFromDrive(page, google, 'Show');
+      await page.getByTestId('drive-choose-add').click(); // all of the folder's list
       await expect(row(page, 'Adding 1 of 2')).toHaveAttribute('data-import', 'storing');
     });
     await test.step('When I add "tiny" from Google Drive meanwhile', async () => {

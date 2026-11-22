@@ -45,6 +45,9 @@ const state = {
   selection: null,
   // The playlist playing: { ids, index, advancing }; null for a video played alone.
   playlist: null,
+  // A picked folder's videos, to choose from: { title, from, sourceOf,
+  // items: [{ doc, name, inLibrary, ticked }] }; null when not choosing.
+  choosing: null,
 };
 
 function parseRoute(hash) {
@@ -279,6 +282,7 @@ function render(s) {
   show('search-empty', query !== '' && shown.length === 0);
 
   renderJobs(s.jobs);
+  renderChoosing(s);
 
   // Selecting: the bar, on the library and series screens
   if (s.selection) $('screen-library').dataset.mode = 'select';
@@ -733,41 +737,103 @@ function onUnlockCancel() {
   update();
 }
 
-// Picked in Google Drive: files are added as streamed; a picked folder adds
-// every .kidsvideo in it and its subfolders, skipping titles already there.
+// Picked in Google Drive: files alone are added as streamed. With a folder,
+// every .kidsvideo in it and its subfolders (and any files picked with it) is
+// listed to choose from: new ones ticked, titles already there greyed out.
 async function addFromDrive(docs, sourceOf) {
   const folders = docs.filter((d) => d.mimeType === FOLDER);
   if (!folders.length) return importItems(docs, sourceOf, addStreamed);
-  const items = docs.filter((d) => d.mimeType !== FOLDER);
+  const found = docs.filter((d) => d.mimeType !== FOLDER);
   const job = startJob(`Looking in "${folders[0].name}"…`);
   for (const folder of folders) {
     job.message = `Looking in "${folder.name}"…`;
     update();
     try {
-      items.push(...await listFolder(folder));
+      found.push(...await listFolder(folder));
     } catch (e) {
       return endJob(job, 'error', `Couldn't add the folder "${folder.name}": ${e.message}`);
     }
   }
-  if (!items.length) return endJob(job, 'error', `There are no .kidsvideo files in "${folders[0].name}".`);
-  const from = docs.length === 1 ? ` from "${folders[0].name}"` : '';
+  if (!found.length) return endJob(job, 'error', `There are no .kidsvideo files in "${folders[0].name}".`);
+  state.jobs = state.jobs.filter((j) => j !== job); // the list takes over
+  const titles = new Set(state.library.map((c) => c.appMetadata.title));
+  const items = found.map((doc) => {
+    const name = doc.name.slice(0, -CONTAINER_EXT.length);
+    return { doc, name, inLibrary: titles.has(name), ticked: !titles.has(name) };
+  }).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const one = docs.length === 1;
+  state.choosing = {
+    title: one ? `Add from "${folders[0].name}"` : 'Add from Google Drive',
+    from: one ? ` from "${folders[0].name}"` : '',
+    sourceOf,
+    items,
+  };
+  update();
+}
+
+// The list of a folder's videos: tick, untick, then add the ticked ones.
+function renderChoosing(s) {
+  show('drive-choose', !!s.choosing);
+  if (!s.choosing) return;
+  const { title, items } = s.choosing;
+  const fresh = items.filter((i) => !i.inLibrary);
+  const ticked = fresh.filter((i) => i.ticked).length;
+  $('drive-choose').querySelector('[data-role="choose-title"]').textContent = title;
+  $('drive-choose').querySelector('[data-role="choose-list"]').replaceChildren(...items.map((item) => {
+    const li = document.createElement('li');
+    li.dataset.testid = 'drive-choose-item';
+    li.dataset.state = item.inLibrary ? 'in-library' : 'new';
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.dataset.testid = 'drive-choose-box';
+    box.checked = item.ticked;
+    box.disabled = item.inLibrary;
+    box.addEventListener('change', () => { item.ticked = box.checked; update(); });
+    const name = document.createElement('span');
+    name.textContent = item.inLibrary ? `${item.name} · in the library` : item.name;
+    label.append(box, name);
+    li.append(label);
+    return li;
+  }));
+  $('drive-choose-toggle').textContent = ticked === fresh.length ? 'Untick all' : 'Tick all';
+  $('drive-choose-add').textContent = `Add ${ticked}`;
+  $('drive-choose-add').disabled = ticked === 0;
+}
+
+function onChooseToggle() {
+  const fresh = state.choosing.items.filter((i) => !i.inLibrary);
+  const tick = !fresh.every((i) => i.ticked);
+  for (const item of fresh) item.ticked = tick;
+  update();
+}
+
+function onChooseCancel() {
+  state.choosing = null;
+  update();
+}
+
+// Add the ticked videos, one after another, in one row.
+async function onChooseAdd() {
+  const { items, sourceOf, from } = state.choosing;
+  state.choosing = null;
+  const chosen = items.filter((i) => i.ticked);
+  const skipped = items.filter((i) => i.inLibrary).length;
   let added = 0;
-  let skipped = 0;
   const failed = [];
-  for (const [i, item] of items.entries()) {
-    const name = item.name.slice(0, -CONTAINER_EXT.length);
-    Object.assign(job, { progress: i / items.length, message: `Adding ${i + 1} of ${items.length}: ${name}…` });
+  const job = startJob('Adding…');
+  for (const [i, { doc, name }] of chosen.entries()) {
+    Object.assign(job, { progress: i / chosen.length, message: `Adding ${i + 1} of ${chosen.length}: ${name}…` });
     update();
     try {
-      await addStreamed(sourceOf(item));
+      await addStreamed(sourceOf(doc));
       added += 1;
     } catch (e) {
-      if (e.duplicate) skipped += 1;
-      else failed.push(`${name} (${e.message})`);
+      failed.push(`${name} (${e.message})`); // also a title already there under another file name
     }
     await refreshLibrary();
   }
-  const summary = `Added ${added} of ${items.length} videos${from}${skipped ? ` (${skipped} already in the library)` : ''}.`;
+  const summary = `Added ${added} of ${chosen.length} videos${from}${skipped ? ` (${skipped} already in the library)` : ''}.`;
   if (failed.length) endJob(job, 'error', `${summary} Couldn't add: ${failed.join('; ')}.`);
   else endJob(job, 'done', summary);
 }
@@ -902,6 +968,9 @@ async function boot() {
   $('add-from-drive-button').addEventListener('click', () => askUnlock('drive'));
   $('play-button').addEventListener('click', () => onPlayRequested(true));
   $('pause-button').addEventListener('click', onPause);
+  $('drive-choose-toggle').addEventListener('click', onChooseToggle);
+  $('drive-choose-cancel').addEventListener('click', onChooseCancel);
+  $('drive-choose-add').addEventListener('click', onChooseAdd);
   $('selection-cancel').addEventListener('click', () => { state.selection = null; update(); });
   $('selection-play').addEventListener('click', playSelection);
   initSearch();

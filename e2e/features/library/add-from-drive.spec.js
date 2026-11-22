@@ -3,7 +3,8 @@
 // catalogue and always stream from Google Drive (playing them:
 // e2e/features/streaming/). Only their title and poster are kept on the device;
 // a copy on the device comes from "Add video" (Files / AirDrop). Several files
-// can be picked at once, and whole folders (add-folder-from-drive.spec.js).
+// can be picked at once, and folders, choosing which of their videos to add
+// (add-folder-from-drive.spec.js).
 // After Face ID, a Google sign-in that is due opens on a tap on "Continue"
 // (unlock.spec.js); signed in already, the Picker opens straight away.
 // Google is faked at the network boundary (fakeGoogle in e2e/support.js). Not @ipad: once the
