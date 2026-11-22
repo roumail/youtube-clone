@@ -9,7 +9,14 @@
 // on its own: it waits for a tap on "Use Face ID". So Face ID always looks the
 // same: the device's passkey sheet, then Face ID, never an extra "Continue"
 // alert from the browser. It lives in the PIN prompt alone: every
-// action behind the PIN gets it the same way, with no exceptions per action.
+// action behind the PIN gets it the same way; the only difference per action
+// is the "Continue" tap below, for actions that must start within a tap.
+// Adding a video (the file picker), and adding from Google Drive or
+// downloading when a Google sign-in is due (its window), must start within a
+// tap. Face ID takes a moment, and Safari (iPad) no longer counts the tap that
+// asked for it, so after Face ID these wait for one more tap, on "Continue".
+// Signed in already, Google's file picker opens inside the page: no extra tap. Chromium here doesn't enforce
+// that; these scenarios pin down the extra tap, the iPad is checked by hand.
 // With a PIN set (Face ID without a PIN: face-id-only.spec.js),
 // the PIN stays: it is typed whenever Face ID fails or is cancelled, and the
 // prompt's rules (lockout, setup, changing the PIN) don't change.
@@ -21,7 +28,7 @@
 // as it does after the PIN (play-requires-pin.spec.js).
 import {
   test, expect, goto, enterPin, openVideo, expectPlaying, expectNotPlaying, playerState, PIN,
-  mediaSessionAction,
+  mediaSessionAction, fakeGoogle, fixtureContainer,
 } from '../../support.js';
 
 // A device with Face ID: a platform authenticator that passes unless told to fail.
@@ -161,6 +168,91 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
       });
     });
   }
+
+  test('Scenario: after Face ID, "Add video" waits for a tap on "Continue", which opens the file picker', async ({ page, pinSet }) => {
+    const device = await faceIdDevice(page);
+    await test.step('Given Face ID is on', async () => {
+      await goto(page, '#/library');
+      await switchFaceIdOn(page);
+    });
+    const before = await device.uses();
+    await test.step('When I tap "Add video" and pass Face ID', async () => {
+      await page.getByTestId('add-video-button').click();
+    });
+    await test.step('Then the prompt shows "Continue", without a PIN field', async () => {
+      await expect(page.getByTestId('pin-continue-button')).toBeVisible();
+      await expect(prompt(page)).toHaveAttribute('data-mode', 'continue');
+      await expect(page.getByTestId('pin-input')).toBeHidden();
+      expect(await device.uses()).toBe(before + 1);
+    });
+    await test.step('And tapping "Continue" opens the file picker', async () => {
+      const chooser = page.waitForEvent('filechooser');
+      await page.getByTestId('pin-continue-button').click();
+      await chooser;
+      await expect(prompt(page)).toBeHidden();
+    });
+  });
+
+  test('Scenario: after Face ID, "Add from Google Drive" waits for a tap on "Continue", which opens Google\'s sign-in', async ({ page, pinSet }) => {
+    await faceIdDevice(page);
+    const google = await fakeGoogle(page, { 'tiny.kidsvideo': fixtureContainer('tiny') });
+    await test.step('Given Face ID is on', async () => {
+      await goto(page, '#/library');
+      await switchFaceIdOn(page);
+    });
+    await test.step('When I tap "Add from Google Drive" and pass Face ID', async () => {
+      await page.getByTestId('add-from-drive-button').click();
+    });
+    await test.step('Then the prompt shows "Continue", and Google\'s sign-in is not asked yet', async () => {
+      await expect(page.getByTestId('pin-continue-button')).toBeVisible();
+      expect(await google.signIns()).toBe(0);
+    });
+    await test.step('And tapping "Continue" asks Google\'s sign-in', async () => {
+      await page.getByTestId('pin-continue-button').click();
+      await expect.poll(() => google.signIns()).toBe(1);
+    });
+  });
+
+  test('Scenario: signed in to Google already, "Add from Google Drive" after Face ID needs no extra tap', async ({ page, pinSet }) => {
+    await faceIdDevice(page);
+    const google = await fakeGoogle(page, {
+      'tiny.kidsvideo': fixtureContainer('tiny'), 'medium.kidsvideo': fixtureContainer('medium'),
+    });
+    await test.step('Given Face ID is on, and I signed in to Google adding "tiny"', async () => {
+      await goto(page, '#/library');
+      await switchFaceIdOn(page);
+      await google.willPick('tiny.kidsvideo');
+      await page.getByTestId('add-from-drive-button').click();
+      await page.getByTestId('pin-continue-button').click();
+      await expect(page.getByTestId('import-status').filter({ hasText: 'Added "tiny".' })).toBeVisible();
+    });
+    await test.step('When I tap "Add from Google Drive" again, pass Face ID and pick "medium"', async () => {
+      await google.willPick('medium.kidsvideo');
+      await page.getByTestId('add-from-drive-button').click();
+    });
+    await test.step('Then "medium" is added without "Continue", and without signing in again', async () => {
+      await expect(page.getByTestId('import-status').filter({ hasText: 'Added "medium".' })).toBeVisible();
+      await expect(page.getByTestId('pin-continue-button')).toBeHidden();
+      expect(await google.signIns()).toBe(1);
+    });
+  });
+
+  test('Scenario: Cancel after Face ID passed does nothing', async ({ page, pinSet }) => {
+    await faceIdDevice(page);
+    await test.step('Given Face ID is on, and Face ID passed after tapping "Add video"', async () => {
+      await goto(page, '#/library');
+      await switchFaceIdOn(page);
+      await page.getByTestId('add-video-button').click();
+      await expect(page.getByTestId('pin-continue-button')).toBeVisible();
+    });
+    await test.step('When I tap Cancel', async () => {
+      await page.getByTestId('pin-cancel').click();
+    });
+    await test.step('Then the prompt closes, and the library is shown', async () => {
+      await expect(prompt(page)).toBeHidden();
+      await expect(page.getByTestId('screen-library')).toBeVisible();
+    });
+  });
 
   test('Scenario: play from the device (not a tap) waits for a tap on "Use Face ID"', async ({ page, pinSet, seedLibrary }) => {
     const device = await faceIdDevice(page);
