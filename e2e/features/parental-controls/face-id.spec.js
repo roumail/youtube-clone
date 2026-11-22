@@ -10,7 +10,8 @@
 // same: the device's passkey sheet, then Face ID, never an extra "Continue"
 // alert from the browser. It lives in the PIN prompt alone: every
 // action behind the PIN gets it the same way, with no exceptions per action.
-// The PIN stays: it is typed whenever Face ID fails or is cancelled, and the
+// With a PIN set (Face ID without a PIN: face-id-only.spec.js),
+// the PIN stays: it is typed whenever Face ID fails or is cancelled, and the
 // prompt's rules (lockout, setup, changing the PIN) don't change.
 // Switching it on sets up a passkey for this app on this device; switching it
 // off forgets it. Devices without Face ID / Touch ID don't offer it.
