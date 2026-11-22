@@ -2,7 +2,7 @@
 import { test, expect, goto } from '../../support.js';
 
 test.describe('Feature: Browse the library', () => {
-  test('Scenario: an empty library says so', async ({ page, pinSet }) => {
+  test('Scenario: an empty library says so', async ({ page, setUp }) => {
     await test.step('Given no videos are stored', async () => {
       await goto(page, '#/library');
     });
@@ -12,7 +12,7 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test('Scenario: several stored videos each appear with title and poster', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: several stored videos each appear with title and poster', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny", "medium" and "episode-like" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium', 'episode-like');
@@ -30,7 +30,7 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test('Scenario: the library survives a reload', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the library survives a reload', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny" is stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');
@@ -43,7 +43,7 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test('Scenario: a series sits among the other videos by its name', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a series sits among the other videos by its name', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given three episodes of "Show" (stored out of order) and "tiny" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('Show - S01E10 - Tenth', 'tiny', 'Show - S01E02 - Second', 'Show - S01E01 - First');
@@ -53,7 +53,7 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test('Scenario: opening the app at its plain address shows the library', async ({ page, pinSet }) => {
+  test('Scenario: opening the app at its plain address shows the library', async ({ page, setUp }) => {
     await test.step('When I open the app with no route (the home-screen icon, the bare URL)', async () => {
       await goto(page, '');
     });
@@ -62,7 +62,7 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test('Scenario: the library shows the released version', async ({ page, context, pinSet }) => {
+  test('Scenario: the library shows the released version', async ({ page, context, setUp }) => {
     await test.step('Given the site runs release "v2.7.2"', async () => {
       await context.route('**/version.json', (route) => route.fulfill({ json: { version: 'v2.7.2', commit: '0123abc' } }));
     });
@@ -74,7 +74,7 @@ test.describe('Feature: Browse the library', () => {
     });
   });
 
-  test('Scenario: a video named like a series sits just before that series', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a video named like a series sits just before that series', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given the video "Show", the series "Show" and "tiny" are stored', async () => {
       await goto(page, '#/library');
       await seedLibrary('Show - S01E01 - First', 'tiny', 'Show');

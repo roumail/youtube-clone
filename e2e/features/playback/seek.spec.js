@@ -1,14 +1,15 @@
 // Feature: Seek — a scrub bar (elapsed / total) and ← / → to jump 10 s.
 // The child may seek freely: seeking never starts playback, so it can't get
-// around the PIN (owner decision 2026-11-19). Built in M8.
+// around unlocking (owner decision 2026-11-19). Built in M8.
 import {
-  test, expect, goto, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState, slowPlayer,
+  test, expect, goto, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState,
+  slowPlayer,
 } from '../../support.js';
 
 const position = (page) => page.getByTestId('player-video').evaluate((v) => v.currentTime);
 
 test.describe('Feature: Seek', () => {
-  test.beforeEach(async ({ page, pinSet, seedLibrary }) => {
+  test.beforeEach(async ({ page, setUp, seedLibrary }) => {
     await goto(page, '#/library');
     await seedLibrary('medium'); // 60 s
     await openVideo(page, 'medium');
@@ -22,15 +23,15 @@ test.describe('Feature: Seek', () => {
     });
   });
 
-  test('Scenario: dragging the bar while paused jumps there and stays paused, with no PIN', async ({ page }) => {
+  test('Scenario: dragging the bar while paused jumps there and stays paused, with no Face ID', async ({ page }) => {
     await test.step('When I drag the bar to 0:30', async () => {
       await page.getByTestId('seek-bar').fill('30');
     });
-    await test.step('Then the video is at 0:30, still paused, and no PIN was asked', async () => {
+    await test.step('Then the video is at 0:30, still paused, and no unlocking was asked', async () => {
       await expect.poll(() => position(page)).toBeCloseTo(30, 0);
       await expect(page.getByTestId('time-elapsed')).toHaveText('00:30');
       await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
-      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+      await expect(page.getByTestId('unlock-prompt')).toBeHidden();
       await expectNotPlaying(page);
     });
   });

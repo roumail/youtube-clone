@@ -95,7 +95,7 @@ export function init(ctx) {
 
   render();
   return {
-    /** Called after the play PIN. Returns true if it takes over (asks for a budget). */
+    /** Called after unlocking play. Returns true if it takes over (asks for a budget). */
     beforePlay(proceed, cancel) {
       const s = read();
       if (s && s.used < s.budget) return false;

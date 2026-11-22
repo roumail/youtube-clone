@@ -1,13 +1,12 @@
-// Feature: Remove a video — from settings, behind the PIN.
-import { test, expect, goto, enterPin, PIN } from '../../support.js';
+// Feature: Remove a video — from settings, behind unlocking.
+import { test, expect, goto } from '../../support.js';
 
 test.describe('Feature: Remove a video', () => {
-  test('Scenario: removing one of two videos leaves the other', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: removing one of two videos leaves the other', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny" and "medium" are stored and settings is unlocked', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium');
       await page.getByTestId('settings-button').click();
-      await enterPin(page, PIN);
       await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
     await test.step('When I remove "tiny"', async () => {

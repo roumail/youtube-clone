@@ -19,7 +19,7 @@ async function expectControls(page, shown) {
 }
 
 test.describe('Feature: Controls hide while playing', () => {
-  test.beforeEach(async ({ page, pinSet, seedLibrary }) => {
+  test.beforeEach(async ({ page, setUp, seedLibrary }) => {
     await page.clock.install(); // fake timers: fast-forward the 3 s instead of waiting
     await goto(page, '#/library');
     await seedLibrary('medium'); // 60 s

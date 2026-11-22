@@ -11,7 +11,7 @@
 // folder path to the files in it. Not @ipad, for the same reason as
 // add-from-drive.spec.js.
 import {
-  test, expect, goto, enterPin, startPlaying, fixtureContainer, fakeGoogle, PIN,
+  test, expect, goto, startPlaying, fixtureContainer, fakeGoogle, tapContinue, signInDue,
 } from '../../support.js';
 
 const episodes = {
@@ -30,14 +30,17 @@ const folders = {
   Empty: [],
 };
 
+// Pick in Google Drive after Face ID; the first time, the sign-in is due, so
+// "Continue" is tapped for it (unlock.spec.js).
 async function addFromDrive(page, google, ...names) {
   await google.willPick(...names);
+  const signingIn = await signInDue(page);
   await page.getByTestId('add-from-drive-button').click();
-  await enterPin(page, PIN);
+  if (signingIn) await tapContinue(page);
 }
 
 test.describe('Feature: Add a whole folder from Google Drive', () => {
-  test('Scenario: picking a folder adds every .kidsvideo in it and its subfolders, as streamed', async ({ page, pinSet }) => {
+  test('Scenario: picking a folder adds every .kidsvideo in it and its subfolders, as streamed', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the catalogue is empty', async () => {
       await goto(page, '#/library');
@@ -55,14 +58,14 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test('Scenario: an episode added from a folder plays after the PIN', async ({ page, pinSet }) => {
+  test('Scenario: an episode added from a folder plays after Face ID', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the folder "Show" was added', async () => {
       await goto(page, '#/library');
       await addFromDrive(page, google, 'Show');
       await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
     });
-    await test.step('When I open its first episode and play with the PIN', async () => {
+    await test.step('When I open its first episode and play with Face ID', async () => {
       await page.getByTestId('series-item').filter({ hasText: 'Show' }).tap();
       await page.getByTestId('episode-item').first().tap();
       await expect(page.getByTestId('screen-player')).toHaveAttribute('data-state', 'paused');
@@ -73,7 +76,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test('Scenario: adding a folder again adds only what is new, and says how many were already there', async ({ page, pinSet }) => {
+  test('Scenario: adding a folder again adds only what is new, and says how many were already there', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given "Show - S01E01 - First" is already in the catalogue', async () => {
       await goto(page, '#/library');
@@ -90,7 +93,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test('Scenario: a folder with no .kidsvideo in it says so and adds nothing', async ({ page, pinSet }) => {
+  test('Scenario: a folder with no .kidsvideo in it says so and adds nothing', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the catalogue is empty', async () => {
       await goto(page, '#/library');
@@ -104,7 +107,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test('Scenario: a folder and a file picked together are both added', async ({ page, pinSet }) => {
+  test('Scenario: a folder and a file picked together are both added', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the catalogue is empty', async () => {
       await goto(page, '#/library');
@@ -118,7 +121,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test('Scenario: a video in the folder that cannot be added is named, and the rest are added', async ({ page, pinSet }) => {
+  test('Scenario: a video in the folder that cannot be added is named, and the rest are added', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given "Show - S01E02 - Second.kidsvideo" in the folder can no longer be read', async () => {
       await goto(page, '#/library');
@@ -133,7 +136,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test('Scenario: a folder no longer shared says so and adds nothing', async ({ page, pinSet }) => {
+  test('Scenario: a folder no longer shared says so and adds nothing', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the folder "Show" is no longer shared with the account', async () => {
       await goto(page, '#/library');
@@ -148,7 +151,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test('Scenario: if the folder cannot be listed, it says so and adds nothing', async ({ page, pinSet }) => {
+  test('Scenario: if the folder cannot be listed, it says so and adds nothing', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the connection to Google Drive drops when the folder is listed', async () => {
       await goto(page, '#/library');
@@ -163,7 +166,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
     });
   });
 
-  test('Scenario: an added episode keeps working after the hour, through the usual sign-in', async ({ page, pinSet }) => {
+  test('Scenario: an added episode keeps working after the hour, through the usual sign-in', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, episodes, folders);
     await test.step('Given the folder "Show" was added, and an hour has passed', async () => {
@@ -172,7 +175,7 @@ test.describe('Feature: Add a whole folder from Google Drive', () => {
       await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
       await page.clock.fastForward('01:00:00');
     });
-    await test.step('When I open an episode and play with the PIN', async () => {
+    await test.step('When I open an episode and play with Face ID', async () => {
       await page.getByTestId('series-item').filter({ hasText: 'Show' }).tap();
       await page.getByTestId('episode-item').first().tap();
       await expect(page.getByTestId('screen-player')).toHaveAttribute('data-state', 'paused');

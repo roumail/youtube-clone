@@ -8,8 +8,8 @@
 // Google is faked at the network boundary.
 // Not @ipad, for the same reason as add-from-drive.spec.js.
 import {
-  test, expect, goto, enterPin, openVideo, startPlaying, expectPlaying, fixtureContainer, fakeGoogle, freeSpace,
-  containerSize, playerState, PIN,
+  test, expect, goto, openVideo, startPlaying, expectPlaying, fixtureContainer, fakeGoogle,
+  freeSpace, containerSize, playerState, tapContinue, signInDue,
 } from '../../support.js';
 
 const shared = () => ({
@@ -17,23 +17,26 @@ const shared = () => ({
   'medium.kidsvideo': fixtureContainer('medium'),
 });
 
+// Added from Google Drive after Face ID; the first time, the sign-in is due,
+// so "Continue" is tapped for it (unlock.spec.js).
 async function streamFromDrive(page, google, ...names) {
   await google.willPick(...names);
+  const signingIn = await signInDue(page);
   await page.getByTestId('add-from-drive-button').click();
-  await enterPin(page, PIN);
+  if (signingIn) await tapContinue(page);
   await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', /done|error/);
 }
 
 const item = (page, title) => page.getByTestId('library-item').filter({ hasText: title });
 const row = (page, text) => page.getByTestId('import-status').filter({ hasText: text });
 
+// After Face ID; signed in already (by the add), so no "Continue".
 async function download(page, title) {
   await item(page, title).getByTestId('download-button').tap();
-  await enterPin(page, PIN);
 }
 
 test.describe('Feature: Download a streamed video', () => {
-  test('Scenario: a streamed video offers Download in the library; a stored one does not', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a streamed video offers Download in the library; a stored one does not', async ({ page, setUp, seedLibrary }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is stored and "medium" is streamed', async () => {
       await goto(page, '#/library');
@@ -46,28 +49,29 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test('Scenario: downloading needs the PIN', async ({ page, pinSet }) => {
+  test('Scenario: downloading needs Face ID', async ({ page, setUp, faceId }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'medium.kidsvideo');
     });
-    await test.step('When I tap Download and cancel the PIN', async () => {
+    await test.step('When I tap Download, Face ID fails, and I cancel', async () => {
+      await faceId.willFail();
       await item(page, 'medium').getByTestId('download-button').tap();
-      await page.getByTestId('pin-cancel').tap();
+      await page.getByTestId('unlock-cancel').tap();
     });
     await test.step('Then nothing is downloaded', async () => {
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'false');
     });
   });
 
-  test('Scenario: a downloaded video is marked as downloaded and plays with no connection to Google Drive', async ({ page, pinSet }) => {
+  test('Scenario: a downloaded video is marked as downloaded and plays with no connection to Google Drive', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'medium.kidsvideo');
     });
-    await test.step('When I download it with the PIN', async () => {
+    await test.step('When I download it with Face ID', async () => {
       await download(page, 'medium');
     });
     await test.step('Then it is marked as downloaded', async () => {
@@ -83,7 +87,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test('Scenario: a download shows its progress, and the video can be watched while it downloads', async ({ page, pinSet }) => {
+  test('Scenario: a download shows its progress, and the video can be watched while it downloads', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed', async () => {
       await goto(page, '#/library');
@@ -98,7 +102,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test('Scenario: a download can be cancelled; nothing of it is kept, and it still streams', async ({ page, pinSet }) => {
+  test('Scenario: a download can be cancelled; nothing of it is kept, and it still streams', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     let release;
     await test.step('Given "medium" is streamed', async () => {
@@ -125,7 +129,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test('Scenario: a download that does not fit is refused before it starts', async ({ page, pinSet }) => {
+  test('Scenario: a download that does not fit is refused before it starts', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed and there is room for only half of it', async () => {
       await freeSpace(page, Math.floor(containerSize('medium') / 2));
@@ -141,7 +145,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test('Scenario: if the connection drops during a download, nothing is left half-downloaded', async ({ page, pinSet }) => {
+  test('Scenario: if the connection drops during a download, nothing is left half-downloaded', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed', async () => {
       await goto(page, '#/library');
@@ -157,7 +161,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test('Scenario: removing a download frees the space, and the video streams again', async ({ page, pinSet }) => {
+  test('Scenario: removing a download frees the space, and the video streams again', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed and downloaded, and settings is unlocked', async () => {
       await goto(page, '#/library');
@@ -165,7 +169,7 @@ test.describe('Feature: Download a streamed video', () => {
       await download(page, 'medium');
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'true');
       await page.getByTestId('settings-button').tap();
-      await enterPin(page, PIN);
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
     await test.step('When I remove its download', async () => {
       await page.getByTestId('settings-video-item').filter({ hasText: 'medium' })
@@ -181,7 +185,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test('Scenario: a download the browser has cleared falls back to streaming', async ({ page, pinSet }) => {
+  test('Scenario: a download the browser has cleared falls back to streaming', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" was downloaded, and the browser has since cleared the download', async () => {
       await goto(page, '#/library');
@@ -201,7 +205,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test('Scenario: hiding a downloaded video also removes its download', async ({ page, pinSet }) => {
+  test('Scenario: hiding a downloaded video also removes its download', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "medium" is streamed and downloaded, and settings is unlocked', async () => {
       await goto(page, '#/library');
@@ -209,7 +213,7 @@ test.describe('Feature: Download a streamed video', () => {
       await download(page, 'medium');
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'true');
       await page.getByTestId('settings-button').tap();
-      await enterPin(page, PIN);
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
     await test.step('When I hide it', async () => {
       await page.getByTestId('settings-video-item').filter({ hasText: 'medium' })
@@ -231,7 +235,7 @@ test.describe('Feature: Download a streamed video', () => {
   // is still running, so a Cancel or a failure that reaches the wrong
   // download shows up whichever order they were started in.
 
-  test('Scenario: two downloads at once both finish', async ({ page, pinSet }) => {
+  test('Scenario: two downloads at once both finish', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     let releaseTiny;
     let releaseMedium;
@@ -269,7 +273,7 @@ test.describe('Feature: Download a streamed video', () => {
   });
 
   for (const [cancelled, other, which] of [['tiny', 'medium', 'first'], ['medium', 'tiny', 'second']]) {
-    test(`Scenario: with two downloads at once, Cancel on the ${which} one stops only that one`, async ({ page, pinSet }) => {
+    test(`Scenario: with two downloads at once, Cancel on the ${which} one stops only that one`, async ({ page, setUp }) => {
       const google = await fakeGoogle(page, shared());
       const release = {};
       await test.step('Given "tiny" and "medium" are streamed, and both are downloading, "tiny" started first', async () => {
@@ -300,7 +304,7 @@ test.describe('Feature: Download a streamed video', () => {
     });
   }
 
-  test('Scenario: with two downloads at once, a lost connection fails only the one it hits', async ({ page, pinSet }) => {
+  test('Scenario: with two downloads at once, a lost connection fails only the one it hits', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     let releaseMedium;
     await test.step('Given "tiny" and "medium" are streamed, and "medium" is downloading', async () => {

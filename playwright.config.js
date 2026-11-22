@@ -21,7 +21,8 @@ export default defineConfig({
   globalSetup: './e2e/coverage.js',
   globalTeardown: './e2e/coverage-teardown.js',
   use: {
-    baseURL: LIVE ?? `http://127.0.0.1:${PORT}/app/`,
+    // localhost, not 127.0.0.1: Face ID (WebAuthn) needs a host name.
+    baseURL: LIVE ?? `http://localhost:${PORT}/app/`,
     // PW_HEADED=1 shows the browser window (e.g. when run on a Mac).
     headless: !process.env.PW_HEADED,
     trace: 'retain-on-failure',

@@ -3,7 +3,7 @@
 import { test, expect, goto, openVideo, startPlaying, expectNotPlaying, playerState } from '../../support.js';
 
 test.describe('Feature: No autoplay', () => {
-  test('Scenario: at the end of a video, nothing else starts', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: at the end of a video, nothing else starts', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny" (3 s) and "medium" are stored, and "tiny" is playing', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny', 'medium');

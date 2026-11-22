@@ -6,13 +6,13 @@ test.describe('Feature: Works offline', () => {
   // The app comes from a test server of its own, which is then stopped: routing
   // requests or Playwright's offline switch leave the service worker's own
   // requests alone, so only a server that is really gone tests its offline copy.
-  test('Scenario: the app and a stored video work with no network', async ({ page, pinSet, seedLibrary }, testInfo) => {
+  test('Scenario: the app and a stored video work with no network', async ({ page, setUp, seedLibrary }, testInfo) => {
     const port = 4300 + testInfo.parallelIndex;
     const server = spawn(process.execPath, ['e2e/server.js', String(port)], { stdio: 'ignore' });
     try {
       await test.step('Given "tiny" is stored and the app has loaded once', async () => {
         await expect.poll(() => fetch(`http://127.0.0.1:${port}/healthz`).then((r) => r.ok, () => false)).toBe(true);
-        await page.goto(`http://127.0.0.1:${port}/app/#/library`);
+        await page.goto(`http://localhost:${port}/app/#/library`);
         await appReady(page);
         await seedLibrary('tiny');
         await page.evaluate(() => navigator.serviceWorker.ready);
@@ -23,7 +23,7 @@ test.describe('Feature: Works offline', () => {
         await new Promise((resolve) => { server.once('exit', resolve); });
         reopened = await page.reload();
       });
-      await test.step('Then the app opens from its offline copy, "tiny" is listed and plays after the PIN', async () => {
+      await test.step('Then the app opens from its offline copy, "tiny" is listed and plays after Face ID', async () => {
         expect(reopened.fromServiceWorker()).toBe(true);
         await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toBeVisible();
         await openVideo(page, 'tiny');
@@ -34,7 +34,7 @@ test.describe('Feature: Works offline', () => {
     }
   });
 
-  test('Scenario: an app update deletes the old version\'s cached files, never the videos', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: an app update deletes the old version\'s cached files, never the videos', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given "tiny" is stored and an older app version left its files in the cache "app-v1"', async () => {
       await goto(page, '#/library');
       await seedLibrary('tiny');

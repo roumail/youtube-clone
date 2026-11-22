@@ -18,18 +18,18 @@ test.describe('codec canary', () => {
 });
 
 test.describe('the 4 screens load', () => {
-  test('first launch shows the PIN prompt in setup mode', async ({ page }) => {
-    await test.step('Given a fresh install with no PIN set', async () => {
+  test('first launch asks to set up Face ID', async ({ page }) => {
+    await test.step('Given a fresh install', async () => {
       await goto(page, '#/library');
     });
-    await test.step('Then the PIN prompt asks to set a PIN', async () => {
-      await expect(page.getByTestId('pin-prompt')).toBeVisible();
-      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'setup');
+    await test.step('Then the unlock prompt asks to set up Face ID', async () => {
+      await expect(page.getByTestId('unlock-prompt')).toBeVisible();
+      await expect(page.getByTestId('unlock-prompt')).toHaveAttribute('data-mode', 'setup');
     });
   });
 
-  test('library screen loads', async ({ page, pinSet }) => {
-    await test.step('Given a PIN is set and the library is empty', async () => {
+  test('library screen loads', async ({ page, setUp }) => {
+    await test.step('Given Face ID is set up and the library is empty', async () => {
       await goto(page, '#/library');
     });
     await test.step('And without a release (local/CI) the version label says "dev"', async () => {
@@ -38,12 +38,12 @@ test.describe('the 4 screens load', () => {
     await test.step('Then the library screen shows its empty state', async () => {
       await expect(page.getByTestId('screen-library')).toBeVisible();
       await expect(page.getByTestId('screen-library')).toHaveAttribute('data-state', 'empty');
-      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+      await expect(page.getByTestId('unlock-prompt')).toBeHidden();
     });
   });
 
-  test('player screen loads', async ({ page, pinSet }) => {
-    await test.step('Given a PIN is set', async () => {
+  test('player screen loads', async ({ page, setUp }) => {
+    await test.step('Given Face ID is set up', async () => {
       await goto(page, '#/player/does-not-exist');
     });
     await test.step('Then the player screen loads and reports an error for an unknown video', async () => {
@@ -52,14 +52,13 @@ test.describe('the 4 screens load', () => {
     });
   });
 
-  test('settings screen loads locked behind the PIN', async ({ page, pinSet }) => {
-    await test.step('Given a PIN is set', async () => {
+  test('settings screen loads, unlocked by Face ID', async ({ page, setUp }) => {
+    await test.step('Given Face ID is set up', async () => {
       await goto(page, '#/settings');
     });
-    await test.step('Then settings is shown locked with the PIN prompt in verify mode', async () => {
-      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'locked');
-      await expect(page.getByTestId('pin-prompt')).toBeVisible();
-      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'verify');
+    await test.step('Then settings is shown, unlocked after Face ID', async () => {
+      await expect(page.getByTestId('screen-settings')).toBeVisible();
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
   });
 });

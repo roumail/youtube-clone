@@ -1,15 +1,12 @@
 // Shared test fixtures and helpers.
 // Rule: wait on observable state, never on time. No waitForTimeout anywhere.
 import { test as base, expect } from '@playwright/test';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { COVERAGE, coverageReport, recordServiceWorkers } from './coverage.js';
 import { readFileSync, statSync } from 'node:fs';
 
 export { expect };
-
-export const PIN = '1234';
-export const WRONG_PIN = '9999';
 
 export const sha256Hex = (s) => createHash('sha256').update(s).digest('hex');
 
@@ -29,6 +26,12 @@ export const test = base.extend({
   // app's real defaults.
   features: [{ watchTimeLimit: false }, { option: true }],
 
+  // Every test runs on a device with Face ID / Touch ID: Chromium's virtual
+  // authenticator (passes unless told to fail), and in WebKit (no virtual
+  // authenticator there) a simulated one that always passes. Scenarios about a
+  // device without it use test.use({ faceIdDevice: false }).
+  faceIdDevice: [true, { option: true }],
+
   // Coverage only: a debugging port per test worker, so the service worker's
   // coverage can be recorded too (e2e/coverage.js).
   coveragePort: [async ({ browserName }, use, workerInfo) => {
@@ -44,7 +47,7 @@ export const test = base.extend({
   // "play" as if from headphones / lock screen. No hooks needed in the app.
   // Every test sees a wide-gamut (P3) screen, like the family's MacBook and
   // iPad. Shaka changes its track choices on such screens.
-  page: async ({ page, features, browserName, coveragePort }, use) => {
+  page: async ({ page, features, browserName, coveragePort, faceIdDevice }, use) => {
     // Coverage of app/ (CI sets COVERAGE): Chromium only, whole test incl. reloads.
     // Chromium drops a page's coverage when it navigates, so it's saved before
     // every goto/reload and recording starts again.
@@ -65,6 +68,7 @@ export const test = base.extend({
         };
       }
     }
+    if (faceIdDevice) faceIdDevices.set(page, await addFaceIdDevice(page, browserName));
     if (features) {
       await page.addInitScript((f) => {
         try {
@@ -107,13 +111,20 @@ export const test = base.extend({
     expect(problems, 'CSP violations / uncaught page errors').toEqual([]);
   },
 
-  // A PIN already exists, so first-run setup is skipped. Only seeds once, so a
-  // test that changes the PIN keeps its change across reloads.
-  pinSet: async ({ page }, use) => {
-    await page.addInitScript(([key, value]) => {
-      if (!localStorage.getItem(key)) localStorage.setItem(key, value);
-    }, ['pin.sha256', sha256Hex(PIN)]);
-    await use(PIN);
+  // This device's Face ID (see faceIdDevice): willFail(), willPass() and
+  // uses(); in Chromium also passkeys() and deletePasskeys().
+  faceId: async ({ page }, use) => {
+    await use(faceIdDevices.get(page));
+  },
+
+  // Face ID is already set up (a passkey for this app on this device), so
+  // first run is skipped. Only seeds once, across reloads.
+  setUp: async ({ page, baseURL }, use) => {
+    const id = await faceIdDevices.get(page).addPasskey(new URL(baseURL).hostname);
+    await page.addInitScript((credentialId) => {
+      if (!localStorage.getItem('faceId.credentialId')) localStorage.setItem('faceId.credentialId', credentialId);
+    }, id);
+    await use();
   },
 
   // Arrange via API: store fixtures through Shaka directly, bypassing the
@@ -153,6 +164,60 @@ export const test = base.extend({
   },
 });
 
+// ---------- Face ID ----------
+
+const faceIdDevices = new WeakMap();
+const base64Url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+async function addFaceIdDevice(page, browserName) {
+  if (browserName !== 'chromium') {
+    await page.addInitScript(() => {
+      window.__faceId = { uses: 0, fail: false };
+      const pass = async () => {
+        if (window.__faceId.fail) throw new DOMException('Face ID failed', 'NotAllowedError');
+        window.__faceId.uses += 1;
+        return { rawId: new Uint8Array([7, 7, 7, 7]).buffer };
+      };
+      Object.defineProperty(navigator, 'credentials', { configurable: true, value: { create: pass, get: pass } });
+      const PKC = window.PublicKeyCredential ?? function PublicKeyCredential() {};
+      Object.defineProperty(PKC, 'isUserVerifyingPlatformAuthenticatorAvailable', { configurable: true, value: async () => true });
+      window.PublicKeyCredential = PKC;
+    });
+    // Simulated: willFail / willPass / uses for this page (until a reload).
+    return {
+      willFail: () => page.evaluate(() => { window.__faceId.fail = true; }),
+      willPass: () => page.evaluate(() => { window.__faceId.fail = false; }),
+      uses: () => page.evaluate(() => window.__faceId.uses),
+      addPasskey: async () => base64Url(Buffer.from([7, 7, 7, 7])),
+    };
+  }
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('WebAuthn.enable');
+  const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', { options: {
+    protocol: 'ctap2', transport: 'internal', hasResidentKey: true,
+    hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true,
+  } });
+  const credentials = async () => (await cdp.send('WebAuthn.getCredentials', { authenticatorId })).credentials;
+  return {
+    willFail: () => cdp.send('WebAuthn.setUserVerified', { authenticatorId, isUserVerified: false }),
+    willPass: () => cdp.send('WebAuthn.setUserVerified', { authenticatorId, isUserVerified: true }),
+    passkeys: async () => (await credentials()).length,
+    // How often Face ID was passed with this app's passkey.
+    uses: async () => (await credentials()).reduce((n, c) => n + c.signCount, 0),
+    deletePasskeys: () => cdp.send('WebAuthn.clearCredentials', { authenticatorId }),
+    // A passkey made earlier (as first run would); returns its id as the app stores it.
+    addPasskey: async (rpId) => {
+      const id = randomBytes(16);
+      const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+      await cdp.send('WebAuthn.addCredential', { authenticatorId, credential: {
+        credentialId: id.toString('base64'), isResidentCredential: false, rpId,
+        privateKey: privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'), signCount: 0,
+      } });
+      return base64Url(id);
+    },
+  };
+}
+
 // ---------- helpers ----------
 
 export async function appReady(page) {
@@ -164,11 +229,17 @@ export async function goto(page, route) {
   await appReady(page);
 }
 
-export async function enterPin(page, pin) {
-  const prompt = page.getByTestId('pin-prompt');
-  await expect(prompt).toBeVisible();
-  await prompt.getByTestId('pin-input').fill(pin);
-  await prompt.getByTestId('pin-submit').tap();
+// A Google sign-in is due (none yet, or it ran out): adding from Drive,
+// downloading or playing a streamed video then needs "Continue" after Face ID.
+export const signInDue = (page) => page.evaluate(() => {
+  const kept = JSON.parse(localStorage.getItem('kids-google-sign-in-readonly'));
+  return !kept || Date.now() >= kept.expiresAt;
+});
+
+// After Face ID, an action that must start within a tap (the file picker, a
+// Google sign-in that is due) waits for "Continue": tap it.
+export async function tapContinue(page) {
+  await page.getByTestId('unlock-continue-button').tap();
 }
 
 export async function openVideo(page, title) {
@@ -439,9 +510,8 @@ export async function mediaSessionAction(page, action) {
   await page.evaluate((a) => window.__mediaSessionHandlers[a]?.({ action: a }), action);
 }
 
-// Tap play, enter the PIN, and wait until media time actually advances.
+// Tap play (Face ID passes), and wait until media time actually advances.
 export async function startPlaying(page) {
   await page.getByTestId('play-button').tap();
-  await enterPin(page, PIN);
   await expectPlaying(page);
 }

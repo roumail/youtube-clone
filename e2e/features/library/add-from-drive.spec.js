@@ -1,15 +1,17 @@
-// Feature: Add from Google Drive — behind the PIN, sign in to Google, pick
+// Feature: Add from Google Drive — behind Face ID, sign in to Google, pick
 // .kidsvideo files in Google's Picker; they are added to this device's
 // catalogue and always stream from Google Drive (playing them:
 // e2e/features/streaming/). Only their title and poster are kept on the device;
 // a copy on the device comes from "Add video" (Files / AirDrop). Several files
 // can be picked at once, and whole folders (add-folder-from-drive.spec.js).
+// After Face ID, a Google sign-in that is due opens on a tap on "Continue"
+// (unlock.spec.js); signed in already, the Picker opens straight away.
 // Google is faked at the network boundary (fakeGoogle in e2e/support.js). Not @ipad: once the
 // service worker controls the page, Playwright's WebKit can't intercept the
 // Drive requests, so they would reach the real Google.
 import {
-  test, expect, goto, enterPin, openVideo, startPlaying, fixtureContainer, fixtureParts, fakeGoogle,
-  PIN, WRONG_PIN,
+  test, expect, goto, openVideo, startPlaying, fixtureContainer, fixtureParts, fakeGoogle,
+  tapContinue,
 } from '../../support.js';
 
 const shared = () => ({
@@ -18,47 +20,49 @@ const shared = () => ({
   'poster.jpg': fixtureParts('tiny')[3],
 });
 
-async function addFromDrive(page) {
+// Tap "Add from Google Drive" (Face ID passes); when a sign-in is due, tap "Continue".
+async function addFromDrive(page, { signingIn = true } = {}) {
   await page.getByTestId('add-from-drive-button').click();
-  await enterPin(page, PIN);
+  if (signingIn) await tapContinue(page);
 }
 
 test.describe('Feature: Add from Google Drive', () => {
-  test('Scenario: adding from Google Drive needs the PIN', async ({ page, pinSet }) => {
+  test('Scenario: adding from Google Drive needs Face ID', async ({ page, setUp, faceId }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the library is shown', async () => {
       await goto(page, '#/library');
     });
-    await test.step('When I tap "Add from Google Drive" and enter a wrong PIN', async () => {
+    await test.step('When I tap "Add from Google Drive" and Face ID fails', async () => {
+      await faceId.willFail();
       await page.getByTestId('add-from-drive-button').click();
-      await enterPin(page, WRONG_PIN);
     });
-    await test.step('Then the prompt says it is wrong, and Google sign-in was never asked', async () => {
-      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-state', 'wrong');
+    await test.step('Then the unlock prompt shows, and Google sign-in was never asked', async () => {
+      await expect(page.getByTestId('unlock-prompt')).toHaveAttribute('data-mode', 'unlock');
+      await expect(page.getByTestId('unlock-prompt')).toBeVisible();
       expect(await google.signIns()).toBe(0);
     });
   });
 
-  test('Scenario: sign in, pick "tiny.kidsvideo", and it is added as streamed and plays', async ({ page, pinSet }) => {
+  test('Scenario: sign in, pick "tiny.kidsvideo", and it is added as streamed and plays', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
       await google.willPick('tiny.kidsvideo');
     });
-    await test.step('When I tap "Add from Google Drive", enter the PIN, sign in and pick "tiny.kidsvideo"', async () => {
+    await test.step('When I tap "Add from Google Drive", pass Face ID, tap "Continue", sign in and pick "tiny.kidsvideo"', async () => {
       await addFromDrive(page);
     });
     await test.step('Then "tiny" is added, marked as streaming from Google Drive', async () => {
       await expect(page.getByTestId('import-status')).toHaveText('Added "tiny".');
       await expect(page.getByTestId('library-item').filter({ hasText: 'tiny' })).toHaveAttribute('data-plays-from', 'drive');
     });
-    await test.step('And it plays after the PIN', async () => {
+    await test.step('And it plays after Face ID', async () => {
       await openVideo(page, 'tiny');
       await startPlaying(page);
     });
   });
 
-  test('Scenario: picking several videos adds them one after another', async ({ page, pinSet }) => {
+  test('Scenario: picking several videos adds them one after another', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
@@ -73,7 +77,7 @@ test.describe('Feature: Add from Google Drive', () => {
     });
   });
 
-  test('Scenario: a second add in the same session does not ask to sign in again', async ({ page, pinSet }) => {
+  test('Scenario: a second add in the same session does not ask to sign in again', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given I signed in and added "tiny"', async () => {
       await goto(page, '#/library');
@@ -83,21 +87,22 @@ test.describe('Feature: Add from Google Drive', () => {
     });
     await test.step('When I add "medium.kidsvideo" from Google Drive', async () => {
       await google.willPick('medium.kidsvideo');
-      await addFromDrive(page);
+      await addFromDrive(page, { signingIn: false });
     });
-    await test.step('Then it is added, and I signed in only once', async () => {
+    await test.step('Then it is added without "Continue", and I signed in only once', async () => {
+      await expect(page.getByTestId('unlock-continue-button')).toBeHidden();
       await expect(page.getByTestId('import-status').filter({ hasText: 'medium' })).toHaveText('Added "medium".');
       expect(await google.signIns()).toBe(1);
     });
   });
 
-  test('Scenario: cancelling the Google sign-in adds nothing', async ({ page, pinSet }) => {
+  test('Scenario: cancelling the Google sign-in adds nothing', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
       await google.signInWillBeCancelled();
     });
-    await test.step('When I tap "Add from Google Drive", enter the PIN and close the Google sign-in', async () => {
+    await test.step('When I tap "Add from Google Drive", pass Face ID, tap "Continue" and close the Google sign-in', async () => {
       await addFromDrive(page);
     });
     await test.step('Then nothing is added and nothing was downloaded', async () => {
@@ -107,7 +112,7 @@ test.describe('Feature: Add from Google Drive', () => {
     });
   });
 
-  test('Scenario: closing the Picker without picking adds nothing', async ({ page, pinSet }) => {
+  test('Scenario: closing the Picker without picking adds nothing', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
@@ -123,7 +128,7 @@ test.describe('Feature: Add from Google Drive', () => {
     });
   });
 
-  test('Scenario: a picked file that is not a .kidsvideo is refused by name', async ({ page, pinSet }) => {
+  test('Scenario: a picked file that is not a .kidsvideo is refused by name', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');
@@ -139,7 +144,7 @@ test.describe('Feature: Add from Google Drive', () => {
     });
   });
 
-  test('Scenario: a video the account may not read is refused, and nothing is added', async ({ page, pinSet }) => {
+  test('Scenario: a video the account may not read is refused, and nothing is added', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny.kidsvideo" is no longer shared with the account', async () => {
       await goto(page, '#/library');
@@ -155,7 +160,7 @@ test.describe('Feature: Add from Google Drive', () => {
     });
   });
 
-  test('Scenario: if the connection drops while adding, the import says so and nothing is left behind', async ({ page, pinSet }) => {
+  test('Scenario: if the connection drops while adding, the import says so and nothing is left behind', async ({ page, setUp }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given the connection to Google Drive drops while "medium.kidsvideo" downloads', async () => {
       await goto(page, '#/library');
@@ -174,7 +179,7 @@ test.describe('Feature: Add from Google Drive', () => {
     });
   });
 
-  test('Scenario: a video already in the library is refused before downloading', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a video already in the library is refused before downloading', async ({ page, setUp, seedLibrary }) => {
     const google = await fakeGoogle(page, shared());
     await test.step('Given "tiny" is already in the library', async () => {
       await goto(page, '#/library');
@@ -190,7 +195,7 @@ test.describe('Feature: Add from Google Drive', () => {
     });
   });
 
-  test('Scenario: an hour later, adding from Google Drive asks to sign in again', async ({ page, pinSet }) => {
+  test('Scenario: an hour later, adding from Google Drive asks to sign in again', async ({ page, setUp }) => {
     await page.clock.install();
     const google = await fakeGoogle(page, shared());
     await test.step('Given I signed in and added "tiny"', async () => {

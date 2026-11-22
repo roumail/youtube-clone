@@ -3,9 +3,12 @@
 // parent sets a time budget for the session; only playing time counts, across
 // all videos; the session survives refreshes and relaunches.
 // Built in M6.
-import { test, expect, goto, enterPin, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState, setVisibility, PIN } from '../../support.js';
+import {
+  test, expect, goto, openVideo, startPlaying, expectPlaying, expectNotPlaying, playerState,
+  setVisibility,
+} from '../../support.js';
 
-// Seed the feature flag (normally switched on in Settings, behind the PIN).
+// Seed the feature flag (normally switched on in Settings, behind Face ID).
 async function enableWatchTime(page) {
   await page.addInitScript(() => {
     if (!localStorage.getItem('features')) localStorage.setItem('features', JSON.stringify({ watchTimeLimit: true }));
@@ -17,27 +20,25 @@ async function enableWatchTime(page) {
 test.use({ features: null });
 
 test.describe('Feature: Watch-time limit (optional)', () => {
-  test('Scenario: on by default — the first play asks for a budget', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: on by default — the first play asks for a budget', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given a fresh install where nobody touched the setting, and "medium" is open', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
       await openVideo(page, 'medium');
     });
-    await test.step('When I tap play and enter the PIN', async () => {
+    await test.step('When I tap play and pass Face ID', async () => {
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
     });
     await test.step('Then the budget prompt asks how long they can watch', async () => {
       await expect(page.getByTestId('budget-prompt')).toBeVisible();
     });
   });
 
-  test('Scenario: switching it off is in Settings, behind the PIN, and sticks', async ({ page, pinSet, seedLibrary }) => {
-    await test.step('Given settings is unlocked with the PIN', async () => {
+  test('Scenario: switching it off is in Settings, behind Face ID, and sticks', async ({ page, setUp, seedLibrary }) => {
+    await test.step('Given settings is unlocked with Face ID', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
       await page.getByTestId('settings-button').click();
-      await enterPin(page, PIN);
     });
     await test.step('Then "Watch-time limit" is on', async () => {
       await expect(page.getByTestId('feature-toggle-watchTimeLimit')).toBeChecked();
@@ -56,16 +57,15 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: the first play of a session asks the parent for a budget', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the first play of a session asks the parent for a budget', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given the feature is on and "medium" is open', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
       await openVideo(page, 'medium');
     });
-    await test.step('When I tap play and enter the PIN', async () => {
+    await test.step('When I tap play and pass Face ID', async () => {
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
     });
     await test.step('Then I choose a budget (e.g. 30 minutes) and it plays', async () => {
       await expect(page.getByTestId('budget-prompt')).toBeVisible();
@@ -74,7 +74,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: the player shows time watched, time left and the current time', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the player shows time watched, time left and the current time', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await page.clock.install({ time: new Date('2026-11-19T18:05:00') });
     await test.step('Given a 30-minute session is playing', async () => {
@@ -82,7 +82,6 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await seedLibrary('medium');
       await openVideo(page, 'medium');
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await page.getByTestId('budget-option-30').click();
       await expectPlaying(page);
     });
@@ -93,7 +92,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: only playing time counts, not paused time', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: only playing time counts, not paused time', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await page.clock.install(); // fake timers: fast-forward 5 minutes while paused
     await test.step('Given a session is running and I pause', async () => {
@@ -101,7 +100,6 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await seedLibrary('medium');
       await openVideo(page, 'medium');
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await page.getByTestId('budget-option-30').click();
       await expectPlaying(page);
       await page.getByTestId('pause-button').click();
@@ -114,7 +112,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: when the budget runs out, playback stops and needs the PIN', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: when the budget runs out, playback stops and needs Face ID', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given a session with 1 second of budget left is playing', async () => {
       await page.addInitScript(() => localStorage.setItem('watchTime.session', JSON.stringify({ budget: 1800, used: 1799 })));
@@ -122,21 +120,19 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await seedLibrary('medium');
       await openVideo(page, 'medium');
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await expectPlaying(page);
     });
     await test.step('Then it pauses with "Time is up"', async () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'time-up');
       await expectNotPlaying(page);
     });
-    await test.step('And play asks for the PIN, which can grant more time', async () => {
+    await test.step('And play asks for Face ID, which can grant more time', async () => {
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await expect(page.getByTestId('budget-prompt')).toBeVisible();
     });
   });
 
-  test('Scenario: when the budget runs out in a playlist, it stops, and the PIN with more time lets it go on', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: when the budget runs out in a playlist, it stops, and Face ID with more time lets it go on', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given a session with 1 second of budget left, and "medium" then "tiny" playing as a playlist', async () => {
       await page.addInitScript(() => localStorage.setItem('watchTime.session', JSON.stringify({ budget: 1800, used: 1799 })));
@@ -151,36 +147,33 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await page.getByTestId('library-item').filter({ hasText: 'tiny' }).tap();
       await page.getByTestId('selection-play').tap();
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await expectPlaying(page);
     });
     await test.step('Then "medium" pauses with "Time is up"', async () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'time-up');
       await expectNotPlaying(page);
     });
-    await test.step('When I tap play, enter the PIN and give 30 more minutes', async () => {
+    await test.step('When I tap play, pass Face ID and give 30 more minutes', async () => {
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await page.getByTestId('budget-option-30').click();
       await expectPlaying(page);
     });
-    await test.step('Then at the end of "medium", "tiny" plays next with no PIN asked', async () => {
+    await test.step('Then at the end of "medium", "tiny" plays next with no Face ID asked', async () => {
       await page.getByTestId('seek-bar').fill('58');
       const tiny = await page.getByTestId('library-item').filter({ hasText: 'tiny' }).getAttribute('data-video-id');
       await expect.poll(() => decodeURIComponent(page.url()).endsWith(`#/player/${tiny}`)).toBe(true);
       await expectPlaying(page);
-      await expect(page.getByTestId('pin-prompt')).toBeHidden();
+      await expect(page.getByTestId('unlock-prompt')).toBeHidden();
     });
   });
 
-  test('Scenario: one budget across all videos', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: one budget across all videos', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given I watched part of "medium" in a session and went back', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium', 'episode-like');
       await openVideo(page, 'medium');
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await page.getByTestId('budget-option-30').click();
       await expectPlaying(page);
       await page.getByTestId('pause-button').click();
@@ -196,7 +189,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: a refresh or relaunch keeps the session and its budget', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a refresh or relaunch keeps the session and its budget', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given a session with 20 of 30 minutes used', async () => {
       await page.addInitScript(() => {
@@ -214,13 +207,12 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: the parent can end the session in Settings', async ({ page, pinSet }) => {
+  test('Scenario: the parent can end the session in Settings', async ({ page, setUp }) => {
     await enableWatchTime(page);
     await test.step('Given a session is running and settings is unlocked', async () => {
       await page.addInitScript(() => localStorage.setItem('watchTime.session', JSON.stringify({ budget: 1800, used: 600 })));
       await goto(page, '#/library');
       await page.getByTestId('settings-button').click();
-      await enterPin(page, PIN);
     });
     await test.step('When I tap "End session"', async () => {
       await page.getByTestId('end-session-button').click();
@@ -235,11 +227,10 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     await seedLibrary('medium');
     await openVideo(page, 'medium');
     await page.getByTestId('play-button').click();
-    await enterPin(page, PIN);
     await expect(page.getByTestId('budget-prompt')).toBeVisible();
   }
 
-  test('Scenario: "Other…" sets a budget of my own', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: "Other…" sets a budget of my own', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given the feature is on and the budget prompt is open', async () => {
       await openBudgetPrompt(page, seedLibrary);
@@ -256,7 +247,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: a custom budget must be 5 to 180 minutes', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: a custom budget must be 5 to 180 minutes', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await test.step('Given the feature is on and "Other…" is open in the budget prompt', async () => {
       await openBudgetPrompt(page, seedLibrary);
@@ -274,7 +265,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     }
   });
 
-  test('Scenario: the last custom budget is offered next time', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the last custom budget is offered next time', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
     await page.addInitScript(() => localStorage.setItem('watchTime.lastCustom', '25'));
     await test.step('Given a custom budget of 25 minutes was used before, and the budget prompt is open', async () => {
@@ -288,7 +279,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: switching it back on in Settings takes effect at once, without a reload', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: switching it back on in Settings takes effect at once, without a reload', async ({ page, setUp, seedLibrary }) => {
     await page.addInitScript(() => {
       if (!localStorage.getItem('features')) localStorage.setItem('features', JSON.stringify({ watchTimeLimit: false }));
     });
@@ -296,7 +287,6 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
       await page.getByTestId('settings-button').click();
-      await enterPin(page, PIN);
       await expect(page.getByTestId('feature-toggle-watchTimeLimit')).not.toBeChecked();
     });
     await test.step('When I switch it on and open "medium" without reloading', async () => {
@@ -304,16 +294,15 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await page.getByTestId('screen-settings').getByTestId('back-button').click();
       await openVideo(page, 'medium');
     });
-    await test.step('Then play with the PIN asks for a budget', async () => {
+    await test.step('Then play with Face ID asks for a budget', async () => {
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await expect(page.getByTestId('budget-prompt')).toBeVisible();
     });
   });
 
-  test('Scenario: cancelling the budget prompt leaves the video paused', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: cancelling the budget prompt leaves the video paused', async ({ page, setUp, seedLibrary }) => {
     await enableWatchTime(page);
-    await test.step('Given the budget prompt is open after play and the PIN', async () => {
+    await test.step('Given the budget prompt is open after play and Face ID', async () => {
       await openBudgetPrompt(page, seedLibrary);
     });
     await test.step('When I tap Cancel', async () => {
@@ -327,7 +316,7 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: the arrow keys in the budget\'s minutes field change the minutes, not the video', async ({ page, pinSet, seedLibrary }) => {
+  test('Scenario: the arrow keys in the budget\'s minutes field change the minutes, not the video', async ({ page, setUp, seedLibrary }) => {
     const position = () => page.getByTestId('player-video').evaluate((v) => v.currentTime);
     await test.step('Given "medium" is open at 0:30 and the budget prompt\'s own minutes field is open', async () => {
       await goto(page, '#/library');
@@ -335,7 +324,6 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await openVideo(page, 'medium');
       await page.getByTestId('seek-bar').fill('30');
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await page.getByTestId('budget-option-other').click();
       await page.getByTestId('budget-custom-input').focus();
     });
@@ -348,13 +336,12 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     });
   });
 
-  test('Scenario: after leaving the app with the budget prompt open, choosing a budget does not start playback', async ({ page, pinSet, seedLibrary }) => {
-    await test.step('Given I tapped play on "medium", entered the PIN, and the budget prompt is open', async () => {
+  test('Scenario: after leaving the app with the budget prompt open, choosing a budget does not start playback', async ({ page, setUp, seedLibrary, faceId }) => {
+    await test.step('Given I tapped play on "medium", passed Face ID, and the budget prompt is open', async () => {
       await goto(page, '#/library');
       await seedLibrary('medium');
       await openVideo(page, 'medium');
       await page.getByTestId('play-button').click();
-      await enterPin(page, PIN);
       await expect(page.getByTestId('budget-prompt')).toBeVisible();
     });
     await test.step('When the app goes to the background and comes back', async () => {
@@ -364,11 +351,12 @@ test.describe('Feature: Watch-time limit (optional)', () => {
     await test.step('And I choose 30 minutes', async () => {
       await page.getByTestId('budget-option-30').click();
     });
-    await test.step('Then nothing plays: the video is paused and play asks for the PIN again', async () => {
+    await test.step('Then nothing plays: the video is paused and play asks for Face ID again', async () => {
       await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
       await expectNotPlaying(page);
+      const before = await faceId.uses();
       await page.getByTestId('play-button').click();
-      await expect(page.getByTestId('pin-prompt')).toHaveAttribute('data-mode', 'verify');
+      await expect.poll(() => faceId.uses()).toBe(before + 1);
     });
   });
 });

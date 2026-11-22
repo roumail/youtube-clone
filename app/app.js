@@ -1,13 +1,11 @@
 // App: routing + one state object + render(state).
-// M2 library/import, M3 player + PIN gate, M4 first-run PIN, lockout, change
-// PIN, offline (service worker) and installability.
+// Everything behind the parent unlocks with Face ID / Touch ID (unlock.js);
+// offline (service worker) and installability.
 import { installLocalScheme, pickedSource, CONTAINER_EXT } from './local-scheme.js';
 import {
   initDrive, pickFromDrive, signedIn, signIn, signInEnds, driveSource, listFolder, FOLDER,
 } from './drive.js';
-import {
-  hasPin, verifyPinSync, savePin, removePin, isValidNewPin, lockoutRemaining, recordFailure, recordSuccess,
-} from './pin.js';
+import * as unlock from './unlock.js';
 import {
   listVideos, importVideo, addStreamed, streamUri, removeVideo, parseTitle,
 } from './library.js';
@@ -17,32 +15,30 @@ import {
   timeUp, seekTo, seekBy, playOn,
 } from './player.js';
 import {
-  FEATURES, flags, setFlag, loadEnabled, start as startFeature, unavailable as unavailableFeatures, setUp as setUpFeature,
+  FEATURES, flags, setFlag, loadEnabled, start as startFeature,
 } from './features.js';
 
 const $ = (testid, root = document) => root.querySelector(`[data-testid="${testid}"]`);
 
 const state = {
   route: { name: 'library' },
-  pinSet: false,
+  setUp: false, // first run is done: Face ID is set up on this device
   library: [], // the catalogue: stored and streamed videos (library.js listVideos)
   settingsUnlocked: false,
-  search: '', // library search text (not saved); typing needs the PIN
+  search: '', // library search text (not saved); typing needs unlocking
   searchUnlocked: false, // until the search field loses focus
-  // PIN prompt: { purpose: 'setup' | 'import' | 'drive' | 'download' | 'settings' | 'play' | 'change' | 'search'
-  //                       | 'remove-pin' | 'faceid-off',
-  //              mode: 'start' | 'setup' | 'confirm' | 'verify' | 'change' | 'continue', status: 'entry' | 'wrong' | 'faceid', error }
-  //              ('start': first run offers Face ID or a PIN; 'faceid': Face ID is being asked, the prompt out of sight;
-  //               mode 'continue': Face ID passed, an action that needs a tap waits for "Continue")
-  // A 'verify' prompt with no PIN set (Face ID alone) shows as mode 'faceid': no PIN field.
+  // Unlock prompt: { purpose: 'setup' | 'import' | 'drive' | 'download' | 'settings' | 'play' | 'search',
+  //                 mode: 'unavailable' | 'setup' | 'unlock' | 'continue', asking }
+  // ('unavailable': no Face ID, Touch ID or passcode; 'setup': first run;
+  //  'unlock': Face ID failed, was cancelled, or waits for a tap; 'continue':
+  //  Face ID passed, and an action that needs a tap waits for "Continue").
+  // While asking, Face ID is being asked and the prompt is out of sight.
   prompt: null,
-  newPin: null, // first entry of a new PIN, until it is confirmed
   returnTo: '#/library', // where the player's Back goes (the library or a series list)
   features: {}, // running optional features, by id (features.js)
-  unavailable: new Set(), // optional features this device can't offer
   jobs: [], // adds and downloads, one row each: { phase: 'storing' | 'done' | 'error' | 'cancelled', progress, message, cancel }
   signingIn: null, // a Google sign-in started by the tap that opened a streamed video
-  downloadTarget: null, // the streamed video whose Download asked for the PIN
+  downloadTarget: null, // the streamed video whose Download asked for unlocking
   downloading: new Set(), // the streamed videos being downloaded (their URIs)
   // Videos ticked to play in a row (catalogue ids, in the order ticked); null
   // while not selecting. Not saved.
@@ -64,32 +60,17 @@ const go = (hash) => { location.hash = hash; };
 // ---------- render ----------
 
 const PROMPT_TITLES = {
-  start: 'Unlock with Face ID or a PIN?', setup: 'Set a PIN (4–6 digits)', confirm: 'Enter the PIN again',
-  verify: 'Enter PIN', faceid: 'Unlock with Face ID', change: 'New PIN (4–6 digits)',
-  continue: 'Face ID passed',
+  unavailable: "This device can't use Kids Library", setup: 'Set up Face ID / Touch ID',
+  unlock: 'Unlock with Face ID', continue: 'Face ID passed',
 };
 
 // Actions the browser only allows during a tap: the file picker, and Google's
-// sign-in window when a sign-in is due (Google's file picker opens inside the
-// page). Face ID takes a moment, and Safari no longer counts the tap that
-// asked for it, so after Face ID these wait for a tap on "Continue".
-const needsTap = (purpose) => purpose === 'import' || (['drive', 'download'].includes(purpose) && !signedIn());
-
-// Unlocking is set up: a PIN, or Face ID alone. Until then, first run.
-const unlockSetUp = (s) => s.pinSet || !!s.features.faceId;
-
-function pinPromptFor(s) {
-  if (!s.prompt) return null;
-  const mode = s.prompt.mode === 'verify' && !s.pinSet ? 'faceid' : s.prompt.mode;
-  const locked = mode === 'verify' && lockoutRemaining() > 0;
-  return {
-    mode,
-    status: locked ? 'locked-out' : s.prompt.status,
-    title: PROMPT_TITLES[mode],
-    error: locked ? 'Too many wrong tries. Wait a minute.' : s.prompt.error,
-    cancellable: s.prompt.purpose !== 'setup',
-  };
-}
+// sign-in window when a sign-in is due (adding from Drive, downloading, or
+// playing a streamed video; Google's file picker opens inside the page).
+// Face ID takes a moment, and Safari no longer counts the tap that asked for
+// it, so after Face ID these wait for a tap on "Continue".
+const needsTap = (purpose) => purpose === 'import'
+  || (!signedIn() && (['drive', 'download'].includes(purpose) || (purpose === 'play' && streamsNow(playing()))));
 
 function tile(testid, poster, ...texts) {
   const li = document.createElement('li');
@@ -189,7 +170,7 @@ function playSelection() {
 }
 
 // At the end of a video in a playlist, the next one opens and plays by itself:
-// the PIN was given at the start. The last one stops, as any video does.
+// it was unlocked at the start. The last one stops, as any video does.
 // Replacing the history entry keeps Back (and the back gesture) going to the library.
 function onEnded() {
   const list = state.playlist;
@@ -200,7 +181,7 @@ function onEnded() {
 }
 
 // A streamed video's tile says whether it is downloaded, and offers Download
-// (behind the PIN) while it isn't. Stored videos are already on the device.
+// (behind unlocking) while it isn't. Stored videos are already on the device.
 function downloadControls(li, c) {
   if (c.playsFrom !== 'drive') return;
   li.dataset.downloaded = c.download ? 'true' : (state.downloading.has(c.offlineUri) ? 'downloading' : 'false');
@@ -212,7 +193,7 @@ function downloadControls(li, c) {
   button.addEventListener('click', (event) => {
     event.stopPropagation(); // not opening the video
     state.downloadTarget = c;
-    askPin('download');
+    askUnlock('download');
   });
   li.append(button);
 }
@@ -333,8 +314,6 @@ function render(s) {
 
   // Settings
   show('screen-settings', s.route.name === 'settings');
-  $('change-pin-button').textContent = s.pinSet ? 'Change PIN' : 'Set a PIN';
-  show('remove-pin-button', s.pinSet && !!s.features.faceId);
   $('screen-settings').dataset.state = s.settingsUnlocked ? 'unlocked' : 'locked';
   document.querySelector('[data-role="settings-list"]').replaceChildren(
     ...(s.settingsUnlocked ? s.library.map(settingsRow) : []),
@@ -344,24 +323,18 @@ function render(s) {
   );
   for (const f of Object.values(s.features)) f.render?.();
 
-  // PIN prompt (overlay over any screen)
-  const prompt = pinPromptFor(s);
-  show('pin-prompt', !!prompt && prompt.status !== 'faceid');
-  if (prompt) {
-    $('pin-prompt').dataset.mode = prompt.mode;
-    $('pin-prompt').dataset.state = prompt.status;
-    $('pin-prompt').querySelector('[data-role="pin-title"]').textContent = prompt.title;
-    show('pin-cancel', prompt.cancellable);
-    const typed = !['start', 'faceid', 'continue'].includes(prompt.mode);
-    show('pin-input', typed);
-    show('pin-submit', typed);
-    show('pin-continue-button', prompt.mode === 'continue');
-    show('setup-faceid-button', prompt.mode === 'start');
-    show('setup-pin-button', prompt.mode === 'start');
-    show('pin-error', !!prompt.error);
-    $('pin-error').textContent = prompt.error;
-    $('pin-submit').disabled = prompt.status === 'locked-out';
-    $('pin-input').disabled = prompt.status === 'locked-out';
+  // Unlock prompt (overlay over any screen); out of sight while Face ID is asked
+  const p = s.prompt;
+  show('unlock-prompt', !!p && !p.asking);
+  if (p) {
+    $('unlock-prompt').dataset.mode = p.mode;
+    $('unlock-prompt').querySelector('[data-role="unlock-title"]').textContent = PROMPT_TITLES[p.mode];
+    show('unlock-unavailable', p.mode === 'unavailable');
+    show('setup-faceid-button', p.mode === 'setup');
+    show('unlock-faceid-button', p.mode === 'unlock');
+    show('unlock-faceid-setup-button', p.mode === 'unlock');
+    show('unlock-continue-button', p.mode === 'continue');
+    show('unlock-cancel', !['unavailable', 'setup'].includes(p.mode));
   }
 }
 
@@ -373,95 +346,67 @@ async function refreshLibrary() {
   state.library = await listVideos();
 }
 
-// Re-render when a lockout ends (also after a reload during a lockout).
-function scheduleLockoutEnd() {
-  const left = lockoutRemaining();
-  if (left > 0) setTimeout(update, left + 10);
+// Something behind the parent: Face ID first. byTap: asked from a tap on the
+// page; from the device's media controls (no tap) Face ID can't start, so the
+// prompt waits for a tap on "Use Face ID".
+function askUnlock(purpose, byTap = true) {
+  state.prompt = { purpose, mode: 'unlock', asking: false };
+  if (byTap) tryFaceId(unlock.verify);
+  else update();
 }
 
-// byTap: the prompt opens from a tap on the page (not from the device's
-// media controls); features may start something only a tap allows.
-function askPin(purpose, byTap = true) {
-  state.prompt = { purpose, mode: 'verify', status: 'entry', error: '' };
-  $('pin-input').value = '';
-  update();
-  for (const f of Object.values(state.features)) f.promptOpened?.(byTap);
-  // Face ID may have started: then the PIN field waits until it fails.
-  if (state.prompt.status !== 'faceid') $('pin-input').focus();
-}
-
-async function onPinSubmit(event) {
-  event.preventDefault();
+// Face ID (or setting it up again, which needs Face ID or the device passcode
+// too). Started within the tap; the prompt is out of sight meanwhile. Passing
+// it unlocks; failing it or cancelling shows the prompt again.
+async function tryFaceId(faceId) {
   const prompt = state.prompt;
-  const input = $('pin-input');
-  const value = input.value;
-  input.value = '';
-
-  // Choosing a new PIN (first run, or "Change PIN"), then confirming it.
-  if (prompt.mode === 'setup' || prompt.mode === 'change') {
-    if (!isValidNewPin(value)) {
-      Object.assign(prompt, { status: 'wrong', error: 'Use 4 to 6 digits.' });
-      return update();
-    }
-    state.newPin = value;
-    Object.assign(prompt, { mode: 'confirm', status: 'entry', error: '' });
+  Object.assign(prompt, { mode: 'unlock', asking: true });
+  update();
+  try {
+    await faceId();
+  } catch (e) {
+    console.warn('Face ID:', e.name, e.message); // shows why in Web Inspector
+    prompt.asking = false;
     return update();
   }
-  if (prompt.mode === 'confirm') {
-    if (value !== state.newPin) {
-      state.newPin = null;
-      Object.assign(prompt, {
-        mode: prompt.purpose === 'setup' ? 'setup' : 'change', status: 'wrong', error: "The PINs didn't match. Try again.",
-      });
-      return update();
-    }
-    await savePin(value);
-    state.newPin = null;
-    state.pinSet = true;
-    recordSuccess();
-    state.prompt = null;
-    // Switching Face ID off, with no PIN before: now that there is one.
-    if (prompt.purpose === 'faceid-off') return onFeatureToggle('faceId', false);
+  if (needsTap(prompt.purpose)) {
+    Object.assign(prompt, { mode: 'continue', asking: false });
     return update();
   }
-
-  // Checking the current PIN. Synchronous on purpose: the file picker and
-  // playback below must start within the user's tap, or Safari (iPad) refuses.
-  if (lockoutRemaining() > 0) return update();
-  const ok = verifyPinSync(value);
-  if (!ok) {
-    if (recordFailure()) scheduleLockoutEnd();
-    Object.assign(prompt, { status: 'wrong', error: 'Wrong PIN.' });
-    return update();
-  }
-  recordSuccess();
   return acceptPrompt(prompt);
 }
 
-// The prompt was answered: by the right PIN, or by an optional feature (Face ID).
+// First run: set up Face ID. If it fails or is cancelled, it asks again.
+async function onSetUp() {
+  try {
+    await unlock.setUp();
+  } catch (e) {
+    console.warn('Face ID:', e.name, e.message);
+    return;
+  }
+  unlock.forgetPin();
+  state.setUp = true;
+  state.prompt = null;
+  update();
+}
+
+// Unlocked: by Face ID, or by "Continue" after it.
 async function acceptPrompt(prompt) {
   const { purpose } = prompt;
-  if (purpose === 'change') {
-    Object.assign(prompt, { mode: 'change', status: 'entry', error: '' });
-    return update();
-  }
   state.prompt = null;
   if (purpose === 'import') {
-    // Still within the tap on "OK", so the browser allows opening the picker.
+    // Within the tap on "Continue", so the browser allows opening the picker.
     $('import-input').click();
   } else if (purpose === 'download') {
-    // Within the tap too: the download may need a new Google sign-in.
+    // Within a tap too when a Google sign-in is due (needsTap).
     downloadVideo(state.downloadTarget, signInIfNeeded());
   } else if (purpose === 'drive') {
-    // Also within the tap: Google's sign-in opens a pop-up.
+    // Likewise: Google's sign-in opens a pop-up.
     pickFromDrive(addFromDrive);
   } else if (purpose === 'settings') {
     state.settingsUnlocked = true;
-  } else if (purpose === 'remove-pin') {
-    removePin();
-    state.pinSet = false;
   } else if (purpose === 'search') {
-    // Focus within the tap on "OK", so the iPad/iPhone keyboard comes up.
+    // Unlocked until the field loses focus (a tap on it brings the keyboard).
     state.searchUnlocked = true;
     update();
     $('search-input').focus();
@@ -469,11 +414,11 @@ async function acceptPrompt(prompt) {
   } else {
     update();
     // Optional features may step in first (e.g. ask for a watch-time budget);
-    // they call proceed() from their own tap, so playback still starts in-gesture.
+    // they call proceed() from their own tap.
     const proceed = () => { allowPlay(signInForPlay()).then(update); update(); };
     const cancel = () => { cancelPlay(); update(); };
     if (Object.values(state.features).some((f) => f.beforePlay?.(proceed, cancel))) return update();
-    await allowPlay(signInForPlay()); // still within the tap, so autoplay rules allow it
+    await allowPlay(signInForPlay()); // a refusal shows Play again (player.js)
   }
   update();
 }
@@ -483,7 +428,7 @@ async function acceptPrompt(prompt) {
 function featureSettings(s) {
   const on = flags();
   const rows = [];
-  for (const f of FEATURES.filter((x) => !s.unavailable.has(x.id))) {
+  for (const f of FEATURES) {
     const label = document.createElement('label');
     label.className = 'feature-toggle';
     const box = document.createElement('input');
@@ -499,59 +444,14 @@ function featureSettings(s) {
 }
 
 async function onFeatureToggle(id, on) {
-  // Face ID alone: switching it off needs a PIN to unlock with first.
-  if (id === 'faceId' && !on && !state.pinSet) {
-    state.prompt = { purpose: 'faceid-off', mode: 'change', status: 'entry', error: '' };
-    update();
-    $('pin-input').focus();
-    return;
-  }
-  if (on) {
-    try {
-      await setUpFeature(id);
-    } catch {
-      return update(); // its setup failed or was cancelled: it stays off
-    }
-  }
   setFlag(id, on);
   if (on && !state.features[id]) state.features[id] = await startFeature(id, featureContext());
   if (!on && state.features[id]) { state.features[id].stop(); delete state.features[id]; }
   update();
 }
 
-// First run: "Set up Face ID". If it fails or is cancelled, both choices stay.
-async function onSetUpFaceId() {
-  await onFeatureToggle('faceId', true);
-  if (state.features.faceId) state.prompt = null;
-  update();
-}
-
-function onUsePinInstead() {
-  Object.assign(state.prompt, { mode: 'setup', status: 'entry', error: '' });
-  update();
-  $('pin-input').focus();
-}
-
 function featureContext() {
-  return {
-    $, playerState, timeUp, changed: () => update(),
-    prompt: () => pinPromptFor(state),
-    // Face ID started (the prompt goes out of sight) or failed (the prompt
-    // shows again, ready for the PIN).
-    faceIdAsking: (asking) => {
-      Object.assign(state.prompt, { status: asking ? 'faceid' : 'entry', error: '' });
-      update();
-      $('pin-input').focus();
-    },
-    answerPrompt: () => {
-      recordSuccess();
-      if (needsTap(state.prompt.purpose)) {
-        Object.assign(state.prompt, { mode: 'continue', status: 'entry', error: '' });
-        return update();
-      }
-      return acceptPrompt(state.prompt);
-    },
-  };
+  return { $, playerState, timeUp, changed: () => update() };
 }
 
 // ---------- seek (M8) ----------
@@ -571,8 +471,8 @@ function showPosition() {
   $('time-total').textContent = clock(total);
 }
 // Phones: the on-screen keyboard covers part of the screen, and Safari doesn't
-// shrink full-screen layers for it. Keep the PIN prompt inside the area that is
-// still visible, so the field and buttons stay above the keyboard.
+// shrink full-screen layers for it. Keep prompts inside the area that is
+// still visible, so fields and buttons stay above the keyboard.
 function initVisibleArea() {
   const vv = window.visualViewport;
   const root = document.documentElement.style;
@@ -584,8 +484,8 @@ function initVisibleArea() {
   vv.addEventListener('scroll', apply);
   apply();
 }
-// Library search: locked until the PIN, unlocked until
-// the field loses focus; clearing needs no PIN.
+// Library search: locked until unlocked (Face ID), then until
+// the field loses focus; clearing needs nothing.
 // The search field alone: locking it on blur must not rebuild the results,
 // or a tap on a result would land on a tile that was just replaced.
 function renderSearchField(s) {
@@ -597,7 +497,7 @@ function renderSearchField(s) {
 
 function initSearch() {
   const input = $('search-input');
-  input.addEventListener('click', () => { if (!state.searchUnlocked) askPin('search'); });
+  input.addEventListener('click', () => { if (!state.searchUnlocked) askUnlock('search'); });
   input.addEventListener('input', () => {
     state.search = input.value;
     update();
@@ -669,7 +569,7 @@ function initSeek() {
   bar.addEventListener('change', () => { dragging = false; seekTo(Number(bar.value)); showPosition(); update(); });
   document.addEventListener('keydown', (e) => {
     if (state.route.name !== 'player' || state.prompt || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-    if (e.target instanceof HTMLInputElement && e.target !== bar) return; // typing a PIN
+    if (e.target instanceof HTMLInputElement && e.target !== bar) return; // typing (the budget's minutes)
     e.preventDefault(); // also stops the range input's own 1-second step
     seekBy(e.key === 'ArrowRight' ? 10 : -10);
     showPosition();
@@ -685,14 +585,14 @@ const playing = () => state.library.find((c) => c.offlineUri === playerState.off
 // Call within a tap: the sign-in in progress, or null if still signed in.
 const signInIfNeeded = () => (signedIn() ? null : signIn());
 
-// Within the play PIN's tap: a streamed video needs a valid Google sign-in.
+// Within the tap that plays (or its "Continue"): a streamed video needs a valid Google sign-in.
 // Returns the sign-in in progress, or null when none is needed.
 function signInForPlay() {
   return streamsNow(playing()) ? signInIfNeeded() : null;
 }
 
-// A streamed video pauses just before the sign-in ends; play with the PIN
-// signs in again (renewing it needs a tap).
+// A streamed video pauses just before the sign-in ends; play (Face ID, then
+// "Continue") signs in again (renewing it needs a tap).
 let signInTimer = null;
 function watchSignIn() {
   if (playerState.status !== 'playing' || !streamsNow(playing())) {
@@ -813,10 +713,10 @@ async function importSeveral(items, sourceOf, add) {
   else endJob(job, 'done', summary);
 }
 
-// Play (button or OS command): the PIN comes first, every time.
+// Play (button or OS command): unlocking comes first, every time.
 function onPlayRequested(byTap) {
   if (state.route.name !== 'player' || state.prompt) return;
-  if (requestPlay()) askPin('play', byTap);
+  if (requestPlay()) askUnlock('play', byTap);
 }
 
 function onPause() {
@@ -825,10 +725,9 @@ function onPause() {
   update();
 }
 
-function onPinCancel() {
+function onUnlockCancel() {
   const purpose = state.prompt?.purpose;
   state.prompt = null;
-  state.newPin = null;
   if (purpose === 'settings') go('#/library');
   if (purpose === 'play') cancelPlay();
   update();
@@ -957,8 +856,8 @@ function onRouteChange() {
     });
   }
   if (previous.name === 'settings' && state.route.name !== 'settings') state.settingsUnlocked = false;
-  if (state.route.name === 'settings' && !state.settingsUnlocked && unlockSetUp(state)) {
-    askPin('settings');
+  if (state.route.name === 'settings' && !state.settingsUnlocked && state.setUp) {
+    askUnlock('settings');
   } else if (state.prompt?.purpose === 'settings') {
     state.prompt = null;
   }
@@ -984,27 +883,25 @@ async function boot() {
   shaka.polyfill.installAll();
   installLocalScheme();
 
-  $('add-video-button').addEventListener('click', () => askPin('import'));
+  $('add-video-button').addEventListener('click', () => askUnlock('import'));
   $('settings-button').addEventListener('click', () => go('#/settings'));
   for (const screen of ['screen-settings', 'screen-series']) {
     $('back-button', $(screen)).addEventListener('click', () => go('#/library'));
   }
   $('back-button', $('screen-player')).addEventListener('click', () => go(state.returnTo));
-  $('pin-prompt').querySelector('form').addEventListener('submit', onPinSubmit);
-  $('pin-cancel').addEventListener('click', onPinCancel);
+  $('unlock-cancel').addEventListener('click', onUnlockCancel);
+  $('setup-faceid-button').addEventListener('click', onSetUp);
+  $('unlock-faceid-button').addEventListener('click', () => tryFaceId(unlock.verify));
+  $('unlock-faceid-setup-button').addEventListener('click', () => tryFaceId(unlock.setUp));
+  $('unlock-continue-button').addEventListener('click', () => acceptPrompt(state.prompt));
   $('import-input').addEventListener('change', (event) => {
     const files = [...event.target.files];
     event.target.value = '';
     importItems(files, pickedSource, importVideo);
   });
-  $('add-from-drive-button').addEventListener('click', () => askPin('drive'));
+  $('add-from-drive-button').addEventListener('click', () => askUnlock('drive'));
   $('play-button').addEventListener('click', () => onPlayRequested(true));
   $('pause-button').addEventListener('click', onPause);
-  $('change-pin-button').addEventListener('click', () => askPin('change'));
-  $('remove-pin-button').addEventListener('click', () => askPin('remove-pin'));
-  $('setup-faceid-button').addEventListener('click', onSetUpFaceId);
-  $('setup-pin-button').addEventListener('click', onUsePinInstead);
-  $('pin-continue-button').addEventListener('click', () => acceptPrompt(state.prompt));
   $('selection-cancel').addEventListener('click', () => { state.selection = null; update(); });
   $('selection-play').addEventListener('click', playSelection);
   initSearch();
@@ -1016,12 +913,12 @@ async function boot() {
   initVisibleArea();
   initControlsHide();
   // Leaving the app (switching apps, locking the screen) pauses; coming back
-  // needs the PIN again.
+  // needs unlocking again.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') onPause();
   });
   // OS media controls (lock screen, Control Center, headphones, media keys):
-  // "play" goes through the PIN like the on-screen button; "pause" is free.
+  // "play" needs unlocking like the on-screen button; "pause" is free.
   navigator.mediaSession.setActionHandler('play', () => onPlayRequested(false));
   navigator.mediaSession.setActionHandler('pause', onPause);
 
@@ -1030,19 +927,16 @@ async function boot() {
   // One user, no UI: just ask the browser to keep the library.
   navigator.storage.persist();
 
-  state.unavailable = await unavailableFeatures();
   state.features = await loadEnabled(featureContext());
 
-  // First run: a device with Face ID / Touch ID offers it first, else a PIN.
-  state.pinSet = hasPin();
-  if (!unlockSetUp(state)) {
-    const mode = state.unavailable.has('faceId') ? 'setup' : 'start';
-    state.prompt = { purpose: 'setup', mode, status: 'entry', error: '' };
-  }
+  // First run (and installs from before, with a PIN only): set up Face ID.
+  // Installs from before with Face ID on keep their passkey. Any PIN is forgotten.
+  state.setUp = unlock.isSetUp();
+  if (state.setUp) unlock.forgetPin();
+  else state.prompt = { purpose: 'setup', mode: await unlock.available() ? 'setup' : 'unavailable', asking: false };
   await refreshLibrary();
   state.route = { name: '' };
   onRouteChange();
-  scheduleLockoutEnd();
   $('app').dataset.ready = 'true';
   showVersion();
   initDrive().then((ready) => { $('add-from-drive-button').hidden = !ready; });

@@ -125,7 +125,7 @@ function openPicker(onPicked) {
 }
 
 /**
- * Called within the parent's tap (the PIN's OK): Google's sign-in pop-up, unless
+ * Called within the parent's tap: Google's sign-in pop-up, unless
  * this session's sign-in is still valid, then the Picker. Closing either adds
  * nothing. onPicked(docs, sourceOf) gets the picked files.
  */
