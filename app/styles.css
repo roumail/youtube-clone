@@ -53,6 +53,18 @@ button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 0; back
 .unlock-card h2, .unlock-card p { margin: 0; }
 .unlock-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
 
+/* A picked folder's videos to choose from: a scrolling list in a card. */
+[data-testid="drive-choose"] {
+  position: fixed; inset: 0; z-index: 15; display: grid; place-items: center; background: rgb(0 0 0 / 0.7);
+}
+.choose-card { background: #1d1d1d; padding: 20px; border-radius: 16px; display: grid; gap: 12px; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); grid-template-rows: auto minmax(0, 1fr) auto; }
+.choose-card h2 { margin: 0; overflow-wrap: anywhere; }
+.choose-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.choose-list label { display: flex; gap: 12px; align-items: center; padding: 10px 4px; border-bottom: 1px solid #333; overflow-wrap: anywhere; }
+.choose-list input { width: 22px; height: 22px; flex: none; }
+.choose-list li[data-state="in-library"] { color: var(--muted); }
+.choose-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
+
 /* Library grid (M2) */
 .grid li { background: #1d1d1d; border-radius: 12px; overflow: hidden; cursor: pointer; display: grid; }
 .grid li img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; display: block; }

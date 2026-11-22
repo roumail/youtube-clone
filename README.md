@@ -34,9 +34,10 @@ Each video in a catalogue is either:
 - **Streaming from Google Drive:** "Add from Google Drive" (behind Face ID) signs
   in to Google and opens Google's file picker, including "Shared with me". Pick
   `.kidsvideo` files or a whole folder (on the iPad Google's picker takes one
-  item at a time, so pick a series' folder): a folder adds every `.kidsvideo`
-  in it and its subfolders, skipping titles already there, so picking it again
-  later adds only new episodes. They're added as streamed: only their title and
+  item at a time, so pick a folder to add several): a folder lists every
+  `.kidsvideo` in it and its subfolders, the new ones ticked and the ones
+  already there greyed out; untick what you don't want and tap Add, so picking
+  it again later adds only new episodes. They're added as streamed: only their title and
   poster are read. The app only reads Google Drive (read-only permission), and
   the device account sees nothing but the shelf. The button appears once the site is
   deployed with a Google project's values: see

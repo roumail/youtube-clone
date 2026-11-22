@@ -103,6 +103,19 @@
       <ul data-role="settings-list"></ul>
     </section>
 
+    <!-- A picked folder's videos, to choose which to add (Add from Google Drive) -->
+    <div class="choose-prompt" data-testid="drive-choose" role="dialog" aria-modal="true" hidden>
+      <div class="choose-card">
+        <h2 data-role="choose-title"></h2>
+        <ul class="choose-list" data-role="choose-list"></ul>
+        <div class="choose-actions">
+          <button type="button" data-testid="drive-choose-toggle">Untick all</button>
+          <button type="button" data-testid="drive-choose-cancel">Cancel</button>
+          <button type="button" data-testid="drive-choose-add">Add</button>
+        </div>
+      </div>
+    </div>
+
     <div data-testid="unlock-prompt" data-mode="unlock" role="dialog" aria-modal="true" hidden>
       <div class="unlock-card">
         <h2 data-role="unlock-title">Unlock with Face ID</h2>
