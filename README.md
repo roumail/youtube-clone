@@ -29,6 +29,9 @@ Each video in a catalogue is either:
   choice of browser changes nothing.
 - **Each device has its own catalogue and its own PIN**, kept in that device's
   browser storage. The PIN can be changed in Settings.
+- **Face ID / Touch ID instead of a PIN:** on a device with Face ID or Touch ID,
+  first run sets it up and no PIN is needed ("Use a PIN instead" if you'd
+  rather). Settings can add a PIN as a fallback, or remove it again.
 - **Streaming from Google Drive:** "Add from Google Drive" (behind the PIN) signs
   in to Google and opens Google's file picker, including "Shared with me". Pick
   `.kidsvideo` files or a whole folder (on the iPad Google's picker takes one

@@ -64,6 +64,8 @@ export function verifyPinSync(pin) {
 export const hasPin = () => !!localStorage.getItem(PIN_KEY);
 export const isValidNewPin = (pin) => /^\d{4,6}$/.test(pin);
 
+export const removePin = () => localStorage.removeItem(PIN_KEY);
+
 export async function savePin(pin) {
   localStorage.setItem(PIN_KEY, await sha256Hex(pin));
 }
