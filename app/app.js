@@ -773,7 +773,7 @@ async function addFromDrive(docs, sourceOf) {
 
 // The list of a folder's videos: tick, untick, then add the ticked ones.
 function renderChoosing(s) {
-  show('drive-choose', !!s.choosing);
+  $('drive-choose').hidden = !s.choosing;
   if (!s.choosing) return;
   const { title, items } = s.choosing;
   const fresh = items.filter((i) => !i.inLibrary);
