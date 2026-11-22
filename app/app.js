@@ -31,8 +31,9 @@ const state = {
   searchUnlocked: false, // until the search field loses focus
   // PIN prompt: { purpose: 'setup' | 'import' | 'drive' | 'download' | 'settings' | 'play' | 'change' | 'search'
   //                       | 'remove-pin' | 'faceid-off',
-  //              mode: 'start' | 'setup' | 'confirm' | 'verify' | 'change', status: 'entry' | 'wrong' | 'faceid', error }
-  //              ('start': first run offers Face ID or a PIN; 'faceid': Face ID is being asked, the prompt out of sight)
+  //              mode: 'start' | 'setup' | 'confirm' | 'verify' | 'change' | 'continue', status: 'entry' | 'wrong' | 'faceid', error }
+  //              ('start': first run offers Face ID or a PIN; 'faceid': Face ID is being asked, the prompt out of sight;
+  //               mode 'continue': Face ID passed, an action that needs a tap waits for "Continue")
   // A 'verify' prompt with no PIN set (Face ID alone) shows as mode 'faceid': no PIN field.
   prompt: null,
   newPin: null, // first entry of a new PIN, until it is confirmed
@@ -65,7 +66,13 @@ const go = (hash) => { location.hash = hash; };
 const PROMPT_TITLES = {
   start: 'Unlock with Face ID or a PIN?', setup: 'Set a PIN (4–6 digits)', confirm: 'Enter the PIN again',
   verify: 'Enter PIN', faceid: 'Unlock with Face ID', change: 'New PIN (4–6 digits)',
+  continue: 'Face ID passed',
 };
+
+// Actions the browser only allows during a tap (a file picker, Google's
+// sign-in window). Face ID takes a moment, and Safari no longer counts the tap
+// that asked for it, so after Face ID these wait for a tap on "Continue".
+const NEEDS_TAP = new Set(['import', 'drive', 'download']);
 
 // Unlocking is set up: a PIN, or Face ID alone. Until then, first run.
 const unlockSetUp = (s) => s.pinSet || !!s.features.faceId;
@@ -344,9 +351,10 @@ function render(s) {
     $('pin-prompt').dataset.state = prompt.status;
     $('pin-prompt').querySelector('[data-role="pin-title"]').textContent = prompt.title;
     show('pin-cancel', prompt.cancellable);
-    const typed = !['start', 'faceid'].includes(prompt.mode);
+    const typed = !['start', 'faceid', 'continue'].includes(prompt.mode);
     show('pin-input', typed);
     show('pin-submit', typed);
+    show('pin-continue-button', prompt.mode === 'continue');
     show('setup-faceid-button', prompt.mode === 'start');
     show('setup-pin-button', prompt.mode === 'start');
     show('pin-error', !!prompt.error);
@@ -536,6 +544,10 @@ function featureContext() {
     },
     answerPrompt: () => {
       recordSuccess();
+      if (NEEDS_TAP.has(state.prompt.purpose)) {
+        Object.assign(state.prompt, { mode: 'continue', status: 'entry', error: '' });
+        return update();
+      }
       return acceptPrompt(state.prompt);
     },
   };
@@ -991,6 +1003,7 @@ async function boot() {
   $('remove-pin-button').addEventListener('click', () => askPin('remove-pin'));
   $('setup-faceid-button').addEventListener('click', onSetUpFaceId);
   $('setup-pin-button').addEventListener('click', onUsePinInstead);
+  $('pin-continue-button').addEventListener('click', () => acceptPrompt(state.prompt));
   $('selection-cancel').addEventListener('click', () => { state.selection = null; update(); });
   $('selection-play').addEventListener('click', playSelection);
   initSearch();
