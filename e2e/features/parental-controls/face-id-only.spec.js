@@ -65,7 +65,8 @@ async function watchPrompt(page) {
 async function faceIdOnly(page) {
   await goto(page, '#/library');
   await setupFaceId(page).click();
-  await expect(page.getByTestId('screen-library')).toBeVisible();
+  await expect(prompt(page)).toBeHidden();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('features'))?.faceId)).toBe(true);
 }
 
 test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
@@ -118,9 +119,10 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
       await setupFaceId(page).click();
     });
     await test.step('Then nothing is set up, and both choices are offered again', async () => {
+      await expect(prompt(page)).toBeVisible();
       await expect(setupFaceId(page)).toBeVisible();
       await expect(setupPin(page)).toBeVisible();
-      await expect(page.getByTestId('screen-library')).toBeHidden();
+      expect(await page.evaluate(() => JSON.parse(localStorage.getItem('features'))?.faceId)).toBeFalsy();
       expect(await storedPin(page)).toBeNull();
     });
   });
@@ -276,7 +278,8 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
       await expect(page.getByTestId('screen-settings')).toBeVisible();
     });
     await test.step('When I switch Face ID off', async () => {
-      await toggle(page).uncheck();
+      // A plain tap: the box stays ticked while the new PIN is asked.
+      await toggle(page).click();
     });
     await test.step('Then a new PIN is asked first; cancelling it keeps Face ID on', async () => {
       await expect(prompt(page)).toHaveAttribute('data-mode', 'change');
@@ -285,7 +288,7 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
       expect(await storedPin(page)).toBeNull();
     });
     await test.step('And setting the PIN switches Face ID off, and the PIN unlocks from then on', async () => {
-      await toggle(page).uncheck();
+      await toggle(page).click();
       await enterPin(page, '2468');
       await enterPin(page, '2468');
       await expect(toggle(page)).not.toBeChecked();
