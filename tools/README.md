@@ -226,7 +226,7 @@ over 2 MB. If `gitleaks` is installed (`brew install gitleaks`) it runs too.
   `tools/bin/` (gitignored).
 - `node tools/real-episode-check.mjs "<Kids Library>/<Title>.kidsvideo"` — adds and plays a
   prepared video in the live app, in your installed Chrome, with a throwaway
-  profile and PIN (manual; needs `npm ci --ignore-scripts` once).
+  profile and a simulated Touch ID (manual; needs `npm ci --ignore-scripts` once).
 
 ## Releases
 ```bash

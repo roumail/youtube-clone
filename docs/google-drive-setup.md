@@ -51,11 +51,11 @@ folder) and nothing else. The Google project lives on that account too.
    console: don't paste it into notes, docs or the repo.
 8. **On the iPad and iPhone:** open the app online, close it in the app
    switcher and open it again; "Add from Google Drive" shows next to "Add
-   video". Add from Google Drive → PIN → sign in as the device account. The
+   video". Add from Google Drive → Face ID → Continue → sign in as the device account. The
    first time, Google says it "hasn't verified this app" (it stays in Testing):
    Continue, then allow "See and download all your Google Drive files". Then
    Shared with me (or the shortcut) → pick `.kidsvideo` files or a folder. If
-   the sign-in window doesn't open, check Settings → Safari → Block Pop-ups, or
+   the sign-in window doesn't open after Continue, check Settings → Safari → Block Pop-ups, or
    try from the site in a Safari tab.
 
 **Later.** The device account's myaccount.google.com → Security → Your
