@@ -169,12 +169,12 @@ test.describe('Feature: Face ID / Touch ID instead of a PIN', () => {
       await expect(prompt(page)).toHaveAttribute('data-mode', 'faceid');
       await expect(faceIdButton(page)).toBeVisible();
       await expect(pinInput(page)).toBeHidden();
-      await expect(page.getByTestId('screen-settings')).toBeHidden();
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'locked');
     });
     await test.step('And when I tap "Use Face ID" and it passes this time, Settings opens', async () => {
       await device.willPass();
       await faceIdButton(page).click();
-      await expect(page.getByTestId('screen-settings')).toBeVisible();
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
   });
 
