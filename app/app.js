@@ -69,10 +69,11 @@ const PROMPT_TITLES = {
   continue: 'Face ID passed',
 };
 
-// Actions the browser only allows during a tap (a file picker, Google's
-// sign-in window). Face ID takes a moment, and Safari no longer counts the tap
-// that asked for it, so after Face ID these wait for a tap on "Continue".
-const NEEDS_TAP = new Set(['import', 'drive', 'download']);
+// Actions the browser only allows during a tap: the file picker, and Google's
+// sign-in window when a sign-in is due (Google's file picker opens inside the
+// page). Face ID takes a moment, and Safari no longer counts the tap that
+// asked for it, so after Face ID these wait for a tap on "Continue".
+const needsTap = (purpose) => purpose === 'import' || (['drive', 'download'].includes(purpose) && !signedIn());
 
 // Unlocking is set up: a PIN, or Face ID alone. Until then, first run.
 const unlockSetUp = (s) => s.pinSet || !!s.features.faceId;
@@ -544,7 +545,7 @@ function featureContext() {
     },
     answerPrompt: () => {
       recordSuccess();
-      if (NEEDS_TAP.has(state.prompt.purpose)) {
+      if (needsTap(state.prompt.purpose)) {
         Object.assign(state.prompt, { mode: 'continue', status: 'entry', error: '' });
         return update();
       }

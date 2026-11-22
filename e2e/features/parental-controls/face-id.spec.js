@@ -11,10 +11,11 @@
 // alert from the browser. It lives in the PIN prompt alone: every
 // action behind the PIN gets it the same way; the only difference per action
 // is the "Continue" tap below, for actions that must start within a tap.
-// Adding a video, adding from Google Drive and downloading must start within
-// a tap (a file picker, Google's sign-in window). Face ID takes a moment, and
-// Safari (iPad) no longer counts the tap that asked for it, so after Face ID
-// these wait for one more tap, on "Continue". Chromium here doesn't enforce
+// Adding a video (the file picker), and adding from Google Drive or
+// downloading when a Google sign-in is due (its window), must start within a
+// tap. Face ID takes a moment, and Safari (iPad) no longer counts the tap that
+// asked for it, so after Face ID these wait for one more tap, on "Continue".
+// Signed in already, Google's file picker opens inside the page: no extra tap. Chromium here doesn't enforce
 // that; these scenarios pin down the extra tap, the iPad is checked by hand.
 // With a PIN set (Face ID without a PIN: face-id-only.spec.js),
 // the PIN stays: it is typed whenever Face ID fails or is cancelled, and the
@@ -209,6 +210,30 @@ test.describe('Feature: Face ID / Touch ID (optional)', () => {
     await test.step('And tapping "Continue" asks Google\'s sign-in', async () => {
       await page.getByTestId('pin-continue-button').click();
       await expect.poll(() => google.signIns()).toBe(1);
+    });
+  });
+
+  test('Scenario: signed in to Google already, "Add from Google Drive" after Face ID needs no extra tap', async ({ page, pinSet }) => {
+    await faceIdDevice(page);
+    const google = await fakeGoogle(page, {
+      'tiny.kidsvideo': fixtureContainer('tiny'), 'medium.kidsvideo': fixtureContainer('medium'),
+    });
+    await test.step('Given Face ID is on, and I signed in to Google adding "tiny"', async () => {
+      await goto(page, '#/library');
+      await switchFaceIdOn(page);
+      await google.willPick('tiny.kidsvideo');
+      await page.getByTestId('add-from-drive-button').click();
+      await page.getByTestId('pin-continue-button').click();
+      await expect(page.getByTestId('import-status').filter({ hasText: 'Added "tiny".' })).toBeVisible();
+    });
+    await test.step('When I tap "Add from Google Drive" again, pass Face ID and pick "medium"', async () => {
+      await google.willPick('medium.kidsvideo');
+      await page.getByTestId('add-from-drive-button').click();
+    });
+    await test.step('Then "medium" is added without "Continue", and without signing in again', async () => {
+      await expect(page.getByTestId('import-status').filter({ hasText: 'Added "medium".' })).toBeVisible();
+      await expect(page.getByTestId('pin-continue-button')).toBeHidden();
+      expect(await google.signIns()).toBe(1);
     });
   });
 
