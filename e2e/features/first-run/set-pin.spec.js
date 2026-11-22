@@ -1,4 +1,6 @@
 // Feature: First run — a parent sets a PIN before anything else is usable.
+// On a device with Face ID / Touch ID, first run offers Face ID first and a
+// PIN on request (face-id-only.spec.js); these scenarios are the PIN path.
 import { test, expect, goto, enterPin, sha256Hex } from '../../support.js';
 
 test.describe('Feature: Set a PIN on first run', () => {

@@ -1,10 +1,13 @@
 // Feature "faceId": Face ID / Touch ID answers the PIN prompt. Switching it on
 // sets up a passkey for this app on this device (setUp); with it on, every PIN
 // prompt that asks for the current PIN starts Face ID as it opens, and passing
-// it counts as the right PIN. A prompt opened without a tap (play from the
-// device's media controls) waits for a tap on "Use Face ID" instead. A failed or cancelled Face ID leaves the prompt
-// open for the PIN, and "Use Face ID" tries again. Switching it off forgets
-// the passkey's id.
+// it counts as the right PIN. While Face ID is asked, the prompt stays out of
+// sight, so only the device's own sheets show. A prompt opened without a tap
+// (play from the device's media controls) waits for a tap on "Use Face ID"
+// instead. A failed or cancelled Face ID shows the prompt for the PIN, and
+// "Use Face ID" tries again. Switching it off forgets the passkey's id.
+// With no PIN (Face ID alone), the prompt has no PIN field, and "Set up Face
+// ID again" replaces a lost passkey.
 const KEY = 'faceId.credentialId';
 
 const challenge = () => crypto.getRandomValues(new Uint8Array(32));
@@ -26,31 +29,45 @@ export async function setUp() {
 }
 
 export function init(ctx) {
-  const { $, prompt, answerPrompt } = ctx;
+  const { $, prompt, answerPrompt, faceIdAsking } = ctx;
   const button = $('pin-faceid-button');
+  const again = $('pin-faceid-setup-button');
   const listening = new AbortController();
 
-  async function ask() {
+  const ask = () => navigator.credentials.get({ publicKey: {
+    challenge: challenge(),
+    allowCredentials: [{ type: 'public-key', id: fromBase64Url(localStorage.getItem(KEY)) }],
+    userVerification: 'required',
+    timeout: 60_000,
+  } });
+
+  // Face ID (or setting it up again, which needs Face ID or the device
+  // passcode too): passing it answers the prompt.
+  const attempt = (faceId) => async () => {
+    faceIdAsking(true);
     try {
-      await navigator.credentials.get({ publicKey: {
-        challenge: challenge(),
-        allowCredentials: [{ type: 'public-key', id: fromBase64Url(localStorage.getItem(KEY)) }],
-        userVerification: 'required',
-        timeout: 60_000,
-      } });
-    } catch {
-      return; // failed or cancelled: the prompt stays open for the PIN
+      await faceId();
+    } catch (e) {
+      // Failed or cancelled: the prompt shows again. Logged so a console
+      // (Web Inspector on the iPad) shows why.
+      console.warn('Face ID:', e.name, e.message);
+      faceIdAsking(false);
+      return;
     }
     answerPrompt();
-  }
-  button.addEventListener('click', ask, { signal: listening.signal });
+  };
+  button.addEventListener('click', attempt(ask), { signal: listening.signal });
+  again.addEventListener('click', attempt(setUp), { signal: listening.signal });
 
   return {
-    // Shown while a prompt asks for the current PIN; not during a lockout.
+    // Shown while a prompt asks for the current PIN (or, with no PIN, for
+    // Face ID alone); not during a lockout. With no PIN, a lost passkey can be
+    // set up again.
     render() {
       const p = prompt();
-      button.hidden = p?.mode !== 'verify';
+      button.hidden = !['verify', 'faceid'].includes(p?.mode);
       button.disabled = p?.status === 'locked-out';
+      again.hidden = p?.mode !== 'faceid';
     },
     // A prompt just opened: after a tap, start Face ID at once (a disabled
     // button ignores this); otherwise wait for a tap on "Use Face ID".
@@ -60,6 +77,7 @@ export function init(ctx) {
     stop() {
       listening.abort();
       button.hidden = true;
+      again.hidden = true;
       localStorage.removeItem(KEY);
     },
   };
