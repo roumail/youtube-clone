@@ -1,10 +1,11 @@
 // Feature "faceId": Face ID / Touch ID answers the PIN prompt. Switching it on
 // sets up a passkey for this app on this device (setUp); with it on, every PIN
 // prompt that asks for the current PIN starts Face ID as it opens, and passing
-// it counts as the right PIN. A prompt opened without a tap (play from the
-// device's media controls) waits for a tap on "Use Face ID" instead. A failed or cancelled Face ID leaves the prompt
-// open for the PIN, and "Use Face ID" tries again. Switching it off forgets
-// the passkey's id.
+// it counts as the right PIN. While Face ID is asked, the prompt stays out of
+// sight, so only the device's own sheets show. A prompt opened without a tap
+// (play from the device's media controls) waits for a tap on "Use Face ID"
+// instead. A failed or cancelled Face ID shows the prompt for the PIN, and
+// "Use Face ID" tries again. Switching it off forgets the passkey's id.
 const KEY = 'faceId.credentialId';
 
 const challenge = () => crypto.getRandomValues(new Uint8Array(32));
@@ -26,11 +27,12 @@ export async function setUp() {
 }
 
 export function init(ctx) {
-  const { $, prompt, answerPrompt } = ctx;
+  const { $, prompt, answerPrompt, faceIdAsking } = ctx;
   const button = $('pin-faceid-button');
   const listening = new AbortController();
 
   async function ask() {
+    faceIdAsking(true);
     try {
       await navigator.credentials.get({ publicKey: {
         challenge: challenge(),
@@ -38,8 +40,12 @@ export function init(ctx) {
         userVerification: 'required',
         timeout: 60_000,
       } });
-    } catch {
-      return; // failed or cancelled: the prompt stays open for the PIN
+    } catch (e) {
+      // Failed or cancelled: the prompt shows for the PIN. Logged so a
+      // console (Web Inspector on the iPad) shows why.
+      console.warn('Face ID:', e.name, e.message);
+      faceIdAsking(false);
+      return;
     }
     answerPrompt();
   }
