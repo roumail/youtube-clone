@@ -9,7 +9,8 @@
 // on its own: it waits for a tap on "Use Face ID". So Face ID always looks the
 // same: the device's passkey sheet, then Face ID, never an extra "Continue"
 // alert from the browser. It lives in the PIN prompt alone: every
-// action behind the PIN gets it the same way, with no exceptions per action.
+// action behind the PIN gets it the same way; the only difference per action
+// is the "Continue" tap below, for actions that must start within a tap.
 // Adding a video, adding from Google Drive and downloading must start within
 // a tap (a file picker, Google's sign-in window). Face ID takes a moment, and
 // Safari (iPad) no longer counts the tap that asked for it, so after Face ID
