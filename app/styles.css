@@ -97,6 +97,18 @@ progress[data-testid="import-progress"] { display: block; width: 100%; margin: 4
   content: "Time is up"; position: absolute; z-index: 2; top: 40%; width: 100%; text-align: center;
   font-size: 2rem; font-weight: 700; color: var(--fg); text-shadow: 0 2px 12px #000;
 }
+/* The parent's picture, above "Time is up". */
+.time-up-picture {
+  position: absolute; z-index: 2; left: 50%; top: 14%; transform: translateX(-50%);
+  max-width: min(70vw, 420px); max-height: 42vh; border-radius: 16px; box-shadow: 0 4px 24px #000;
+}
+[data-testid="screen-player"][data-state="time-up"]:has(.time-up-picture:not([hidden]))::after { top: auto; bottom: 26%; }
+.time-up-settings { display: grid; gap: 10px; background: #1d1d1d; padding: 12px; border-radius: 10px; }
+.time-up-settings h2 { margin: 0; font-size: 1.05rem; }
+.time-up-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.time-up-row > span:first-child { min-width: 4.5em; color: var(--muted); }
+[data-testid="time-up-picture-preview"] { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
+[data-testid="time-up-picture-status"], [data-testid="time-up-sound-status"] { color: var(--accent); }
 .budget-prompt {
   position: fixed; left: 0; right: 0; top: var(--visible-top, 0); height: var(--visible-height, 100%);
   z-index: 15; display: grid; place-items: center; overflow: auto; background: rgb(0 0 0 / 0.7);

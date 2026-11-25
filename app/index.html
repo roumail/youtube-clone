@@ -67,6 +67,9 @@
         <button type="button" data-testid="pause-button">Pause</button>
       </div>
       <p class="error-note" data-testid="player-error">This video isn't in the library.</p>
+      <!-- "Time is up" picture and sound (features/time-up.js) -->
+      <img class="time-up-picture" data-testid="time-up-picture" alt="" hidden>
+      <audio data-testid="time-up-sound" data-sound="built-in" preload="auto"></audio>
       <!-- Optional feature "watchTimeLimit" (features/watch-time.js) -->
       <div class="session-bar" data-testid="session-bar" hidden>
         <span data-testid="session-time" data-seconds="0"></span>

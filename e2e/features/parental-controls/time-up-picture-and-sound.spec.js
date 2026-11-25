@@ -7,7 +7,6 @@
 // The built-in tune is a short, gentle music-box melody (about 10 seconds,
 // original), synthesized by the app (no media file). It plays once, at the
 // device's volume (hardware buttons only).
-// Not built yet.
 import {
   test, expect, goto, openVideo, expectNotPlaying, playerState, tapContinue,
 } from '../../support.js';
@@ -71,7 +70,7 @@ async function choose(page, button, file) {
 test.use({ features: null });
 
 test.describe('Feature: "Time is up" picture and sound', () => {
-  test.fixme('Scenario: by default, "Time is up" plays the built-in tune once, with no picture @ipad', async ({ page, setUp, seedLibrary }) => {
+  test('Scenario: by default, "Time is up" plays the built-in tune once, with no picture @ipad', async ({ page, setUp, seedLibrary }) => {
     await oneSecondLeft(page);
     await test.step('Given nobody chose a picture or a sound, and "medium" is in the library', async () => {
       await goto(page, '#/library');
@@ -90,7 +89,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
     });
   });
 
-  test.fixme('Scenario: a picture chosen in Settings shows with "Time is up"', async ({ page, setUp, seedLibrary }) => {
+  test('Scenario: a picture chosen in Settings shows with "Time is up"', async ({ page, setUp, seedLibrary }) => {
     await oneSecondLeft(page);
     await test.step('Given settings is unlocked with Face ID', async () => {
       await goto(page, '#/library');
@@ -113,7 +112,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
     });
   });
 
-  test.fixme('Scenario: the picture and the sound are kept on this device after a reload', async ({ page, setUp, seedLibrary }) => {
+  test('Scenario: the picture and the sound are kept on this device after a reload', async ({ page, setUp, seedLibrary }) => {
     await oneSecondLeft(page);
     await test.step('Given I chose a picture and a sound in Settings', async () => {
       await goto(page, '#/library');
@@ -121,6 +120,8 @@ test.describe('Feature: "Time is up" picture and sound', () => {
       await openSettings(page);
       await choose(page, 'time-up-picture-choose', PICTURE);
       await choose(page, 'time-up-sound-choose', SOUND);
+      await expect(page.getByTestId('time-up-picture-preview')).toBeVisible();
+      await expect(page.getByTestId('time-up-sound-name')).toHaveText('our-song.wav');
     });
     await test.step('When I reload the app and the budget runs out', async () => {
       await page.reload();
@@ -134,7 +135,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
     });
   });
 
-  test.fixme('Scenario: removing the picture shows "Time is up" without one again', async ({ page, setUp, seedLibrary }) => {
+  test('Scenario: removing the picture shows "Time is up" without one again', async ({ page, setUp, seedLibrary }) => {
     await oneSecondLeft(page);
     await test.step('Given I chose a picture in Settings', async () => {
       await goto(page, '#/library');
@@ -155,7 +156,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
     });
   });
 
-  test.fixme('Scenario: a sound chosen in Settings plays instead of the built-in tune @ipad', async ({ page, setUp, seedLibrary }) => {
+  test('Scenario: a sound chosen in Settings plays instead of the built-in tune @ipad', async ({ page, setUp, seedLibrary }) => {
     await oneSecondLeft(page);
     await test.step('Given settings is unlocked with Face ID', async () => {
       await goto(page, '#/library');
@@ -178,7 +179,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
     });
   });
 
-  test.fixme('Scenario: going back to the built-in tune', async ({ page, setUp, seedLibrary }) => {
+  test('Scenario: going back to the built-in tune', async ({ page, setUp, seedLibrary }) => {
     await oneSecondLeft(page);
     await test.step('Given I chose my own sound in Settings', async () => {
       await goto(page, '#/library');
@@ -200,7 +201,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
     });
   });
 
-  test.fixme('Scenario: a file that isn\'t a picture or a sound is refused, and the choice stays as it was', async ({ page, setUp }) => {
+  test('Scenario: a file that isn\'t a picture or a sound is refused, and the choice stays as it was', async ({ page, setUp }) => {
     await test.step('Given settings is unlocked with Face ID, with no picture and the built-in tune', async () => {
       await goto(page, '#/library');
       await openSettings(page);
@@ -217,7 +218,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
     });
   });
 
-  test.fixme('Scenario: pausing or reaching the end of a video shows no picture and plays no sound', async ({ page, setUp, seedLibrary }) => {
+  test('Scenario: pausing or reaching the end of a video shows no picture and plays no sound', async ({ page, setUp, seedLibrary }) => {
     await test.step('Given I chose a picture, and "tiny" is playing with time left', async () => {
       await page.addInitScript(() => localStorage.setItem('watchTime.session', JSON.stringify({ budget: 1800, used: 0 })));
       await goto(page, '#/library');

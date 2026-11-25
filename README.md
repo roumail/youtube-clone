@@ -69,6 +69,10 @@ Each video in a catalogue is either:
   removed, which deletes its copy and frees the space. A streamed video can
   only be hidden from this device (with its download, if any); it stays on the
   shelf and can be added again.
+- **"Time is up"** (with the watch-time limit): when the time runs out, a
+  little built-in tune plays. In Settings (behind Face ID) a parent can choose a
+  picture or GIF to show with "Time is up", and a sound file to play instead of
+  the tune. Both stay on that device only, like stored videos.
 - **Deleting the home-screen app** (or clearing its data) empties its
   catalogue and deletes its stored copies. The shelf is the backup: add the
   videos again from it.
