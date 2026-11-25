@@ -189,7 +189,8 @@ cp "$RAW/tiny.mp4" "$OUT/raw-h264.mp4"
 "$FFMPEG" -hide_banner -loglevel error -y -i "$RAW/tiny.mp4" \
   -c:v libvpx-vp9 -b:v 0 -crf 40 -deadline realtime -c:a libopus "$OUT/raw-vp9.webm"
 
-# Exercise the re-encode path of kidsvideo prepare too.
+# Exercise the re-encode path of kidsvideo prepare too (the destination must exist).
+mkdir -p "$OUT/prepared-from-vp9"
 prepare "$OUT/raw-vp9.webm" "$OUT/prepared-from-vp9" >/dev/null
 test -f "$OUT/prepared-from-vp9/raw-vp9.kidsvideo"
 

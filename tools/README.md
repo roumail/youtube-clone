@@ -97,16 +97,18 @@ echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 ## `tools/run_prepare.sh`: options and examples
 
 ```bash
-tools/run_prepare.sh [--dest DIR] [--title "Clean Title"] [--series "Name"] INPUT...
+tools/run_prepare.sh [--tmux] [--dest DIR] [--title "Clean Title"] [--series "Name"] [--dry-run] INPUT...
 ls *.mp4 | tools/run_prepare.sh        # paths on stdin, one per line
 ```
 
 | Option | Meaning |
 |---|---|
 | `INPUT...` | Video files and/or folders. Folders are searched recursively for `.mp4 .m4v .mov .mkv .webm .avi`. With no `INPUT`, paths are read from stdin, one per line (`ls *.mp4 \| run_prepare`). |
-| `--dest DIR` | Where the `.kidsvideo` files go. Default: `KIDS_LIBRARY` from the environment or `.env`. |
+| `--dest DIR` | Where the `.kidsvideo` files go; the folder must exist. Default: `KIDS_LIBRARY` from the environment or `.env`. |
 | `--title "…"` | Clean title for a **single** file (instead of its file name). With `--series`, the episode title. |
 | `--series "Name"` | The inputs are episodes of a series (see below). |
+| `--dry-run` | Says, per video, whether each track would be copied or re-encoded; writes nothing. |
+| `--tmux` / `--no-tmux` | Run the job detached in tmux, or not (see Long jobs). |
 
 ### Examples
 
@@ -190,8 +192,8 @@ Kids Library/
   On the iPad, pick the episode's `.kidsvideo` file.
 
 ### What it does
-- For each video, runs `kidsvideo prepare` (the Go tool in `tools/kidsvideo/`,
-  which `run_prepare.sh` builds when Go is installed), which:
+- Hands the job to `kidsvideo prepare` (the Go tool in `tools/kidsvideo/`,
+  which `run_prepare.sh` builds when Go is installed), which, for each video:
   - picks the **English** audio track if there are several (otherwise the first);
   - keeps each video small, to save space: at most 540p, video at most
     0.7 Mbit/s (H.264), stereo audio at 64 kbit/s, so about 0.35 GB per hour.
@@ -218,11 +220,10 @@ data (home-folder paths, email addresses), `.env` files, video files and files
 over 2 MB. If `gitleaks` is installed (`brew install gitleaks`) it runs too.
 
 ## Lower-level tools
-- `tools/bin/kidsvideo prepare [--title T] [--dry-run] --dest DIR <video>` —
-  prepares exactly one video; `--dry-run` says, per track, whether it would be
-  copied or re-encoded. `run_prepare.sh` calls this. The Go tool also packs and
-  checks `.kidsvideo` files, and is planned to take over `run_prepare.sh` and
-  `get-packager.sh` too; see `tools/kidsvideo/README.md`.
+- `tools/bin/kidsvideo prepare [--dest DIR] [--title T] [--series NAME] [--dry-run] <videos and folders…>` —
+  does all of the above; `run_prepare.sh` only builds it, fetches the packager
+  and adds `--tmux`. The Go tool also packs and checks `.kidsvideo` files, and
+  is planned to take over `get-packager.sh` too; see `tools/kidsvideo/README.md`.
 - `tools/get-packager.sh` — downloads the pinned Shaka Packager into
   `tools/bin/` (gitignored).
 - `node tools/real-episode-check.mjs "<Kids Library>/<Title>.kidsvideo"` — adds and plays a
