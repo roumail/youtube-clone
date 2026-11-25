@@ -2,6 +2,9 @@
 // first play of a session; one budget for all videos; only actual playing time
 // counts; the session survives refreshes and relaunches and never ends by
 // itself — only a used-up budget or the parent (Settings → End session).
+// "Time is up" shows the parent's picture and plays a tune (time-up.js).
+import { initTimeUp } from './time-up.js';
+
 const KEY = 'watchTime.session'; // { budget, used } in seconds
 export const BUDGETS = [20, 30, 45]; // minutes (owner decision 2026-11-19)
 // "Other…": any whole number of minutes in this range; the last one is offered next time.
@@ -21,9 +24,11 @@ export function init(ctx) {
   let last = null;
   let onChosen = null;
   let onCancel = null;
+  const extras = initTimeUp($);
 
   function render() {
     account();
+    extras.render(playerState.status);
     const s = read();
     bar.hidden = false;
     const used = s?.used ?? 0;
@@ -43,7 +48,10 @@ export function init(ctx) {
     if (s && last !== null) {
       s.used = Math.min(s.budget, s.used + (now - last) / 1000);
       write(s);
-      if (playing && s.used >= s.budget) timeUp();
+      if (playing && s.used >= s.budget) {
+        timeUp();
+        extras.sounded();
+      }
     }
     last = playing ? now : null;
   }
@@ -51,6 +59,7 @@ export function init(ctx) {
   const timer = setInterval(() => { account(); render(); }, 250);
 
   function choose(minutes) {
+    extras.unlockSound(); // a tap: lets the tune play when this budget runs out
     write({ budget: minutes * 60, used: 0 });
     prompt.hidden = true;
     render();
@@ -105,15 +114,15 @@ export function init(ctx) {
       return true;
     },
     settingsRows() {
-      if (!read()) return [];
+      if (!read()) return [extras.settings];
       const end = document.createElement('button');
       end.type = 'button';
       end.dataset.testid = 'end-session-button';
       end.textContent = 'End watch-time session';
       end.addEventListener('click', () => { localStorage.removeItem(KEY); render(); ctx.changed(); });
-      return [end];
+      return [end, extras.settings];
     },
     render,
-    stop() { clearInterval(timer); bar.hidden = true; prompt.hidden = true; },
+    stop() { clearInterval(timer); bar.hidden = true; prompt.hidden = true; extras.stop(); },
   };
 }
