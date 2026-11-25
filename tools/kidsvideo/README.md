@@ -5,18 +5,18 @@ the same way on a Mac and on Linux (and in the Docker image). It grows in
 stages; each stage replaces a shell script, which is deleted once that stage's
 tests pass on the synthetic fixtures (`fixtures/generate.sh`).
 
-**Built today:** stages 1 and 2 (tests: `main_test.go`, `prepare_test.go`, with
-ffprobe, ffmpeg and the packager faked; the real ones run in CI through
-`fixtures/generate.sh`). Stages 3–4 are specified, not built: their tests are
-in `prepare_spec_test.go` and skip with "not built yet" (the Go equivalent of
-the app's `test.fixme`). Building a stage means removing those skips and
+**Built today:** stages 1–3 (tests: `main_test.go`, `prepare_test.go`,
+`prepare_batch_test.go`, with ffprobe, ffmpeg and the packager faked; the real
+ones run in CI through `fixtures/generate.sh`). Stage 4 is specified, not
+built: its tests are in `prepare_spec_test.go` and skip with "not built yet"
+(the Go equivalent of the app's `test.fixme`). Building a stage means removing those skips and
 implementing until `go test` is green.
 
 | Stage | Command | Replaces | Status |
 |---|---|---|---|
 | 1 | `kidsvideo pack <parts-folder>`, `kidsvideo verify <file>` | `tools/pack.sh` | built |
 | 2 | `kidsvideo prepare --dest DIR <video>` | `tools/prepare.sh` (deleted) | built |
-| 3 | `kidsvideo prepare <videos and folders…>` with titles and series | `tools/run_prepare.sh` | specified |
+| 3 | `kidsvideo prepare <videos and folders…>` with titles and series | the work of `tools/run_prepare.sh` (now a launcher: see below) | built |
 | 4 | the pinned Shaka Packager, downloaded and checked by the tool | `tools/get-packager.sh` | specified |
 
 ## Stage 2: prepare one video
@@ -47,23 +47,31 @@ implementing until `go test` is green.
 
 `kidsvideo prepare [--dest DIR] [--title T] [--series NAME] <videos and folders…>`
 
-- **Inputs:** files and folders (until then, `tools/run_prepare.sh` does this and calls stage 2 per video); folders are searched recursively for
-  .mp4 .m4v .mov .mkv .webm .avi. With no inputs, paths are read from stdin,
-  one per line.
+- **Inputs:** files and folders; folders are searched recursively for
+  .mp4 .m4v .mov .mkv .webm .avi, in path order. A file given by name is
+  prepared whatever its extension. With no inputs, paths are read from stdin,
+  one per line. Options may come before or after the inputs.
 - **Destination:** `--dest`, else `KIDS_LIBRARY` from the environment, else
-  from the repo's `.env`. None of them: the tool says so and stops.
+  from the repo's `.env` (two folders up from `tools/bin/kidsvideo`). None of
+  them: the tool says so and stops. It must exist: a typo or a drive that
+  isn't mounted is refused, not created.
 - **Titles:** the file name tidied ("Frozen.2.2019.1080p.BluRay.x264-GRP" →
   "Frozen 2 2019"); `--title` sets it for a single input.
 - **Series:** with `--series NAME`, each file name must carry its season and
   episode (S01E03, s1e3, 1x03); the title becomes
   "NAME - S01E03 - Episode title" and the file goes in `DIR/NAME/`. A file
   without them is refused by name; the others go on.
-- **Batch:** one failure doesn't stop the rest. The last line is
-  `prepared: N   skipped (already there): N   failed: N   → DIR`, and the exit
-  code is non-zero when anything failed.
+- **Batch:** one failure (including an input that isn't there) doesn't stop
+  the rest. Each video starts with `== <Title>`; the summary is
+  `prepared: N   skipped (already there): N   failed: N   → DIR` (with
+  `--dry-run`: `would prepare: N …`), then one `FAILED: <path>` line per
+  failure, and the exit code is non-zero when anything failed.
 
-Long jobs (`run_prepare.sh --tmux`): the Go tool doesn't detach itself; how
-long jobs are started is decided when stage 3 is built.
+Long jobs: the Go tool doesn't detach itself. `tools/run_prepare.sh` stays as
+a thin launcher: it builds the tool when Go is installed, fetches the pinned
+packager (until stage 4), and with `--tmux` (or `RUN_PREPARE_TMUX=1` in
+`.env`) runs `kidsvideo prepare` in a detached tmux session, passing on this
+shell's `KIDS_LIBRARY`; every other option goes to the tool unchanged.
 
 ## Stage 4: Shaka Packager
 

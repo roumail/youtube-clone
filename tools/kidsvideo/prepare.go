@@ -1,18 +1,23 @@
 package main
 
-// kidsvideo prepare: one source video -> "<dest>/<Title>.kidsvideo" (stage 2 in
-// README.md). ffprobe, ffmpeg and Shaka Packager do the work; this decides
-// what to ask of them, and writes the file all or nothing.
+// kidsvideo prepare: source videos -> "<dest>/<Title>.kidsvideo" (stages 2 and 3
+// in README.md). ffprobe, ffmpeg and Shaka Packager do the work; this decides
+// what to ask of them, and writes each file all or nothing. Stage 3 (folders,
+// stdin, the destination, titles, series, the batch) is runPrepare.
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -55,6 +60,16 @@ type toolset struct {
 	ffmpeg, ffprobe, packager string
 	r                         runner
 	progress                  io.Writer // a terminal for the re-encode progress line, or nil
+	stdin                     io.Reader // paths, one per line, when none are given; nil on a terminal
+	getenv                    func(string) string
+	dotEnv                    string // the repo's .env (KIDS_LIBRARY), if any
+}
+
+func (t toolset) env(key string) string {
+	if t.getenv == nil {
+		return ""
+	}
+	return t.getenv(key)
 }
 
 type stream struct {
@@ -225,23 +240,25 @@ func (w *progressLine) Write(b []byte) (int, error) {
 	}
 }
 
-// prepare writes dest/<title>.kidsvideo from input, saying what it does line by line.
-func prepare(t toolset, input, dest, title string, dryRun bool, say func(string)) error {
+// prepare writes dest/<title>.kidsvideo from input, saying what it does line by
+// line. skipped: the title was already there.
+func prepare(t toolset, input, dest, title string, dryRun bool, say func(string)) (skipped bool, err error) {
 	if info, err := os.Stat(input); err != nil || !info.Mode().IsRegular() {
-		return fmt.Errorf("no such file: %s", input)
-	}
-	if title == "" {
-		title = strings.TrimSuffix(filepath.Base(input), filepath.Ext(input))
+		return false, fmt.Errorf("no such file: %s", input)
 	}
 	// The tar name field holds 100 bytes: "<Title>.mpd" and its closing NUL must fit.
 	if len(title) > 95 {
-		return fmt.Errorf("title too long for the container (max 95 bytes; an accented letter counts as 2): %s", title)
+		return false, fmt.Errorf("title too long for the container (max 95 bytes; an accented letter counts as 2): %s", title)
 	}
 	out := filepath.Join(dest, title+ext)
 	if _, err := os.Stat(out); err == nil {
 		say("already prepared: " + title)
-		return nil
+		return true, nil
 	}
+	return false, prepareNew(t, input, dest, title, out, dryRun, say)
+}
+
+func prepareNew(t toolset, input, dest, title, out string, dryRun bool, say func(string)) error {
 	raw, err := t.r.output(t.ffprobe, "-v", "error", "-show_entries",
 		"stream=index,codec_type,codec_name,height,channels,bit_rate:stream_tags=language:format=duration", "-of", "json", input)
 	if err != nil {
@@ -342,20 +359,239 @@ func copyFile(from, to string) error {
 	return dst.Close()
 }
 
-// runPrepare: kidsvideo prepare [--title T] [--dry-run] --dest DIR <video>
+const prepareUsage = "usage: kidsvideo prepare [--dest DIR] [--title T] [--series NAME] [--dry-run] <videos and folders…>  (no inputs: paths from stdin)"
+
+// Folders are searched for these.
+var videoExts = map[string]bool{".mp4": true, ".m4v": true, ".mov": true, ".mkv": true, ".webm": true, ".avi": true}
+
+// videosIn: a file is itself; a folder, its video files (recursively, sorted).
+func videosIn(input string) ([]string, error) {
+	info, err := os.Stat(input)
+	if err != nil {
+		return nil, fmt.Errorf("not found: %s", input)
+	}
+	if !info.IsDir() {
+		return []string{input}, nil
+	}
+	var found []string
+	err = filepath.WalkDir(input, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.Type().IsRegular() && videoExts[strings.ToLower(filepath.Ext(path))] {
+			found = append(found, path)
+		}
+		return nil
+	})
+	sort.Strings(found)
+	return found, err
+}
+
+// Title tidying: a release-style file name -> a title.
+var (
+	leadingGroup    = regexp.MustCompile(`^\s*[\[(][^\])]*[\])]\s*`)
+	dotsUnderscores = regexp.MustCompile(`[._]+`)
+	underscores     = regexp.MustCompile(`_+`)
+	releaseTag      = regexp.MustCompile(`(?i)\b(2160p|1080p|720p|576p|480p|4k|uhd|hdr10?|dv|web[- ]?dl|webrip|web|bluray|blu ray|bdrip|brrip|hdtv|dvdrip|remux|amzn|nf|dsnp|hmax|atvp|x26[45]|h ?26[45]|hevc|avc|aac\d?|ac3|eac3|ddp?\d?|dts|truehd|atmos|proper|repack|extended|multi|\d+(?:\.\d+)? ?[mg]b)\b.*$`)
+	manySpaces      = regexp.MustCompile(`\s{2,}`)
+	edges           = regexp.MustCompile(`^[\s\-]+|[\s\-.\[(]+$`)
+	seasonEpisode   = regexp.MustCompile(`[Ss]([0-9]{1,3})[Ee]([0-9]{1,3})`)
+	crossEpisode    = regexp.MustCompile(`(?:^|[^0-9])(([0-9]{1,2})x([0-9]{1,3}))(?:[^0-9]|$)`)
+)
+
+// tidy: dots/underscores become spaces (only when the name has no spaces, so
+// "Mr. Bean" keeps its dot), a leading [group] is dropped, and everything from
+// the first quality/source/size tag on is cut.
+//
+//	"Frozen.2.2019.1080p.BluRay.1400MB.DD5.1.x264-GalaxyRG" -> "Frozen 2 2019"
+func tidy(name string) string {
+	name = leadingGroup.ReplaceAllString(name, "")
+	if !strings.Contains(name, " ") {
+		name = dotsUnderscores.ReplaceAllString(name, " ")
+	} else {
+		name = underscores.ReplaceAllString(name, " ")
+	}
+	name = releaseTag.ReplaceAllString(name, "")
+	name = manySpaces.ReplaceAllString(name, " ")
+	return edges.ReplaceAllString(name, "")
+}
+
+// episodeTitle: "NAME - S01E03 - Episode title" from a file name carrying its
+// season and episode (S01E03, s1e3, 1x03); the episode title is the tidied
+// text after them, unless given. ok is false without season and episode.
+func episodeTitle(stem, series, given string) (title string, ok bool) {
+	var tag, season, episode string
+	if m := seasonEpisode.FindStringSubmatch(stem); m != nil {
+		tag, season, episode = m[0], m[1], m[2]
+	} else if m := crossEpisode.FindStringSubmatch(stem); m != nil {
+		tag, season, episode = m[1], m[2], m[3]
+	} else {
+		return "", false
+	}
+	if given == "" {
+		_, after, _ := strings.Cut(stem, tag)
+		given = tidy(after)
+	}
+	s, _ := strconv.Atoi(season)
+	e, _ := strconv.Atoi(episode)
+	title = fmt.Sprintf("%s - S%02dE%02d", series, s, e)
+	if given != "" {
+		title += " - " + given
+	}
+	return title, true
+}
+
+// dotEnvValue: key's value in a shell-style .env file (the last one wins;
+// "$HOME" and the like are expanded except in single quotes), "" when absent.
+func dotEnvValue(path, key string, getenv func(string) string) string {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	value := ""
+	for _, line := range strings.Split(string(body), "\n") {
+		line = strings.TrimPrefix(strings.TrimSpace(line), "export ")
+		k, v, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(k) != key {
+			continue
+		}
+		v = strings.TrimSpace(v)
+		if len(v) >= 2 && v[0] == '\'' && v[len(v)-1] == '\'' {
+			value = v[1 : len(v)-1]
+			continue
+		}
+		if len(v) >= 2 && v[0] == '"' && v[len(v)-1] == '"' {
+			v = v[1 : len(v)-1]
+		}
+		value = os.Expand(v, func(name string) string {
+			if getenv == nil {
+				return ""
+			}
+			return getenv(name)
+		})
+	}
+	return value
+}
+
+// parseInterspersed: options may come before, between or after the inputs.
+func parseInterspersed(f *flag.FlagSet, args []string) ([]string, error) {
+	var inputs []string
+	for {
+		if err := f.Parse(args); err != nil {
+			return nil, err
+		}
+		if f.NArg() == 0 {
+			return inputs, nil
+		}
+		inputs = append(inputs, f.Arg(0))
+		args = f.Args()[1:]
+	}
+}
+
+// runPrepare: kidsvideo prepare [--dest DIR] [--title T] [--series NAME] [--dry-run] <videos and folders…>
 func runPrepare(args []string, stdout, stderr io.Writer, t toolset) int {
-	fs := flag.NewFlagSet("prepare", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	dest := fs.String("dest", "", "where the .kidsvideo file goes")
-	title := fs.String("title", "", "the title (default: the file name)")
-	dryRun := fs.Bool("dry-run", false, "say what would be done, write nothing")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 1 || *dest == "" {
-		fmt.Fprintln(stderr, "usage: kidsvideo prepare [--title T] [--dry-run] --dest DIR <video>")
+	f := flag.NewFlagSet("prepare", flag.ContinueOnError)
+	f.SetOutput(stderr)
+	dest := f.String("dest", "", "where the .kidsvideo files go (default: KIDS_LIBRARY)")
+	title := f.String("title", "", "the title of a single video (default: the file name, tidied); with --series, the episode title")
+	series := f.String("series", "", "these are episodes of NAME, filed under DEST/NAME/")
+	dryRun := f.Bool("dry-run", false, "say what would be done, write nothing")
+	inputs, err := parseInterspersed(f, args)
+	if err != nil {
+		fmt.Fprintln(stderr, prepareUsage)
 		return 2
 	}
+	if len(inputs) == 0 && t.stdin != nil {
+		lines := bufio.NewScanner(t.stdin)
+		for lines.Scan() {
+			if line := strings.TrimRight(lines.Text(), "\r"); line != "" {
+				inputs = append(inputs, line)
+			}
+		}
+	}
+	if len(inputs) == 0 {
+		fmt.Fprintln(stderr, prepareUsage)
+		return 2
+	}
+
+	library := *dest
+	if library == "" {
+		library = t.env("KIDS_LIBRARY")
+	}
+	if library == "" && t.dotEnv != "" {
+		library = dotEnvValue(t.dotEnv, "KIDS_LIBRARY", t.getenv)
+	}
+	if library == "" {
+		fmt.Fprintln(stderr, "no destination: use --dest DIR, or set KIDS_LIBRARY (in the environment or in the repo's .env; see .env.example)")
+		return 2
+	}
+	if info, err := os.Stat(library); err != nil || !info.IsDir() {
+		fmt.Fprintf(stderr, "destination does not exist: %s (create it first, e.g. a \"Kids Library\" folder)\n", library)
+		return 1
+	}
+
+	var files, failed []string
+	for _, input := range inputs {
+		found, err := videosIn(input)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			failed = append(failed, input)
+			continue
+		}
+		files = append(files, found...)
+	}
+	if len(files) == 0 && len(failed) == 0 {
+		fmt.Fprintln(stderr, "no video files found")
+		return 1
+	}
+	if *title != "" && len(files)+len(failed) != 1 {
+		fmt.Fprintf(stderr, "--title names a single video (got %d)\n", len(files)+len(failed))
+		return 2
+	}
+
 	say := func(line string) { fmt.Fprintln(stdout, line) }
-	if err := prepare(t, fs.Arg(0), *dest, *title, *dryRun, say); err != nil {
-		fmt.Fprintln(stderr, err)
+	indented := func(line string) { say("   " + line) }
+	done, skipped := 0, 0
+	for _, file := range files {
+		stem := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+		name, dir := *title, library
+		if *series != "" {
+			var ok bool
+			if name, ok = episodeTitle(stem, *series, *title); !ok {
+				say("== " + stem)
+				fmt.Fprintln(stderr, "   no season and episode (e.g. S01E03) in the file name: "+file)
+				failed = append(failed, file)
+				continue
+			}
+			dir = filepath.Join(library, *series)
+		} else if name == "" {
+			if name = tidy(stem); name == "" {
+				name = stem
+			}
+		}
+		say("== " + name)
+		wasThere, err := prepare(t, file, dir, name, *dryRun, indented)
+		switch {
+		case err != nil:
+			fmt.Fprintln(stderr, "   "+err.Error())
+			failed = append(failed, file)
+		case wasThere:
+			skipped++
+		default:
+			done++
+		}
+	}
+
+	verb := "prepared"
+	if *dryRun {
+		verb = "would prepare"
+	}
+	say("")
+	say(fmt.Sprintf("%s: %d   skipped (already there): %d   failed: %d   → %s", verb, done, skipped, len(failed), library))
+	for _, file := range failed {
+		indented("FAILED: " + file)
+	}
+	if len(failed) > 0 {
 		return 1
 	}
 	return 0
@@ -363,6 +599,7 @@ func runPrepare(args []string, stdout, stderr io.Writer, t toolset) int {
 
 // realTools: from the environment (FFMPEG, FFPROBE, PACKAGER), else ffmpeg and
 // ffprobe on PATH and the packager next to this program (tools/bin/packager).
+// The repo's .env is two folders up from this program (tools/bin/kidsvideo).
 func realTools() toolset {
 	env := func(key, fallback string) string {
 		if v := os.Getenv(key); v != "" {
@@ -371,9 +608,16 @@ func realTools() toolset {
 		return fallback
 	}
 	self, _ := os.Executable()
+	if real, err := filepath.EvalSymlinks(self); err == nil {
+		self = real
+	}
 	t := toolset{
 		ffmpeg: env("FFMPEG", "ffmpeg"), ffprobe: env("FFPROBE", "ffprobe"),
 		packager: env("PACKAGER", filepath.Join(filepath.Dir(self), "packager")), r: execRunner{},
+		getenv: os.Getenv, dotEnv: filepath.Join(filepath.Dir(self), "..", "..", ".env"),
+	}
+	if info, err := os.Stdin.Stat(); err == nil && info.Mode()&os.ModeCharDevice == 0 {
+		t.stdin = os.Stdin
 	}
 	// The progress line goes straight to the terminal (callers like run_prepare.sh
 	// filter stdout line by line, which would hide it); no terminal, no line.

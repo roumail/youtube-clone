@@ -98,10 +98,12 @@ func newSetup(t *testing.T, source probed, inputName string) setup {
 	packager := filepath.Join(dir, "packager")
 	os.WriteFile(packager, nil, 0o755)
 	fake := &fakeTools{source: source}
+	dest := filepath.Join(dir, "Kids Library")
+	os.Mkdir(dest, 0o755)
 	return setup{
 		fake:  fake,
 		tools: toolset{ffmpeg: "ffmpeg", ffprobe: "ffprobe", packager: packager, r: fake},
-		input: input, dest: filepath.Join(dir, "Kids Library"),
+		input: input, dest: dest,
 	}
 }
 
@@ -336,8 +338,10 @@ func TestPrepareShowsProgressOnlyOnATerminal(t *testing.T) {
 }
 
 func TestPrepareUsage(t *testing.T) {
-	var out, errOut bytes.Buffer
-	if code := runWith([]string{"prepare", "film.mp4"}, &out, &errOut, toolset{}); code != 2 || !strings.HasPrefix(errOut.String(), "usage: kidsvideo prepare") {
-		t.Fatalf("code %d, stderr %q", code, errOut.String())
+	for _, args := range [][]string{{"prepare"}, {"prepare", "--nope", "film.mp4"}} {
+		var out, errOut bytes.Buffer
+		if code := runWith(args, &out, &errOut, toolset{}); code != 2 || !strings.Contains(errOut.String(), "usage: kidsvideo prepare") {
+			t.Fatalf("%v: code %d, stderr %q", args, code, errOut.String())
+		}
 	}
 }
