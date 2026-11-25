@@ -1,11 +1,12 @@
 // Feature: "Time is up" picture and sound — part of the watch-time limit
 // (watch-time-limit.spec.js). When the budget runs out, the player shows
-// "Time is up" with a picture the parent chose, if any, and plays a sound:
-// a short built-in chime, or a sound file the parent chose instead.
+// "Time is up" with a picture the parent chose, if any, and plays a little
+// background tune: a built-in one, or a sound file the parent chose instead.
 // Both are chosen in Settings (behind Face ID) and kept on this device only,
 // like the videos: nothing personal goes into the app or the repo.
-// The built-in chime is made by the app (no media file); it plays once, at the
-// device's volume (hardware buttons only), and is meant to be gentle.
+// The built-in tune is a short, gentle music-box melody (about 10 seconds,
+// original), synthesized by the app (no media file). It plays once, at the
+// device's volume (hardware buttons only).
 // Not built yet.
 import {
   test, expect, goto, openVideo, expectNotPlaying, playerState, tapContinue,
@@ -70,7 +71,7 @@ async function choose(page, button, file) {
 test.use({ features: null });
 
 test.describe('Feature: "Time is up" picture and sound', () => {
-  test.fixme('Scenario: by default, "Time is up" plays the built-in chime once, with no picture @ipad', async ({ page, setUp, seedLibrary }) => {
+  test.fixme('Scenario: by default, "Time is up" plays the built-in tune once, with no picture @ipad', async ({ page, setUp, seedLibrary }) => {
     await oneSecondLeft(page);
     await test.step('Given nobody chose a picture or a sound, and "medium" is in the library', async () => {
       await goto(page, '#/library');
@@ -79,7 +80,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
     await test.step('When the budget runs out while "medium" plays', async () => {
       await runOutOfTime(page);
     });
-    await test.step('Then the built-in chime plays, once', async () => {
+    await test.step('Then the built-in tune plays, once', async () => {
       await expect(sound(page)).toHaveAttribute('data-sound', 'built-in');
       await expectSoundPlayed(page);
       expect(await sound(page).evaluate((a) => a.loop)).toBe(false);
@@ -154,7 +155,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
     });
   });
 
-  test.fixme('Scenario: a sound chosen in Settings plays instead of the built-in chime @ipad', async ({ page, setUp, seedLibrary }) => {
+  test.fixme('Scenario: a sound chosen in Settings plays instead of the built-in tune @ipad', async ({ page, setUp, seedLibrary }) => {
     await oneSecondLeft(page);
     await test.step('Given settings is unlocked with Face ID', async () => {
       await goto(page, '#/library');
@@ -171,13 +172,13 @@ test.describe('Feature: "Time is up" picture and sound', () => {
       await goto(page, '#/library');
       await runOutOfTime(page);
     });
-    await test.step('Then my sound plays, not the chime', async () => {
+    await test.step('Then my sound plays, not the built-in tune', async () => {
       await expect(sound(page)).toHaveAttribute('data-sound', 'own');
       await expectSoundPlayed(page);
     });
   });
 
-  test.fixme('Scenario: going back to the built-in chime', async ({ page, setUp, seedLibrary }) => {
+  test.fixme('Scenario: going back to the built-in tune', async ({ page, setUp, seedLibrary }) => {
     await oneSecondLeft(page);
     await test.step('Given I chose my own sound in Settings', async () => {
       await goto(page, '#/library');
@@ -185,13 +186,13 @@ test.describe('Feature: "Time is up" picture and sound', () => {
       await openSettings(page);
       await choose(page, 'time-up-sound-choose', SOUND);
     });
-    await test.step('When I tap "Use the built-in chime"', async () => {
+    await test.step('When I tap "Use the built-in tune"', async () => {
       await page.getByTestId('time-up-sound-reset').click();
     });
-    await test.step('Then Settings shows the built-in chime', async () => {
-      await expect(page.getByTestId('time-up-sound-name')).toHaveText('Built-in chime');
+    await test.step('Then Settings shows the built-in tune', async () => {
+      await expect(page.getByTestId('time-up-sound-name')).toHaveText('Built-in tune');
     });
-    await test.step('And when the budget runs out, the chime plays', async () => {
+    await test.step('And when the budget runs out, the built-in tune plays', async () => {
       await goto(page, '#/library');
       await runOutOfTime(page);
       await expect(sound(page)).toHaveAttribute('data-sound', 'built-in');
@@ -200,7 +201,7 @@ test.describe('Feature: "Time is up" picture and sound', () => {
   });
 
   test.fixme('Scenario: a file that isn\'t a picture or a sound is refused, and the choice stays as it was', async ({ page, setUp }) => {
-    await test.step('Given settings is unlocked with Face ID, with no picture and the built-in chime', async () => {
+    await test.step('Given settings is unlocked with Face ID, with no picture and the built-in tune', async () => {
       await goto(page, '#/library');
       await openSettings(page);
     });
@@ -210,9 +211,9 @@ test.describe('Feature: "Time is up" picture and sound', () => {
       await choose(page, 'time-up-sound-choose', NOT_A_PICTURE);
       await expect(page.getByTestId('time-up-sound-status')).toHaveAttribute('data-state', 'refused');
     });
-    await test.step('Then there is still no picture, and the sound is still the built-in chime', async () => {
+    await test.step('Then there is still no picture, and the sound is still the built-in tune', async () => {
       await expect(page.getByTestId('time-up-picture-preview')).toBeHidden();
-      await expect(page.getByTestId('time-up-sound-name')).toHaveText('Built-in chime');
+      await expect(page.getByTestId('time-up-sound-name')).toHaveText('Built-in tune');
     });
   });
 
