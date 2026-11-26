@@ -210,7 +210,8 @@ async function addFaceIdDevice(page, browserName) {
       const id = randomBytes(16);
       const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
       await cdp.send('WebAuthn.addCredential', { authenticatorId, credential: {
-        credentialId: id.toString('base64'), isResidentCredential: false, rpId,
+        credentialId: id.toString('base64'), isResidentCredential: true, rpId,
+        userHandle: Buffer.from('parent').toString('base64'),
         privateKey: privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'), signCount: 0,
       } });
       return base64Url(id);

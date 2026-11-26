@@ -11,12 +11,18 @@
 // be skipped. A device without Face ID, Touch ID or a passcode can't use the
 // app, and says so. Installs from before (with a PIN) set up Face ID on their
 // next start, or keep the passkey they already have; the PIN is forgotten.
-// While Face ID is asked, only the device's own sheets show. When it fails or
-// is cancelled, or play comes from the device (Control Center, the lock
-// screen or a keyboard, where Face ID can't start without a tap), the unlock
-// prompt shows "Use Face ID" and Cancel. If the passkey is gone (deleted in
-// Passwords, or the browser's data cleared), "Set up Face ID again" makes a
-// new one, which itself needs Face ID or the device passcode.
+// First run tells the parents that each of them must be enrolled on the
+// device: the app stores no face, and the device accepts any face (or finger)
+// enrolled on it. On an iPad that is Face ID and its Alternate Appearance.
+// While Face ID is asked, only the device's own sheets show, and another tap
+// doesn't ask it a second time. When it fails or is cancelled, or play comes
+// from the device (Control Center, the lock screen or a keyboard, where Face
+// ID can't start without a tap), the unlock prompt shows "Use Face ID" and
+// Cancel. Unlocking accepts any passkey this app has on the device. If Face ID
+// fails a second time in the same prompt (the passkey may be gone: deleted in
+// Passwords, or the browser's data cleared), the prompt also offers "Set up
+// Face ID again", which needs Face ID or the device passcode and replaces this
+// app's passkey rather than adding one.
 // Some actions must start within a tap: the file picker (Add video), and
 // Google's sign-in window when a sign-in is due (Add from Google Drive,
 // Download, playing a streamed video). Face ID takes a moment, and Safari (iPad) no longer counts the
@@ -57,6 +63,20 @@ async function setUp(page) {
   await expect(page.getByTestId('screen-library')).toBeVisible();
 }
 
+// A passkey as earlier versions made them: a new identity each time.
+// Returns its id as the app stores it.
+const earlierPasskey = (page) => page.evaluate(async () => {
+  const credential = await navigator.credentials.create({ publicKey: {
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rp: { name: 'Kids videos' },
+    user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'parent', displayName: 'Parent' },
+    pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+    authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
+  } });
+  return btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+});
+
 // An install from before this change: a PIN, and optionally Face ID on with a
 // passkey already made (as the PIN-era app stored them).
 async function oldInstall(page, { faceId }) {
@@ -68,19 +88,11 @@ async function oldInstall(page, { faceId }) {
   }, [sha256Hex('1234')]);
   if (!faceId) return;
   await goto(page, '#/library');
-  await page.evaluate(async () => {
-    const credential = await navigator.credentials.create({ publicKey: {
-      challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: { name: 'Kids videos' },
-      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'parent', displayName: 'Parent' },
-      pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
-    } });
-    const id = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    localStorage.setItem('faceId.credentialId', id);
+  const id = await earlierPasskey(page);
+  await page.evaluate((credentialId) => {
+    localStorage.setItem('faceId.credentialId', credentialId);
     localStorage.setItem('features', JSON.stringify({ faceId: true }));
-  });
+  }, id);
 }
 
 test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
@@ -93,6 +105,12 @@ test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
       await expect(setUpFaceId(page)).toBeVisible();
       await expect(page.getByTestId('pin-input')).toHaveCount(0);
       await expect(cancelButton(page)).toBeHidden();
+    });
+    await test.step('And it says each parent must be enrolled on the device', async () => {
+      await expect(page.getByTestId('setup-faceid-parents')).toHaveText(
+        'Each parent who unlocks must be enrolled on this device. On an iPad, add the second '
+        + 'parent\'s face as an Alternate Appearance (Settings → Face ID & Passcode).',
+      );
     });
     await test.step('When I tap "Set up Face ID" and pass it', async () => {
       await setUpFaceId(page).click();
@@ -205,10 +223,11 @@ test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
     await test.step('When I tap Settings', async () => {
       await page.getByTestId('settings-button').click();
     });
-    await test.step('Then the unlock prompt shows "Use Face ID" and Cancel, and Settings stays locked', async () => {
+    await test.step('Then the unlock prompt shows "Use Face ID" and Cancel, not "Set up Face ID again", and Settings stays locked', async () => {
       await expect(unlockPrompt(page)).toHaveAttribute('data-mode', 'unlock');
       await expect(useFaceId(page)).toBeVisible();
       await expect(cancelButton(page)).toBeVisible();
+      await expect(setUpAgain(page)).toBeHidden();
       await expect(page.getByTestId('pin-input')).toHaveCount(0);
       await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'locked');
     });
@@ -275,7 +294,7 @@ test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
     });
   });
 
-  test('Scenario: if the passkey was deleted, "Set up Face ID again" makes a new one that works', async ({ page, faceId }) => {
+  test('Scenario: if the passkey was deleted, Face ID failing twice offers "Set up Face ID again", which makes a new one that works', async ({ page, faceId }) => {
         await test.step('Given Face ID is set up, and its passkey was then deleted (e.g. in Passwords)', async () => {
       await setUp(page);
       await faceId.deletePasskeys();
@@ -283,7 +302,12 @@ test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
     await test.step('When I tap Settings', async () => {
       await page.getByTestId('settings-button').click();
     });
-    await test.step('Then the unlock prompt offers "Set up Face ID again"', async () => {
+    await test.step('Then the unlock prompt offers "Use Face ID", and not yet "Set up Face ID again"', async () => {
+      await expect(useFaceId(page)).toBeVisible();
+      await expect(setUpAgain(page)).toBeHidden();
+    });
+    await test.step('And when I tap "Use Face ID" and it fails again, it offers "Set up Face ID again"', async () => {
+      await useFaceId(page).click();
       await expect(setUpAgain(page)).toBeVisible();
     });
     await test.step('And when I tap it and pass Face ID, Settings opens, and the new passkey unlocks next time', async () => {
@@ -293,6 +317,69 @@ test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
       await page.getByTestId('screen-settings').getByTestId('back-button').click();
       await page.getByTestId('settings-button').click();
       await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
+    });
+  });
+
+  test('Scenario: setting up Face ID again replaces this app\'s passkey instead of adding one', async ({ page, faceId }) => {
+        await test.step('Given Face ID is set up, it will fail, and it failed twice after tapping Settings', async () => {
+      await setUp(page);
+      await faceId.willFail();
+      await page.getByTestId('settings-button').click();
+      await useFaceId(page).click();
+      await expect(setUpAgain(page)).toBeVisible();
+    });
+    await test.step('When I tap "Set up Face ID again" and pass Face ID', async () => {
+      await faceId.willPass();
+      await setUpAgain(page).click();
+    });
+    await test.step('Then Settings opens, and the device still has one passkey for this app', async () => {
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
+      expect(await faceId.passkeys()).toBe(1);
+    });
+  });
+
+  test('Scenario: a passkey from an earlier setup unlocks, even when the newest one was deleted', async ({ page, faceId }) => {
+        await test.step('Given Face ID is set up, that passkey was deleted, and one from an earlier setup is still on the device', async () => {
+      await setUp(page);
+      await faceId.deletePasskeys();
+      await earlierPasskey(page);
+    });
+    const before = await faceId.uses();
+    await test.step('When I tap Settings and pass Face ID', async () => {
+      await page.getByTestId('settings-button').click();
+    });
+    await test.step('Then Settings opens, and the prompt never showed', async () => {
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
+      expect(await faceId.uses()).toBe(before + 1);
+      await expect(unlockPrompt(page)).toBeHidden();
+    });
+  });
+
+  test('Scenario: another tap while Face ID is asked doesn\'t ask it a second time', async ({ page, faceId }) => {
+        await test.step('Given Face ID is set up, and Face ID takes a while to answer', async () => {
+      await setUp(page);
+      await page.evaluate(() => {
+        const get = navigator.credentials.get.bind(navigator.credentials);
+        let answer;
+        const answered = new Promise((resolve) => { answer = resolve; });
+        window.faceIdAnswers = answer;
+        window.faceIdAsked = 0;
+        navigator.credentials.get = async (options) => {
+          window.faceIdAsked += 1;
+          await answered;
+          return get(options);
+        };
+      });
+    });
+    await test.step('When I tap "Add video", and tap it again while Face ID is asked', async () => {
+      await page.getByTestId('add-video-button').click();
+      await page.getByTestId('add-video-button').click();
+    });
+    await test.step('Then Face ID was asked once, and passing it shows "Continue"', async () => {
+      expect(await page.evaluate(() => window.faceIdAsked)).toBe(1);
+      await page.evaluate(() => window.faceIdAnswers());
+      await expect(unlockPrompt(page)).toHaveAttribute('data-mode', 'continue');
+      expect(await page.evaluate(() => window.faceIdAsked)).toBe(1);
     });
   });
 
