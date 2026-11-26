@@ -92,6 +92,11 @@ There is no PIN of the app's own.
   and must not have their face (or finger) enrolled on the device. When Face ID
   fails, the device offers its passcode instead, so the passcode unlocks the
   app too.
+- **Both parents enrol on the device.** The app stores no face: the device
+  accepts any face (or finger) enrolled on it. An iPad with Face ID holds two
+  faces, so add the second parent as its **Alternate Appearance** (Settings →
+  Face ID & Passcode); on a Mac, each parent adds a Touch ID finger. First run
+  says so too.
 - **First run** sets up Face ID: the device saves a passkey for this app
   ("Continue", then Face ID). It can't be skipped. A device without Face ID,
   Touch ID or a passcode can't use the app, and says so.
@@ -102,12 +107,16 @@ There is no PIN of the app's own.
   during a tap, and Face ID takes a moment.
 - **When Face ID fails or is cancelled**, the app shows "Use Face ID" to try
   again, and Cancel. Play from Control Center or the lock screen also waits for
-  a tap on "Use Face ID".
+  a tap on "Use Face ID". Tapping again while Face ID is asked does nothing.
 - **Failed tries are the device's business.** After several, it asks for the
   passcode; wrong passcodes can lock the whole device for a while, as on its
   lock screen. The app itself never locks.
 - **If the passkey is gone** (deleted in Passwords, or the browser's data
-  cleared): "Set up Face ID again" makes a new one, which needs Face ID or the
-  passcode. Deleting the home-screen app also empties its catalogue.
-- **Installs from before** (with a PIN): on the next start they set up Face ID,
-  or keep the passkey they already had; the old PIN is forgotten.
+  cleared), Face ID fails every time: after a second failure in the same
+  prompt, "Set up Face ID again" shows. It needs Face ID or the passcode, and
+  replaces the app's passkey rather than adding another. Deleting the
+  home-screen app also empties its catalogue.
+- **Installs from before** set up Face ID again on their next start. Their
+  PIN is forgotten, and the device is asked to remove the passkey they made;
+  older iPads and browsers can't, so delete any other "Kids videos" passkeys in
+  Passwords. Those no longer unlock the app.

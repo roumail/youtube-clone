@@ -28,7 +28,7 @@ const state = {
   search: '', // library search text (not saved); typing needs unlocking
   searchUnlocked: false, // until the search field loses focus
   // Unlock prompt: { purpose: 'setup' | 'import' | 'drive' | 'download' | 'settings' | 'play' | 'search',
-  //                 mode: 'unavailable' | 'setup' | 'unlock' | 'continue', asking }
+  //                 mode: 'unavailable' | 'setup' | 'unlock' | 'continue', asking, failures }
   // ('unavailable': no Face ID, Touch ID or passcode; 'setup': first run;
   //  'unlock': Face ID failed, was cancelled, or waits for a tap; 'continue':
   //  Face ID passed, and an action that needs a tap waits for "Continue").
@@ -334,9 +334,12 @@ function render(s) {
     $('unlock-prompt').dataset.mode = p.mode;
     $('unlock-prompt').querySelector('[data-role="unlock-title"]').textContent = PROMPT_TITLES[p.mode];
     show('unlock-unavailable', p.mode === 'unavailable');
+    show('setup-faceid-parents', p.mode === 'setup');
     show('setup-faceid-button', p.mode === 'setup');
     show('unlock-faceid-button', p.mode === 'unlock');
-    show('unlock-faceid-setup-button', p.mode === 'unlock');
+    // A single failure is usually a face not recognised, which setting up
+    // again doesn't fix; a gone passkey fails every time.
+    show('unlock-faceid-setup-button', p.mode === 'unlock' && p.failures >= 2);
     show('unlock-continue-button', p.mode === 'continue');
     show('unlock-cancel', !['unavailable', 'setup'].includes(p.mode));
   }
@@ -354,7 +357,8 @@ async function refreshLibrary() {
 // page; from the device's media controls (no tap) Face ID can't start, so the
 // prompt waits for a tap on "Use Face ID".
 function askUnlock(purpose, byTap = true) {
-  state.prompt = { purpose, mode: 'unlock', asking: false };
+  if (state.prompt?.asking) return;
+  state.prompt = { purpose, mode: 'unlock', asking: false, failures: 0 };
   if (byTap) tryFaceId(unlock.verify);
   else update();
 }
@@ -370,7 +374,7 @@ async function tryFaceId(faceId) {
     await faceId();
   } catch (e) {
     console.warn('Face ID:', e.name, e.message); // shows why in Web Inspector
-    prompt.asking = false;
+    Object.assign(prompt, { asking: false, failures: prompt.failures + 1 });
     return update();
   }
   if (needsTap(prompt.purpose)) {
@@ -388,7 +392,6 @@ async function onSetUp() {
     console.warn('Face ID:', e.name, e.message);
     return;
   }
-  unlock.forgetPin();
   state.setUp = true;
   state.prompt = null;
   update();
@@ -998,11 +1001,10 @@ async function boot() {
 
   state.features = await loadEnabled(featureContext());
 
-  // First run (and installs from before, with a PIN only): set up Face ID.
-  // Installs from before with Face ID on keep their passkey. Any PIN is forgotten.
+  // First run, and installs from before (their PIN and passkey are dropped): set up Face ID.
+  await unlock.forgetEarlierVersions();
   state.setUp = unlock.isSetUp();
-  if (state.setUp) unlock.forgetPin();
-  else state.prompt = { purpose: 'setup', mode: await unlock.available() ? 'setup' : 'unavailable', asking: false };
+  if (!state.setUp) state.prompt = { purpose: 'setup', mode: await unlock.available() ? 'setup' : 'unavailable', asking: false };
   await refreshLibrary();
   state.route = { name: '' };
   onRouteChange();
