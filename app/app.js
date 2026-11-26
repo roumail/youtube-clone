@@ -384,13 +384,17 @@ async function tryFaceId(faceId) {
   return acceptPrompt(prompt);
 }
 
-// First run: set up Face ID. If it fails or is cancelled, it asks again.
+// First run: set up Face ID, with the prompt out of sight meanwhile. If it
+// fails or is cancelled, it asks again.
 async function onSetUp() {
+  state.prompt.asking = true;
+  update();
   try {
     await unlock.setUp();
   } catch (e) {
     console.warn('Face ID:', e.name, e.message);
-    return;
+    state.prompt.asking = false;
+    return update();
   }
   state.setUp = true;
   state.prompt = null;
