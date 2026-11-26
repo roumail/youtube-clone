@@ -14,7 +14,8 @@
 // they made (devices without that ability keep it, unused).
 // First run tells the parents that each of them must be enrolled on the
 // device: the app stores no face, and the device accepts any face (or finger)
-// enrolled on it. On an iPad that is Face ID and its Alternate Appearance.
+// enrolled on it. On an iPad that is Face ID and its Alternate Appearance; on
+// a Mac, a Touch ID finger each.
 // While Face ID is asked or set up, only the device's own sheets show, and
 // another tap doesn't ask it a second time. When it fails or is cancelled, or play comes
 // from the device (Control Center, the lock screen or a keyboard, where Face
@@ -111,7 +112,8 @@ test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
     await test.step('And it says each parent must be enrolled on the device', async () => {
       await expect(page.getByTestId('setup-faceid-parents')).toHaveText(
         'Each parent who unlocks must be enrolled on this device. On an iPad, add the second '
-        + 'parent\'s face as an Alternate Appearance (Settings → Face ID & Passcode).',
+        + 'parent\'s face as an Alternate Appearance (Settings → Face ID & Passcode); '
+        + 'on a Mac, each parent adds a Touch ID finger.',
       );
     });
     await test.step('When I tap "Set up Face ID" and pass it', async () => {
