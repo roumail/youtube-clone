@@ -120,10 +120,10 @@ export const test = base.extend({
   // Face ID is already set up (a passkey for this app on this device), so
   // first run is skipped. Only seeds once, across reloads.
   setUp: async ({ page, baseURL }, use) => {
-    const id = await faceIdDevices.get(page).addPasskey(new URL(baseURL).hostname);
-    await page.addInitScript((credentialId) => {
-      if (!localStorage.getItem('faceId.credentialId')) localStorage.setItem('faceId.credentialId', credentialId);
-    }, id);
+    await faceIdDevices.get(page).addPasskey(new URL(baseURL).hostname);
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('faceId.setUp')) localStorage.setItem('faceId.setUp', 'true');
+    });
     await use();
   },
 
@@ -167,7 +167,6 @@ export const test = base.extend({
 // ---------- Face ID ----------
 
 const faceIdDevices = new WeakMap();
-const base64Url = (buf) => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 async function addFaceIdDevice(page, browserName) {
   if (browserName !== 'chromium') {
@@ -176,7 +175,7 @@ async function addFaceIdDevice(page, browserName) {
       const pass = async () => {
         if (window.__faceId.fail) throw new DOMException('Face ID failed', 'NotAllowedError');
         window.__faceId.uses += 1;
-        return { rawId: new Uint8Array([7, 7, 7, 7]).buffer };
+        return { rawId: new Uint8Array([7, 7, 7, 7]).buffer, response: { userHandle: new TextEncoder().encode('parent').buffer } };
       };
       Object.defineProperty(navigator, 'credentials', { configurable: true, value: { create: pass, get: pass } });
       const PKC = window.PublicKeyCredential ?? function PublicKeyCredential() {};
@@ -188,7 +187,7 @@ async function addFaceIdDevice(page, browserName) {
       willFail: () => page.evaluate(() => { window.__faceId.fail = true; }),
       willPass: () => page.evaluate(() => { window.__faceId.fail = false; }),
       uses: () => page.evaluate(() => window.__faceId.uses),
-      addPasskey: async () => base64Url(Buffer.from([7, 7, 7, 7])),
+      addPasskey: async () => {},
     };
   }
   const cdp = await page.context().newCDPSession(page);
@@ -205,16 +204,14 @@ async function addFaceIdDevice(page, browserName) {
     // How often Face ID was passed with this app's passkey.
     uses: async () => (await credentials()).reduce((n, c) => n + c.signCount, 0),
     deletePasskeys: () => cdp.send('WebAuthn.clearCredentials', { authenticatorId }),
-    // A passkey made earlier (as first run would); returns its id as the app stores it.
+    // A passkey made earlier (as first run would).
     addPasskey: async (rpId) => {
-      const id = randomBytes(16);
       const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
       await cdp.send('WebAuthn.addCredential', { authenticatorId, credential: {
-        credentialId: id.toString('base64'), isResidentCredential: true, rpId,
+        credentialId: randomBytes(16).toString('base64'), isResidentCredential: true, rpId,
         userHandle: Buffer.from('parent').toString('base64'),
         privateKey: privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64'), signCount: 0,
       } });
-      return base64Url(id);
     },
   };
 }

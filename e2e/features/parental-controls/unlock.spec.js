@@ -9,8 +9,9 @@
 // passcode, and wrong passcodes can lock the device itself for a while.
 // First run sets up Face ID (a passkey for this app on this device); it can't
 // be skipped. A device without Face ID, Touch ID or a passcode can't use the
-// app, and says so. Installs from before (with a PIN) set up Face ID on their
-// next start, or keep the passkey they already have; the PIN is forgotten.
+// app, and says so. Installs from before set up Face ID again on their next
+// start: their PIN is forgotten, and the device is asked to remove the passkey
+// they made (devices without that ability keep it, unused).
 // First run tells the parents that each of them must be enrolled on the
 // device: the app stores no face, and the device accepts any face (or finger)
 // enrolled on it. On an iPad that is Face ID and its Alternate Appearance.
@@ -18,7 +19,7 @@
 // doesn't ask it a second time. When it fails or is cancelled, or play comes
 // from the device (Control Center, the lock screen or a keyboard, where Face
 // ID can't start without a tap), the unlock prompt shows "Use Face ID" and
-// Cancel. Unlocking accepts any passkey this app has on the device. If Face ID
+// Cancel. Passkeys made by earlier versions don't unlock. If Face ID
 // fails a second time in the same prompt (the passkey may be gone: deleted in
 // Passwords, or the browser's data cleared), the prompt also offers "Set up
 // Face ID again", which needs Face ID or the device passcode and replaces this
@@ -78,7 +79,7 @@ const earlierPasskey = (page) => page.evaluate(async () => {
 });
 
 // An install from before this change: a PIN, and optionally Face ID on with a
-// passkey already made (as the PIN-era app stored them).
+// passkey already made (as earlier versions stored them); returns its id.
 async function oldInstall(page, { faceId }) {
   await page.addInitScript(([pin]) => {
     if (!localStorage.getItem('pin.sha256')) {
@@ -93,6 +94,7 @@ async function oldInstall(page, { faceId }) {
     localStorage.setItem('faceId.credentialId', credentialId);
     localStorage.setItem('features', JSON.stringify({ faceId: true }));
   }, id);
+  return id;
 }
 
 test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
@@ -338,20 +340,18 @@ test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
     });
   });
 
-  test('Scenario: a passkey from an earlier setup unlocks, even when the newest one was deleted', async ({ page, faceId }) => {
-        await test.step('Given Face ID is set up, that passkey was deleted, and one from an earlier setup is still on the device', async () => {
+  test('Scenario: a passkey made by an earlier version doesn\'t unlock', async ({ page, faceId }) => {
+        await test.step('Given Face ID is set up, its passkey was deleted, and one made by an earlier version is on the device', async () => {
       await setUp(page);
       await faceId.deletePasskeys();
       await earlierPasskey(page);
     });
-    const before = await faceId.uses();
-    await test.step('When I tap Settings and pass Face ID', async () => {
+    await test.step('When I tap Settings and pass Face ID with it', async () => {
       await page.getByTestId('settings-button').click();
     });
-    await test.step('Then Settings opens, and the prompt never showed', async () => {
-      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
-      expect(await faceId.uses()).toBe(before + 1);
-      await expect(unlockPrompt(page)).toBeHidden();
+    await test.step('Then the unlock prompt shows "Use Face ID", and Settings stays locked', async () => {
+      await expect(useFaceId(page)).toBeVisible();
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'locked');
     });
   });
 
@@ -443,22 +443,37 @@ test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
     });
   });
 
-  test('Scenario: an install from before, with a PIN and Face ID on, keeps its passkey and forgets the PIN', async ({ page, faceId }) => {
-        await test.step('Given an install with a PIN and Face ID on', async () => {
-      await oldInstall(page, { faceId: true });
+  for (const [device, removes] of [['that can remove it', true], ['that can\'t remove it', false]]) {
+    test(`Scenario: an install from before, with a PIN and Face ID on, sets up Face ID again, on a device ${device}`, async ({ page }) => {
+      let earlier;
+      await test.step(`Given an install with a PIN and Face ID on, on a device ${device}`, async () => {
+        await page.addInitScript(([canRemove]) => {
+          window.removedPasskeys = [];
+          if (canRemove) PublicKeyCredential.signalUnknownCredential = async (passkey) => { window.removedPasskeys.push(passkey); };
+          else delete PublicKeyCredential.signalUnknownCredential;
+        }, [removes]);
+        earlier = await oldInstall(page, { faceId: true });
+      });
+      await test.step('When it starts', async () => {
+        await page.reload();
+      });
+      await test.step('Then it asks to set up Face ID, it can\'t be skipped, and the PIN is gone', async () => {
+        await expect(unlockPrompt(page)).toHaveAttribute('data-mode', 'setup');
+        await expect(cancelButton(page)).toBeHidden();
+        expect((await storedKeys(page)).filter((k) => k.startsWith('pin.'))).toEqual([]);
+      });
+      await test.step(removes ? 'And the device was asked to remove the earlier passkey' : 'And nothing was removed', async () => {
+        expect(await page.evaluate(() => window.removedPasskeys)).toEqual(
+          removes ? [{ rpId: new URL(page.url()).hostname, credentialId: earlier }] : [],
+        );
+      });
+      await test.step('And once Face ID is set up, the library is shown', async () => {
+        await setUpFaceId(page).click();
+        await expect(unlockPrompt(page)).toBeHidden();
+        await expect(page.getByTestId('screen-library')).toBeVisible();
+      });
     });
-    await test.step('When it starts', async () => {
-      await page.reload();
-    });
-    await test.step('Then nothing is asked, the PIN is gone, and the same passkey unlocks Settings', async () => {
-      await expect(unlockPrompt(page)).toBeHidden();
-      await expect(page.getByTestId('screen-library')).toBeVisible();
-      expect((await storedKeys(page)).filter((k) => k.startsWith('pin.'))).toEqual([]);
-      await page.getByTestId('settings-button').click();
-      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
-      expect(await faceId.passkeys()).toBe(1);
-    });
-  });
+  }
 });
 
 test.describe('Feature: Unlocking with Face ID / Touch ID, on a device without it', () => {
