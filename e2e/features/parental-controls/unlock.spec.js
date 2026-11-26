@@ -15,8 +15,8 @@
 // First run tells the parents that each of them must be enrolled on the
 // device: the app stores no face, and the device accepts any face (or finger)
 // enrolled on it. On an iPad that is Face ID and its Alternate Appearance.
-// While Face ID is asked, only the device's own sheets show, and another tap
-// doesn't ask it a second time. When it fails or is cancelled, or play comes
+// While Face ID is asked or set up, only the device's own sheets show, and
+// another tap doesn't ask it a second time. When it fails or is cancelled, or play comes
 // from the device (Control Center, the lock screen or a keyboard, where Face
 // ID can't start without a tap), the unlock prompt shows "Use Face ID" and
 // Cancel. Passkeys made by earlier versions don't unlock. If Face ID
@@ -141,6 +141,37 @@ test.describe('Feature: Unlocking with Face ID / Touch ID', () => {
       await faceId.willPass();
       await setUpFaceId(page).click();
       await expect(unlockPrompt(page)).toBeHidden();
+    });
+  });
+
+  test('Scenario: while Face ID is being set up, only the device\'s sheet shows, so it isn\'t set up twice', async ({ page, faceId }) => {
+        await test.step('Given a fresh install, and Face ID takes a while to answer', async () => {
+      await goto(page, '#/library');
+      await page.evaluate(() => {
+        const create = navigator.credentials.create.bind(navigator.credentials);
+        let answer;
+        const answered = new Promise((resolve) => { answer = resolve; });
+        window.faceIdAnswers = answer;
+        window.faceIdAsked = 0;
+        navigator.credentials.create = async (options) => {
+          window.faceIdAsked += 1;
+          await answered;
+          return create(options);
+        };
+      });
+    });
+    await test.step('When I tap "Set up Face ID"', async () => {
+      await setUpFaceId(page).click();
+    });
+    await test.step('Then the first-run prompt is out of sight while Face ID is asked, and it was asked once', async () => {
+      await expect(unlockPrompt(page)).toBeHidden();
+      expect(await page.evaluate(() => window.faceIdAsked)).toBe(1);
+    });
+    await test.step('And when Face ID passes, one passkey was made, and Face ID unlocks Settings', async () => {
+      await page.evaluate(() => window.faceIdAnswers());
+      await expect.poll(() => faceId.passkeys()).toBe(1);
+      await page.getByTestId('settings-button').click();
+      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
   });
 
