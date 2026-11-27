@@ -60,10 +60,10 @@ implementing until `go test` is green.
   Artist"); `--title` sets it for a single input. A title from the file name
   that is over 95 bytes is cut at a word to fit, and the tool says so; a
   `--title` over 95 bytes is refused.
-- **Series:** with `--series NAME`, each file name must carry its season and
-  episode (S01E03, s1e3, 1x03); the title becomes
-  "NAME - S01E03 - Episode title" and the file goes in `DIR/NAME/`. A file
-  without them is refused by name; the others go on.
+- **Series:** with `--series NAME`, a file name carrying its season and
+  episode (S01E03, s1e3, 1x03) gets the title
+  "NAME - S01E03 - Episode title"; any other gets "NAME - Title" (the tidied
+  file name, or `--title`). The files go in `DIR/NAME/`.
 - **Batch:** one failure (including an input that isn't there) doesn't stop
   the rest. Each video starts with `== <Title>`; the summary is
   `prepared: N   skipped (already there): N   failed: N   → DIR` (with

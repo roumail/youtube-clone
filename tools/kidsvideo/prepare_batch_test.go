@@ -259,20 +259,24 @@ func TestPrepareSeriesNamesEpisodesAndFilesThemInTheSeriesFolder(t *testing.T) {
 	}
 }
 
-func TestPrepareSeriesRefusesAFileWithoutSeasonAndEpisode(t *testing.T) {
-	b := newBatch(t, "Bluey S01E01.mp4", "Bluey Special.mp4", "Bluey 2019.mp4")
-	code, stdout, stderr := b.run(t, "--series", "Bluey", "--dest", b.dest, b.in)
-	if code != 1 {
-		t.Fatalf("code %d", code)
+func TestPrepareSeriesNamesAFileWithoutSeasonAndEpisodeByItsTitle(t *testing.T) {
+	b := newBatch(t, "Bluey S01E01.mp4", "Coke.Studio.Piya.Ghar.Aaya.1080p.webm", "1080p.mp4")
+	if code, _, stderr := b.run(t, "--series", "Music", "--dest", b.dest, b.in); code != 0 {
+		t.Fatal(stderr)
 	}
-	if got := b.library(t); !slices.Equal(got, []string{filepath.Join("Bluey", "Bluey - S01E01.kidsvideo")}) {
+	want := []string{
+		filepath.Join("Music", "Music - 1080p.kidsvideo"),
+		filepath.Join("Music", "Music - Coke Studio Piya Ghar Aaya.kidsvideo"),
+		filepath.Join("Music", "Music - S01E01.kidsvideo"),
+	}
+	if got := b.library(t); !slices.Equal(got, want) {
 		t.Fatalf("library %v", got)
 	}
-	for _, name := range []string{"Bluey Special.mp4", "Bluey 2019.mp4"} {
-		if !strings.Contains(stderr, "no season and episode (e.g. S01E03) in the file name: "+filepath.Join(b.in, name)) ||
-			!strings.Contains(stdout, "FAILED: "+filepath.Join(b.in, name)) {
-			t.Fatalf("%s: stdout %q, stderr %q", name, stdout, stderr)
-		}
+	// --title names it.
+	b = newBatch(t, "einaudi.webm")
+	b.run(t, "--series", "Music", "--title", "Ludovico Einaudi - Tiny Desk", "--dest", b.dest, b.in)
+	if got := b.library(t); !slices.Equal(got, []string{filepath.Join("Music", "Music - Ludovico Einaudi - Tiny Desk.kidsvideo")}) {
+		t.Fatalf("library %v", got)
 	}
 }
 

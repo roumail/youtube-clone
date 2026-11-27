@@ -452,15 +452,22 @@ func shorten(title string) string {
 
 // episodeTitle: "NAME - S01E03 - Episode title" from a file name carrying its
 // season and episode (S01E03, s1e3, 1x03); the episode title is the tidied
-// text after them, unless given. ok is false without season and episode.
-func episodeTitle(stem, series, given string) (title string, ok bool) {
+// text after them, unless given. Without season and episode, "NAME - Title"
+// with the tidied file name (or the given title): the app lists it after the
+// numbered episodes.
+func episodeTitle(stem, series, given string) string {
 	var tag, season, episode string
 	if m := seasonEpisode.FindStringSubmatch(stem); m != nil {
 		tag, season, episode = m[0], m[1], m[2]
 	} else if m := crossEpisode.FindStringSubmatch(stem); m != nil {
 		tag, season, episode = m[1], m[2], m[3]
 	} else {
-		return "", false
+		if given == "" {
+			if given = tidy(stem); given == "" {
+				given = stem
+			}
+		}
+		return series + " - " + given
 	}
 	if given == "" {
 		_, after, _ := strings.Cut(stem, tag)
@@ -468,11 +475,11 @@ func episodeTitle(stem, series, given string) (title string, ok bool) {
 	}
 	s, _ := strconv.Atoi(season)
 	e, _ := strconv.Atoi(episode)
-	title = fmt.Sprintf("%s - S%02dE%02d", series, s, e)
+	title := fmt.Sprintf("%s - S%02dE%02d", series, s, e)
 	if given != "" {
 		title += " - " + given
 	}
-	return title, true
+	return title
 }
 
 // dotEnvValue: key's value in a shell-style .env file (the last one wins;
@@ -590,13 +597,7 @@ func runPrepare(args []string, stdout, stderr io.Writer, t toolset) int {
 		stem := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 		name, dir := *title, library
 		if *series != "" {
-			var ok bool
-			if name, ok = episodeTitle(stem, *series, *title); !ok {
-				say("== " + stem)
-				fmt.Fprintln(stderr, "   no season and episode (e.g. S01E03) in the file name: "+file)
-				failed = append(failed, file)
-				continue
-			}
+			name = episodeTitle(stem, *series, *title)
 			dir = filepath.Join(library, *series)
 		} else if name == "" {
 			if name = tidy(stem); name == "" {

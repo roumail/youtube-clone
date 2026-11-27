@@ -182,13 +182,19 @@ Kids Library/
   The Snowy Day/                        (standalone videos stay at the top level)
 ```
 
-- Each file name must contain its season and episode: `S01E03`, `s1e3` or
-  `1x03`. Files without one are reported as failed (rename them, or prepare
-  them without `--series`).
-- The episode title is the text after that tag, with dots/underscores turned
-  into spaces and release tags (`1080p`, `WEB-DL`, `x264`, …) cut off:
+- A file name with its season and episode (`S01E03`, `s1e3` or `1x03`) gets
+  the title `Name - S01E03 - Episode title`. The episode title is the text
+  after that tag, with dots/underscores turned into spaces and release tags
+  (`1080p`, `WEB-DL`, `x264`, …) cut off:
   `Bluey.S01E03.Keepy.Uppy.1080p.WEB-DL.mkv` → `Bluey - S01E03 - Keepy Uppy`.
-- In the app, episodes of a series are listed together, in episode order.
+- Any other file gets `Name - Title`, from its tidied file name or `--title`.
+  That makes a collection without order: `run_prepare --series "Music" --title
+  "Ludovico Einaudi - Tiny Desk" einaudi.webm` → `Music - Ludovico Einaudi - Tiny Desk`.
+- In the app, a series is one tile: the numbered episodes in episode order,
+  then the others A–Z. Videos you prepared without `--series` join a series
+  too when their title starts with its name and ` - ` (`Bluey - Hotel Bluey`
+  joins `Bluey`); a name before ` - ` that only one video has stays a
+  standalone video.
   On the iPad, pick the episode's `.kidsvideo` file.
 
 ### What it does
