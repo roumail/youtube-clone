@@ -58,17 +58,17 @@ Each video in a catalogue is either:
 - **Downloading a streamed video** (for a trip, or a bad connection): its tile
   in the library has **Download** (behind Face ID). A downloaded video plays and
   seeks with no internet, like a stored one. A download is meant to be
-  short-lived: Settings → **Remove download** frees the space, and if the
+  short-lived: Settings → Downloads → **Remove download** frees the space, and if the
   browser clears it, the video simply streams again.
 - **Playing several in a row** (a playlist): hold a video in the library or a
   series to start selecting, tap more to tick them, then Play. They play in
   the order ticked; Face ID is asked once, at the start, and each next video
   starts by itself. Pausing is free and going on needs Face ID; back ends the
   playlist. A tap on a video still plays it alone. Playlists aren't saved yet.
-- **Removing and hiding** (Settings, behind Face ID): a stored video can be
-  removed, which deletes its copy and frees the space. A streamed video can
-  only be hidden from this device (with its download, if any); it stays on the
-  shelf and can be added again. A streamed video deleted from Google Drive
+- **Removing** (behind Face ID): hold a video to start selecting, tick more,
+  then **Remove**. A stored video's copy is deleted and frees the space. A
+  streamed video is only taken off this device (with its download, if any); it
+  stays on the shelf and can be added again. A streamed video deleted from Google Drive
   (or in its trash) leaves the library by itself at the next Google sign-in,
   or when it is opened; a downloaded one stays.
 - **"Time is up"** (with the watch-time limit): when the time runs out, a

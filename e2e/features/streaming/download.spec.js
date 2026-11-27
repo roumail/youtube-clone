@@ -9,7 +9,7 @@
 // Not @ipad, for the same reason as add-from-drive.spec.js.
 import {
   test, expect, goto, openVideo, startPlaying, expectPlaying, fixtureContainer, fakeGoogle,
-  freeSpace, containerSize, playerState, tapContinue, signInDue,
+  freeSpace, containerSize, playerState, tapContinue, signInDue, selectVideos,
 } from '../../support.js';
 
 const shared = () => ({
@@ -171,9 +171,11 @@ test.describe('Feature: Download a streamed video', () => {
       await page.getByTestId('settings-button').tap();
       await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
-    await test.step('When I remove its download', async () => {
-      await page.getByTestId('settings-video-item').filter({ hasText: 'medium' })
+    await test.step('When I remove its download from the "Downloads" list', async () => {
+      await expect(page.getByTestId('downloads-heading')).toBeVisible();
+      await page.getByTestId('settings-download-item').filter({ hasText: 'medium' })
         .getByTestId('remove-download-button').tap();
+      await expect(page.getByTestId('settings-download-item')).toHaveCount(0);
     });
     await test.step('Then it is still listed, streamed, and plays from Google Drive', async () => {
       await page.getByTestId('screen-settings').getByTestId('back-button').tap();
@@ -205,22 +207,21 @@ test.describe('Feature: Download a streamed video', () => {
     });
   });
 
-  test('Scenario: hiding a downloaded video also removes its download', async ({ page, setUp }) => {
+  test('Scenario: removing a downloaded video also removes its download', async ({ page, setUp }) => {
+    await page.clock.install();
     const google = await fakeGoogle(page, shared());
-    await test.step('Given "medium" is streamed and downloaded, and settings is unlocked', async () => {
+    await test.step('Given "medium" is streamed and downloaded', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'medium.kidsvideo');
       await download(page, 'medium');
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'true');
-      await page.getByTestId('settings-button').tap();
-      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
-    await test.step('When I hide it', async () => {
-      await page.getByTestId('settings-video-item').filter({ hasText: 'medium' })
-        .getByTestId('hide-video-button').tap();
+    await test.step('When I tick it, tap "Remove 1" and pass Face ID', async () => {
+      await selectVideos(page, 'medium');
+      await page.getByTestId('selection-remove').tap();
     });
     await test.step('Then nothing of it is left on the device', async () => {
-      await expect(page.getByTestId('settings-video-item')).toHaveCount(0);
+      await expect(page.getByTestId('library-item')).toHaveCount(0);
       await expect.poll(() => page.evaluate(async () => {
         const storage = new shaka.offline.Storage();
         const n = (await storage.list()).length;
