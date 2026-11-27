@@ -372,6 +372,8 @@ export async function fakeGoogle(page, files, folders = {}) {
   const shared = Object.entries(files).map(([name, file], i) => ({ id: `drive-file-${i}`, name, file }));
   const folderList = Object.keys(folders).map((p, i) => ({ id: `drive-folder-${i}`, path: p, name: p.split('/').pop() }));
   const denied = new Set();
+  const deleted = new Set(); // Drive no longer finds them (404)
+  const trashed = new Set(); // in Drive's trash: still readable, marked trashed
   const dropped = new Set();
   const served = new Map();
   let otherThanReads = 0;
@@ -470,10 +472,17 @@ export async function fakeGoogle(page, files, folders = {}) {
     const entry = shared.find(({ id }) => new URL(request.url()).pathname.endsWith(`/${id}`));
     const signedIn = (await request.headerValue('authorization')) === `Bearer ${token}`;
     pickedForThisProject ||= (await page.evaluate(() => window.__fakeGoogle.appId)) === projectNumber;
+    if (entry && deleted.has(entry.name)) {
+      return route.fulfill({ status: 404, json: { error: { code: 404, message: `File not found: ${entry.id}.` } } });
+    }
     if (!entry || !signedIn || !pickedForThisProject || denied.has(entry.name)) {
       return route.fulfill({ status: 403, json: { error: { code: 403, message: 'The user does not have sufficient permissions for this file.' } } });
     }
     if (dropped.has(entry.name)) return route.abort('connectionreset');
+    // Metadata (?fields=…) rather than the file's bytes.
+    if (new URL(request.url()).searchParams.has('fields')) {
+      return route.fulfill({ json: { trashed: trashed.has(entry.name) } });
+    }
     await held.get(entry.name);
     const data = readFileSync(entry.file);
     const range = /^bytes=(\d+)-(\d+)$/.exec((await request.headerValue('range')) ?? '');
@@ -490,6 +499,8 @@ export async function fakeGoogle(page, files, folders = {}) {
     signInWillBeCancelled: () => page.evaluate(() => { window.__fakeGoogle.signIn = 'cancel'; }),
     willPick: (...names) => page.evaluate((n) => { window.__fakeGoogle.pick = n; }, names),
     deny: (name) => denied.add(name),
+    delete: (name) => deleted.add(name),
+    trash: (name) => trashed.add(name),
     // Reads of this file wait until the returned release() is called.
     holdReads: (name) => {
       let release;
