@@ -68,7 +68,9 @@ Each video in a catalogue is either:
 - **Removing and hiding** (Settings, behind Face ID): a stored video can be
   removed, which deletes its copy and frees the space. A streamed video can
   only be hidden from this device (with its download, if any); it stays on the
-  shelf and can be added again.
+  shelf and can be added again. A streamed video deleted from Google Drive
+  (or in its trash) leaves the library by itself at the next Google sign-in,
+  or when it is opened; a downloaded one stays.
 - **"Time is up"** (with the watch-time limit): when the time runs out, a
   little built-in tune plays. In Settings (behind Face ID) a parent can choose a
   picture or GIF to show with "Time is up", and a sound file to play instead of

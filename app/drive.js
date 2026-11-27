@@ -13,6 +13,10 @@ let config;
 const KEPT = 'kids-google-sign-in-readonly';
 let token = JSON.parse(localStorage.getItem(KEPT));
 let pending = null; // a sign-in in progress
+let afterSignIn = async () => {};
+
+/** fn runs after each sign-in, before anything waiting for the sign-in goes on. */
+export const whenSignedIn = (fn) => { afterSignIn = fn; };
 
 const loadScript = (src) => new Promise((resolve, reject) => {
   const script = document.createElement('script');
@@ -54,7 +58,7 @@ export function signIn() {
       },
       error_callback: () => reject(new Error('the Google sign-in was closed')),
     }).requestAccessToken();
-  }).finally(() => { pending = null; });
+  }).then(() => afterSignIn()).finally(() => { pending = null; });
   return pending;
 }
 
@@ -68,7 +72,7 @@ async function driveFetch(url, name, headers) {
   } catch {
     throw Object.assign(new Error('the connection to Google Drive was lost'), { offline: true });
   }
-  if (!res.ok) throw new Error(`no access to "${name}" in Google Drive`);
+  if (!res.ok) throw Object.assign(new Error(`no access to "${name}" in Google Drive`), { notFound: res.status === 404 });
   return res;
 }
 
@@ -81,6 +85,25 @@ export function driveSource({ id, name, size }) {
     read: async (start, end) => (await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, name,
       { Range: `bytes=${start}-${end - 1}` })).arrayBuffer(),
   };
+}
+
+/**
+ * Which of these Drive files are gone: deleted (Drive no longer finds it) or in
+ * Drive's trash. A file Drive can't answer for (no connection, any other
+ * error) counts as still there. Returns a Set of ids. Needs a sign-in.
+ */
+export async function goneFromDrive(ids) {
+  const gone = await Promise.all(ids.map(async (id) => {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=trashed&supportsAllDrives=true`,
+        { headers: { Authorization: `Bearer ${token.value}` } });
+      if (res.status === 404) return true;
+      return res.ok && (await res.json()).trashed === true;
+    } catch {
+      return false;
+    }
+  }));
+  return new Set(ids.filter((id, i) => gone[i]));
 }
 
 /**

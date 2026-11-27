@@ -3,7 +3,7 @@
 // offline (service worker) and installability.
 import { installLocalScheme, pickedSource, CONTAINER_EXT } from './local-scheme.js';
 import {
-  initDrive, pickFromDrive, signedIn, signIn, signInEnds, driveSource, listFolder, FOLDER,
+  initDrive, pickFromDrive, signedIn, signIn, signInEnds, driveSource, listFolder, FOLDER, whenSignedIn, goneFromDrive,
 } from './drive.js';
 import * as unlock from './unlock.js';
 import {
@@ -623,12 +623,36 @@ function watchSignIn() {
 async function streamFrom(entry, signing) {
   try {
     await signing;
+    // The sign-in's check may have found this video gone (and closed it).
+    if (!state.library.some((c) => c.offlineUri === entry.offlineUri)) throw new Error('gone from Google Drive');
     return await streamUri(driveSource(entry.file));
   } catch (e) {
+    if (e.notFound) await hideGoneFromDrive();
     throw Object.assign(e, {
       userMessage: e.offline ? `"${entry.appMetadata.title}" streams from Google Drive and needs the internet.` : e.message,
     });
   }
+}
+
+// After each Google sign-in, and when Drive can't find a streamed video:
+// streamed videos whose file is gone from Google Drive (deleted, or in its
+// trash) are hidden, as Hide does. A downloaded one stays: it plays without
+// Drive. If the open video is one of them, the player closes and the library
+// says why, instead of an error.
+async function hideGoneFromDrive() {
+  const streamed = state.library.filter(streamsNow);
+  const gone = await goneFromDrive(streamed.map((c) => c.file.id));
+  const hidden = streamed.filter((c) => gone.has(c.file.id));
+  for (const c of hidden) await hideStreamed(c.offlineUri);
+  await refreshLibrary();
+  const open = hidden.find((c) => state.route.name === 'player' && c.offlineUri === state.route.videoId);
+  if (open) {
+    closeVideo();
+    location.replace(state.returnTo);
+    const message = `"${open.appMetadata.title}" is no longer in Google Drive.`;
+    endJob(startJob(message), 'done', message);
+  }
+  update();
 }
 
 // Adds and downloads: a row each, kept (not rebuilt) while it runs, so its
@@ -1019,6 +1043,7 @@ async function boot() {
   $('app').dataset.ready = 'true';
   showVersion();
   initDrive().then((ready) => { $('add-from-drive-button').hidden = !ready; });
+  whenSignedIn(hideGoneFromDrive);
 }
 
 boot();
