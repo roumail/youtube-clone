@@ -14,6 +14,7 @@ package main
 
 import (
 	"archive/tar"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 const (
@@ -101,16 +101,12 @@ func writeArchive(path, dir, title string, names []string) error {
 		return err
 	}
 	defer f.Close()
-	w := tar.NewWriter(f)
 	body, err := json.Marshal(metadata{Format: format, Title: title})
 	if err != nil {
 		return err
 	}
 	body = append(body, '\n')
-	if err := w.WriteHeader(header(meta, int64(len(body)))); err != nil {
-		return err
-	}
-	if _, err := w.Write(body); err != nil {
+	if err := writeEntry(f, meta, int64(len(body)), bytes.NewReader(body)); err != nil {
 		return err
 	}
 	for _, name := range names {
@@ -120,27 +116,58 @@ func writeArchive(path, dir, title string, names []string) error {
 		}
 		info, err := src.Stat()
 		if err == nil {
-			err = w.WriteHeader(header(name, info.Size()))
-		}
-		if err == nil {
-			_, err = io.Copy(w, src)
+			err = writeEntry(f, name, info.Size(), src)
 		}
 		src.Close()
 		if err != nil {
 			return err
 		}
 	}
-	if err := w.Close(); err != nil {
+	// The end of the archive: two empty blocks.
+	if _, err := f.Write(make([]byte, 1024)); err != nil {
 		return err
 	}
 	return f.Sync()
 }
 
-func header(name string, size int64) *tar.Header {
-	return &tar.Header{
-		Typeflag: tar.TypeReg, Name: name, Size: size, Mode: 0o644,
-		ModTime: time.Unix(0, 0), Format: tar.FormatUSTAR,
+// writeEntry: one file in the archive, its header, its bytes, then zeros up
+// to the next 512-byte block.
+func writeEntry(w io.Writer, name string, size int64, body io.Reader) error {
+	if size >= 1<<33 {
+		return fmt.Errorf("%s is too large for the container (8 GiB at most)", name)
 	}
+	if _, err := w.Write(ustarHeader(name, size)); err != nil {
+		return err
+	}
+	if n, err := io.Copy(w, body); err != nil || n != size {
+		return fmt.Errorf("%s: wrote %d of %d bytes: %v", name, n, size, err)
+	}
+	_, err := w.Write(make([]byte, (512-size%512)%512))
+	return err
+}
+
+// ustarHeader: a plain ustar header for a regular file, with the same time
+// and owner every time. Written here rather than by archive/tar, which refuses
+// names that aren't ASCII in ustar; the name is UTF-8, as the app reads it.
+// The name fits: at most 99 bytes (maxTitle).
+func ustarHeader(name string, size int64) []byte {
+	h := make([]byte, 512)
+	copy(h[0:100], name)
+	copy(h[100:], "0000644\x00")                  // mode
+	copy(h[108:], "0000000\x00")                  // uid
+	copy(h[116:], "0000000\x00")                  // gid
+	copy(h[124:], fmt.Sprintf("%011o\x00", size)) // size
+	copy(h[136:], "00000000000\x00")              // mtime: 1970
+	h[156] = '0'                                  // a regular file
+	copy(h[257:], "ustar\x0000")                  // magic and version
+	copy(h[329:], "0000000\x000000000\x00")       // devmajor, devminor
+	copy(h[148:], "        ")                     // the checksum counts as spaces
+	sum := 0
+	for _, b := range h {
+		sum += int(b)
+	}
+	copy(h[148:], fmt.Sprintf("%06o\x00 ", sum))
+	return h
 }
 
 func verify(path string) (string, error) {

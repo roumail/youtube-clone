@@ -101,6 +101,10 @@ done
 cp "$RAW/tiny.mp4" "$RAW/Show.mp4"
 prepare "$RAW/Show.mp4" "$OUT" >/dev/null
 
+# A title with letters beyond ASCII (UTF-8 in the container), from a copy of "tiny".
+cp "$RAW/tiny.mp4" "$RAW/Petit Ours Brun - Le café de Noël.mp4"
+prepare "$RAW/Petit Ours Brun - Le café de Noël.mp4" "$OUT" >/dev/null
+
 # The longest title kidsvideo pack accepts (95 bytes), from a copy of "tiny".
 LONG_TITLE="The Longest Title Allowed - A Tale About Many Long Words That Keeps Going Until It Finally Ends"
 cp "$RAW/tiny.mp4" "$RAW/$LONG_TITLE.mp4"

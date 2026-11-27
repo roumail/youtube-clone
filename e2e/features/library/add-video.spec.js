@@ -228,6 +228,28 @@ test.describe('Feature: Add a video', () => {
     });
   });
 
+  test('Scenario: a video whose title has accents adds under that title and plays', async ({ page, setUp }) => {
+    const title = 'Petit Ours Brun - Le café de Noël';
+    await test.step('Given the library is empty', async () => {
+      await goto(page, '#/library');
+    });
+    const chooser = page.waitForEvent('filechooser');
+    await test.step(`When I add "${title}.kidsvideo"`, async () => {
+      await page.getByTestId('add-video-button').click();
+      await tapContinue(page);
+      await (await chooser).setFiles([fixtureContainer(title)]);
+    });
+    await test.step('Then it is listed under that title, accents and all', async () => {
+      await expect(page.getByTestId('import-status')).toHaveAttribute('data-import', 'done');
+      await expect(page.getByTestId('library-item').filter({ hasText: title })).toBeVisible();
+    });
+    await test.step('And it plays after play and Face ID', async () => {
+      await page.getByTestId('library-item').filter({ hasText: title }).click();
+      await page.getByTestId('play-button').click();
+      await expectPlaying(page);
+    });
+  });
+
   test('Scenario: a renamed file that is not really a .kidsvideo is refused', async ({ page, setUp }) => {
     await test.step('Given the library is empty', async () => {
       await goto(page, '#/library');

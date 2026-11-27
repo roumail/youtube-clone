@@ -86,6 +86,28 @@ func TestPackWritesThePartsInOrderAsPlainUstarWithFixedTimesAndOwners(t *testing
 	}
 }
 
+func TestPackTakesATitleThatIsNotASCII(t *testing.T) {
+	title := "Petit Ours Brun - Le Café ｜ Sesame Street：Tiny Desk"
+	dir := preparedFolder(t, title)
+	if code, _, stderr := cli("pack", dir); code != 0 {
+		t.Fatalf("pack: %s", stderr)
+	}
+	file := filepath.Join(filepath.Dir(dir), title+".kidsvideo")
+	data, _ := os.ReadFile(file)
+	// The name field holds the title's UTF-8 bytes, as the app reads it.
+	second := data[512+512:]
+	if got := string(second[:bytes.IndexByte(second, 0)]); got != title+".mpd" {
+		t.Fatalf("name %q", got)
+	}
+	if got := string(second[257:265]); got != "ustar\x0000" {
+		t.Fatalf("magic %q", got)
+	}
+	code, stdout, stderr := cli("verify", file)
+	if code != 0 || stdout != "ok: \""+title+"\" (4 parts)\n" {
+		t.Fatalf("verify: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
 func TestPackingTheSamePartsTwiceGivesTheSameBytes(t *testing.T) {
 	dir := preparedFolder(t, "Tiny")
 	file := filepath.Join(filepath.Dir(dir), "Tiny.kidsvideo")
