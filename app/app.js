@@ -201,9 +201,10 @@ function downloadControls(li, c) {
 
 // Plays with no connection: stored, or streamed and downloaded.
 const onDevice = (c) => !streamsNow(c);
-// Ticked videos that Download would download: streamed, not downloaded or downloading.
-const toDownload = (s) => s.library.filter((c) => s.selection.includes(c.offlineUri)
-  && c.playsFrom === 'drive' && !c.download && !s.downloading.has(c.offlineUri));
+// Ticked videos that Download would download: streamed, not downloaded or
+// downloading. None with no connection (it would only fail).
+const toDownload = (s) => (s.online ? s.library.filter((c) => s.selection.includes(c.offlineUri)
+  && c.playsFrom === 'drive' && !c.download && !s.downloading.has(c.offlineUri)) : []);
 
 // "3 episodes" when every video in it is numbered, else "3 videos".
 function seriesTile(name, episodes) {
