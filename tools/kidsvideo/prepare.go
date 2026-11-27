@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // The size target, for minimal storage: video H.264 at most 540p and
@@ -246,8 +247,7 @@ func prepare(t toolset, input, dest, title string, dryRun bool, say func(string)
 	if info, err := os.Stat(input); err != nil || !info.Mode().IsRegular() {
 		return false, fmt.Errorf("no such file: %s", input)
 	}
-	// The tar name field holds 100 bytes: "<Title>.mpd" and its closing NUL must fit.
-	if len(title) > 95 {
+	if len(title) > maxTitle {
 		return false, fmt.Errorf("title too long for the container (max 95 bytes; an accented letter counts as 2): %s", title)
 	}
 	out := filepath.Join(dest, title+ext)
@@ -303,15 +303,24 @@ func prepareNew(t toolset, input, dest, title, out string, dryRun bool, say func
 	} else {
 		say("already within the size target: repackaging only")
 	}
-	parts := filepath.Join(work, title)
-	if err := os.Mkdir(parts, 0o755); err != nil {
+	// The packager's stream descriptors are comma-separated, so it works in a
+	// folder with a plain name; the parts get the title afterwards.
+	plain := filepath.Join(work, "parts")
+	if err := os.Mkdir(plain, 0o755); err != nil {
 		return err
 	}
 	if err := t.r.run(t.packager, nil, "--quiet",
-		fmt.Sprintf("in=%s,stream=video,output=%s", src, filepath.Join(parts, "video.mp4")),
-		fmt.Sprintf("in=%s,stream=%s,output=%s", src, audioSel, filepath.Join(parts, "audio.mp4")),
-		"--mpd_output", filepath.Join(parts, title+".mpd")); err != nil {
+		fmt.Sprintf("in=%s,stream=video,output=%s", src, filepath.Join(plain, "video.mp4")),
+		fmt.Sprintf("in=%s,stream=%s,output=%s", src, audioSel, filepath.Join(plain, "audio.mp4")),
+		"--mpd_output", filepath.Join(plain, "video.mpd")); err != nil {
 		return fmt.Errorf("packaging failed: %v", err)
+	}
+	parts := filepath.Join(work, title)
+	if err := os.Rename(filepath.Join(plain, "video.mpd"), filepath.Join(plain, title+".mpd")); err != nil {
+		return err
+	}
+	if err := os.Rename(plain, parts); err != nil {
+		return err
 	}
 	seconds, _ := strconv.ParseFloat(info.Format.Duration, 64)
 	if err := t.r.run(t.ffmpeg, nil, "-hide_banner", "-loglevel", "error", "-y", "-nostdin",
@@ -394,6 +403,8 @@ var (
 	underscores     = regexp.MustCompile(`_+`)
 	releaseTag      = regexp.MustCompile(`(?i)\b(2160p|1080p|720p|576p|480p|4k|uhd|hdr10?|dv|web[- ]?dl|webrip|web|bluray|blu ray|bdrip|brrip|hdtv|dvdrip|remux|amzn|nf|dsnp|hmax|atvp|x26[45]|h ?26[45]|hevc|avc|aac\d?|ac3|eac3|ddp?\d?|dts|truehd|atmos|proper|repack|extended|multi|\d+(?:\.\d+)? ?[mg]b)\b.*$`)
 	manySpaces      = regexp.MustCompile(`\s{2,}`)
+	videoID         = regexp.MustCompile(`\s*\[[A-Za-z0-9_-]{11}\]\s*$`) // yt-dlp's "[WzlO79d3S8c]"
+	fullWidthBar    = regexp.MustCompile(`\s*｜\s*`)                      // yt-dlp's stand-in for "|"
 	edges           = regexp.MustCompile(`^[\s\-]+|[\s\-.\[(]+$`)
 	seasonEpisode   = regexp.MustCompile(`[Ss]([0-9]{1,3})[Ee]([0-9]{1,3})`)
 	crossEpisode    = regexp.MustCompile(`(?:^|[^0-9])(([0-9]{1,2})x([0-9]{1,3}))(?:[^0-9]|$)`)
@@ -401,10 +412,14 @@ var (
 
 // tidy: dots/underscores become spaces (only when the name has no spaces, so
 // "Mr. Bean" keeps its dot), a leading [group] is dropped, and everything from
-// the first quality/source/size tag on is cut.
+// the first quality/source/size tag on is cut. From yt-dlp names, the video id
+// at the end is dropped and "｜" becomes " - ".
 //
 //	"Frozen.2.2019.1080p.BluRay.1400MB.DD5.1.x264-GalaxyRG" -> "Frozen 2 2019"
+//	"Coke Studio｜ Piya Ghar Aaya [WzlO79d3S8c]" -> "Coke Studio - Piya Ghar Aaya"
 func tidy(name string) string {
+	name = videoID.ReplaceAllString(name, "")
+	name = fullWidthBar.ReplaceAllString(name, " - ")
 	name = leadingGroup.ReplaceAllString(name, "")
 	if !strings.Contains(name, " ") {
 		name = dotsUnderscores.ReplaceAllString(name, " ")
@@ -414,6 +429,25 @@ func tidy(name string) string {
 	name = releaseTag.ReplaceAllString(name, "")
 	name = manySpaces.ReplaceAllString(name, " ")
 	return edges.ReplaceAllString(name, "")
+}
+
+// shorten: a title cut at a word boundary to fit maxTitle bytes, trailing
+// separators dropped. A single word too long is cut at a letter boundary.
+func shorten(title string) string {
+	if len(title) <= maxTitle {
+		return title
+	}
+	cut := title[:maxTitle]
+	for !utf8.ValidString(cut) {
+		cut = cut[:len(cut)-1]
+	}
+	if i := strings.LastIndex(cut, " "); i > 0 && (len(title) == len(cut) || title[len(cut)] != ' ') {
+		cut = cut[:i]
+	}
+	if short := edges.ReplaceAllString(cut, ""); short != "" {
+		return short
+	}
+	return cut
 }
 
 // episodeTitle: "NAME - S01E03 - Episode title" from a file name carrying its
@@ -569,7 +603,14 @@ func runPrepare(args []string, stdout, stderr io.Writer, t toolset) int {
 				name = stem
 			}
 		}
+		long := name
+		if *title == "" {
+			name = shorten(name) // a title typed with --title is never cut
+		}
 		say("== " + name)
+		if name != long {
+			indented("title shortened to fit (max 95 bytes): " + long)
+		}
 		wasThere, err := prepare(t, file, dir, name, *dryRun, indented)
 		switch {
 		case err != nil:
