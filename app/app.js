@@ -168,7 +168,7 @@ function toggleSelected(id) {
 }
 
 function playSelection() {
-  const ids = state.selection;
+  const ids = toPlay(state);
   state.selection = null;
   state.playlist = { ids, index: 0, advancing: false };
   openFrom(state.library.find((c) => c.offlineUri === ids[0]), '#/library');
@@ -201,6 +201,9 @@ function downloadControls(li, c) {
 
 // Plays with no connection: stored, or streamed and downloaded.
 const onDevice = (c) => !streamsNow(c);
+// Ticked videos Play would play, in the order ticked: with no connection,
+// only those that play offline.
+const toPlay = (s) => s.selection.filter((id) => s.online || onDevice(s.library.find((c) => c.offlineUri === id)));
 // Ticked videos that Download would download: streamed, not downloaded or
 // downloading. None with no connection (it would only fail).
 const toDownload = (s) => (s.online ? s.library.filter((c) => s.selection.includes(c.offlineUri)
@@ -296,7 +299,9 @@ function render(s) {
   show('selection-bar', !!s.selection && ['library', 'series'].includes(s.route.name));
   if (s.selection) {
     $('selection-count').textContent = `${s.selection.length} selected`;
-    $('selection-play').textContent = `Play ${s.selection.length}`;
+    const plays = toPlay(s).length;
+    show('selection-play', plays > 0);
+    $('selection-play').textContent = `Play ${plays}`;
     $('selection-remove').textContent = `Remove ${s.selection.length}`;
     const downloads = toDownload(s).length;
     show('selection-download', downloads > 0);

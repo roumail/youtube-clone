@@ -4,7 +4,8 @@
 // no connection (stored videos and downloaded ones); it is not saved. With no
 // connection, streamed videos that aren't downloaded are dimmed and a tap does
 // not open them (a series is dimmed when none of its episodes would play).
-// They can still be ticked (to remove them), but Download isn't offered.
+// They can still be ticked (to remove them), but Download isn't offered, and
+// Play counts and plays only the ticked videos that play offline.
 // Downloading itself is in download.spec.js.
 // Google is faked at the network boundary.
 // Not @ipad, for the same reason as add-from-drive.spec.js.
@@ -128,14 +129,21 @@ test.describe('Feature: What is downloaded, at a glance', () => {
       await expect(page.getByTestId('screen-library')).toBeVisible();
       await expect(page.getByTestId('screen-player')).toBeHidden();
     });
-    await test.step('And ticking "tiny" offers Remove but no Download', async () => {
+    await test.step('And ticking "tiny" offers Remove, but no Play and no Download', async () => {
       await selectVideos(page, 'tiny');
       await expect(page.getByTestId('selection-remove')).toHaveText('Remove 1');
+      await expect(page.getByTestId('selection-play')).toBeHidden();
       await expect(page.getByTestId('selection-download')).toBeHidden();
     });
-    await test.step('When the connection is back, nothing is dimmed, and "Download 1" is offered', async () => {
+    await test.step('And ticking "Second" too offers "Play 1" and "Remove 2"', async () => {
+      await item(page, 'Second').tap();
+      await expect(page.getByTestId('selection-play')).toHaveText('Play 1');
+      await expect(page.getByTestId('selection-remove')).toHaveText('Remove 2');
+    });
+    await test.step('When the connection is back, nothing is dimmed, and "Play 2" and "Download 1" are offered', async () => {
       await page.context().setOffline(false);
       await expect(page.locator('[data-unavailable="true"]')).toHaveCount(0);
+      await expect(page.getByTestId('selection-play')).toHaveText('Play 2');
       await expect(page.getByTestId('selection-download')).toHaveText('Download 1');
     });
   });
