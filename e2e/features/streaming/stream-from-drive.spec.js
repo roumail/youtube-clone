@@ -16,7 +16,7 @@
 import { statSync } from 'node:fs';
 import {
   test, expect, goto, openVideo, startPlaying, expectPlaying, fixtureContainer, fixtureParts,
-  fakeGoogle, freeSpace, containerSize, playerState, tapContinue, signInDue,
+  fakeGoogle, freeSpace, containerSize, playerState, tapContinue, signInDue, selectVideos,
 } from '../../support.js';
 
 const shared = () => ({
@@ -346,44 +346,35 @@ test.describe('Feature: Streamed videos', () => {
     });
   });
 
-  test('Scenario: a streamed video can be hidden from this device; it stays in Google Drive', async ({ page, setUp }) => {
-    // Nothing of a streamed video is stored, so there is nothing to remove:
-    // "Hide" only changes what this device shows. "Remove" is for stored videos
-    // and deletes the copy on the device (remove-video.spec.js).
+  test('Scenario: removing a streamed video hides it from this device; it stays in Google Drive', async ({ page, setUp }) => {
+    // Nothing of a streamed video is stored, so removing it only changes what
+    // this device shows; a stored video's copy is deleted (remove-video.spec.js).
+    await page.clock.install();
     const google = await fakeGoogle(page, shared());
-    await test.step('Given "tiny" and "medium" are streamed and settings is unlocked', async () => {
+    await test.step('Given "tiny" and "medium" are streamed', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'tiny.kidsvideo', 'medium.kidsvideo');
-      await page.getByTestId('settings-button').tap();
-      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
     });
-    await test.step('Then a streamed video offers "Hide", not "Remove"', async () => {
-      const item = page.getByTestId('settings-video-item').filter({ hasText: 'tiny' });
-      await expect(item.getByTestId('hide-video-button')).toBeVisible();
-      await expect(item.getByTestId('remove-video-button')).toHaveCount(0);
-    });
-    await test.step('When I hide "tiny"', async () => {
-      await page.getByTestId('settings-video-item').filter({ hasText: 'tiny' })
-        .getByTestId('hide-video-button').tap();
+    await test.step('When I tick "tiny", tap "Remove 1" and pass Face ID', async () => {
+      await selectVideos(page, 'tiny');
+      await page.getByTestId('selection-remove').tap();
     });
     await test.step('Then only "medium" is listed, and Google Drive was only ever read', async () => {
-      await page.getByTestId('screen-settings').getByTestId('back-button').tap();
       await expect(page.getByTestId('library-item')).toHaveCount(1);
       await expect(page.getByTestId('library-item').filter({ hasText: 'medium' })).toBeVisible();
       expect(google.requestsOtherThanReads()).toBe(0);
     });
   });
 
-  test('Scenario: a hidden video can be added again from Google Drive', async ({ page, setUp }) => {
+  test('Scenario: a removed streamed video can be added again from Google Drive', async ({ page, setUp }) => {
+    await page.clock.install();
     const google = await fakeGoogle(page, shared());
-    await test.step('Given "tiny" was streamed and then hidden', async () => {
+    await test.step('Given "tiny" was streamed and then removed', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'tiny.kidsvideo');
-      await page.getByTestId('settings-button').tap();
-      await expect(page.getByTestId('screen-settings')).toHaveAttribute('data-state', 'unlocked');
-      await page.getByTestId('settings-video-item').filter({ hasText: 'tiny' })
-        .getByTestId('hide-video-button').tap();
-      await page.getByTestId('screen-settings').getByTestId('back-button').tap();
+      await selectVideos(page, 'tiny');
+      await page.getByTestId('selection-remove').tap();
+      await expect(page.getByTestId('library-item')).toHaveCount(0);
     });
     await test.step('When I add "tiny.kidsvideo" from Google Drive again', async () => {
       await streamFromDrive(page, google, 'tiny.kidsvideo');

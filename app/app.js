@@ -242,28 +242,19 @@ function libraryTiles(library) {
   return tiles;
 }
 
-function settingsRow(c) {
+// Settings lists the downloads: removing one frees the space, and the video
+// streams again. (Videos leave the library from the selection bar: Remove.)
+function downloadRow(c) {
   const li = document.createElement('li');
-  li.dataset.testid = 'settings-video-item';
+  li.dataset.testid = 'settings-download-item';
   const title = document.createElement('span');
   title.textContent = c.appMetadata.title;
-  // A stored video's copy can be removed; a streamed one has none, so it can
-  // only be hidden from this device (it stays in Google Drive). A streamed
-  // video's download can be removed on its own.
-  const streamed = c.playsFrom === 'drive';
-  const button = (testid, text, onClick) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.dataset.testid = testid;
-    b.textContent = text;
-    b.addEventListener('click', onClick);
-    return b;
-  };
-  li.append(title);
-  if (c.download) li.append(button('remove-download-button', 'Remove download', () => onRemove(c.download)));
-  li.append(streamed
-    ? button('hide-video-button', 'Hide', () => onHide(c))
-    : button('remove-video-button', 'Remove', () => onRemove(c.offlineUri)));
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.testid = 'remove-download-button';
+  button.textContent = 'Remove download';
+  button.addEventListener('click', () => onRemoveDownload(c.download));
+  li.append(title, button);
   return li;
 }
 
@@ -295,6 +286,7 @@ function render(s) {
   if (s.selection) {
     $('selection-count').textContent = `${s.selection.length} selected`;
     $('selection-play').textContent = `Play ${s.selection.length}`;
+    $('selection-remove').textContent = `Remove ${s.selection.length}`;
   }
 
   // Series: its episodes, in season/episode order
@@ -323,9 +315,9 @@ function render(s) {
   // Settings
   show('screen-settings', s.route.name === 'settings');
   $('screen-settings').dataset.state = s.settingsUnlocked ? 'unlocked' : 'locked';
-  document.querySelector('[data-role="settings-list"]').replaceChildren(
-    ...(s.settingsUnlocked ? s.library.map(settingsRow) : []),
-  );
+  const downloads = s.settingsUnlocked ? s.library.filter((c) => c.download) : [];
+  show('downloads-heading', downloads.length > 0);
+  document.querySelector('[data-role="settings-list"]').replaceChildren(...downloads.map(downloadRow));
   document.querySelector('[data-role="feature-settings"]').replaceChildren(
     ...(s.settingsUnlocked ? featureSettings(s) : []),
   );
@@ -420,6 +412,8 @@ async function acceptPrompt(prompt) {
     pickFromDrive(addFromDrive);
   } else if (purpose === 'settings') {
     state.settingsUnlocked = true;
+  } else if (purpose === 'remove') {
+    await removeSelection();
   } else if (purpose === 'search') {
     // Unlocked until the field loses focus (a tap on it brings the keyboard).
     state.searchUnlocked = true;
@@ -888,18 +882,27 @@ async function importItems(items, sourceOf, add) {
   update();
 }
 
-async function onRemove(offlineUri) {
+async function onRemoveDownload(offlineUri) {
   await removeVideo(offlineUri);
   await refreshLibrary();
   update();
 }
 
-// Hiding a streamed video also removes its download, so nothing is left.
-async function onHide(c) {
-  await hideStreamed(c.offlineUri);
-  if (c.download) await removeVideo(c.download);
+// Remove (selection bar, after Face ID): a stored video's copy is deleted; a
+// streamed one is hidden from this device (it stays in Google Drive and can be
+// added again), its download too, so nothing of it is left.
+async function removeSelection() {
+  const ids = state.selection;
+  state.selection = null;
+  for (const c of state.library.filter((v) => ids.includes(v.offlineUri))) {
+    if (c.playsFrom === 'drive') {
+      await hideStreamed(c.offlineUri);
+      if (c.download) await removeVideo(c.download);
+    } else {
+      await removeVideo(c.offlineUri);
+    }
+  }
   await refreshLibrary();
-  update();
 }
 
 // Download a streamed video: a stored copy for offline viewing, kept with it.
@@ -1008,6 +1011,7 @@ async function boot() {
   $('drive-choose-add').addEventListener('click', onChooseAdd);
   $('selection-cancel').addEventListener('click', () => { state.selection = null; update(); });
   $('selection-play').addEventListener('click', playSelection);
+  $('selection-remove').addEventListener('click', () => askUnlock('remove'));
   initSearch();
   window.addEventListener('hashchange', onRouteChange);
 
