@@ -19,8 +19,9 @@ export async function setUp() {
   await navigator.credentials.create({ publicKey: {
     challenge: challenge(),
     rp: { name: 'Kids videos' },
-    // Always the same user, so the device replaces this app's passkey instead of adding one.
-    user: { id: new TextEncoder().encode(USER), name: USER, displayName: 'Parent' },
+    // Always the same user id, so the device replaces this app's passkey instead
+    // of adding one. The name is what the device's password list shows for it.
+    user: { id: new TextEncoder().encode(USER), name: 'Kids videos', displayName: 'Kids videos' },
     pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
     authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
     timeout: 60_000,
