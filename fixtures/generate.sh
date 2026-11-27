@@ -90,6 +90,13 @@ for name in "Garden - S02E01 - Second" "Second"; do
   prepare "$RAW/$name.mp4" "$OUT" >/dev/null
 done
 
+# Grouped by the name before " - " (no season and episode), from copies of
+# "tiny": two "Music" videos, one more "Show" video, and a name used once.
+for name in "Music - Ludovico Einaudi - Tiny Desk" "Music - Coke Studio - Piya Ghar Aaya" "Show - Bonus" "Lone - Thing"; do
+  cp "$RAW/tiny.mp4" "$RAW/$name.mp4"
+  prepare "$RAW/$name.mp4" "$OUT" >/dev/null
+done
+
 # A standalone video named exactly like the series "Show", from a copy of "tiny".
 cp "$RAW/tiny.mp4" "$RAW/Show.mp4"
 prepare "$RAW/Show.mp4" "$OUT" >/dev/null

@@ -43,7 +43,7 @@ export async function listVideos() {
   const downloads = new Map(usable.filter((c) => c.appMetadata.downloadOf).map((c) => [c.appMetadata.downloadOf, c.offlineUri]));
   const stored = usable.filter((c) => !c.appMetadata.downloadOf).map((c) => ({ ...c, playsFrom: 'device' }));
   const streamed = (await listStreamed()).map((c) => ({ ...c, playsFrom: 'drive', download: downloads.get(c.offlineUri) }));
-  return [...stored, ...streamed].sort(byLibraryOrder);
+  return grouped([...stored, ...streamed]).sort(byLibraryOrder);
 }
 
 // No duplicates: a title already in the catalogue, stored or streamed, is
@@ -81,24 +81,47 @@ export async function streamUri(source) {
 /**
  * Series info lives in the title (= the .mpd file name):
  * "Bluey - S01E03 - Keepy Uppy" -> { series: 'Bluey', season: 1, episode: 3, episodeTitle: 'Keepy Uppy' }.
- * Anything else is a standalone video: { series: null }.
+ * Any other "Name - Rest" -> { series: null, prefix: 'Name', episodeTitle: 'Rest' }; it joins
+ * the series Name only next to another video of that name (see grouped).
  */
-export function parseTitle(title = '') {
+function parseTitle(title) {
   const m = /^(.+?) - S(\d{1,3})E(\d{1,3})(?: - (.*))?$/i.exec(title.trim());
-  if (!m) return { series: null, title };
-  return { series: m[1], season: Number(m[2]), episode: Number(m[3]), episodeTitle: m[4] ?? '', title };
+  if (m) return { series: m[1], season: Number(m[2]), episode: Number(m[3]), episodeTitle: m[4] ?? '', title };
+  const n = /^(.+?) - (.+)$/.exec(title.trim());
+  if (n) return { series: null, prefix: n[1], episodeTitle: n[2], title };
+  return { series: null, title };
 }
 
-// Episodes of a series sit together, in season/episode order; everything is
-// otherwise alphabetical (a series sorts by its name).
+// Each video's group: { name, season, episode, title } or null (standalone).
+// "Name - S01E03 - …" is always an episode of Name; any other "Name - Rest" is
+// in the series Name when at least one other video has that name before its
+// " - " (owner decision 2026-11-27).
+function grouped(list) {
+  const parsed = list.map((c) => parseTitle(c.appMetadata.title));
+  const count = new Map();
+  for (const p of parsed) {
+    const name = p.series ?? p.prefix;
+    if (name) count.set(name, (count.get(name) ?? 0) + 1);
+  }
+  return list.map((c, i) => {
+    const p = parsed[i];
+    const name = p.series ?? (count.get(p.prefix) > 1 ? p.prefix : null);
+    return { ...c, group: name ? { name, season: p.season, episode: p.episode, title: p.episodeTitle } : null };
+  });
+}
+
+// A series sits among the other videos by its name; its numbered episodes come
+// first, in season/episode order, then the others A–Z. Everything else is
+// alphabetical, a video named like a series just before it.
 function byLibraryOrder(a, b) {
-  const pa = parseTitle(a.appMetadata?.title);
-  const pb = parseTitle(b.appMetadata?.title);
-  const key = (p) => (p.series ?? p.title).toLocaleLowerCase();
-  const byName = key(pa).localeCompare(key(pb));
+  const key = (c) => (c.group ? c.group.name : c.appMetadata.title).toLocaleLowerCase();
+  const byName = key(a).localeCompare(key(b));
   if (byName !== 0) return byName;
-  if (pa.series && pb.series) return pa.season - pb.season || pa.episode - pb.episode;
-  return Boolean(pa.series) - Boolean(pb.series);
+  const [ga, gb] = [a.group, b.group];
+  if (!ga || !gb) return Boolean(ga) - Boolean(gb);
+  const [na, nb] = [ga.season === undefined, gb.season === undefined];
+  if (na !== nb) return na - nb;
+  return na ? ga.title.localeCompare(gb.title) : ga.season - gb.season || ga.episode - gb.episode;
 }
 
 /**

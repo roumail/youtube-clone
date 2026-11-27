@@ -7,7 +7,7 @@ import {
 } from './drive.js';
 import * as unlock from './unlock.js';
 import {
-  listVideos, importVideo, addStreamed, streamUri, removeVideo, parseTitle,
+  listVideos, importVideo, addStreamed, streamUri, removeVideo,
 } from './library.js';
 import { hideStreamed } from './streamed.js';
 import {
@@ -201,8 +201,10 @@ function downloadControls(li, c) {
   li.append(button);
 }
 
+// "3 episodes" when every video in it is numbered, else "3 videos".
 function seriesTile(name, episodes) {
-  const count = `${episodes.length} episode${episodes.length === 1 ? '' : 's'}`;
+  const noun = episodes.every((c) => c.group.season !== undefined) ? 'episode' : 'video';
+  const count = `${episodes.length} ${noun}${episodes.length === 1 ? '' : 's'}`;
   const li = tile('series-item', episodes[0].appMetadata?.poster, name, count);
   li.dataset.series = name;
   li.addEventListener('click', () => go(`#/series/${encodeURIComponent(name)}`));
@@ -211,8 +213,10 @@ function seriesTile(name, episodes) {
 
 
 function episodeTile(c, hash) {
-  const p = parseTitle(c.appMetadata?.title);
-  const label = `S${pad2(p.season)}E${pad2(p.episode)}${p.episodeTitle ? ` · ${p.episodeTitle}` : ''}`;
+  const g = c.group;
+  const label = g.season === undefined
+    ? g.title
+    : `S${pad2(g.season)}E${pad2(g.episode)}${g.title ? ` · ${g.title}` : ''}`;
   const li = tile('episode-item', c.appMetadata?.poster, label);
   li.dataset.videoId = c.offlineUri;
   li.dataset.playsFrom = c.playsFrom;
@@ -226,12 +230,12 @@ function episodeTile(c, hash) {
 function libraryTiles(library) {
   const bySeries = new Map();
   for (const c of library) {
-    const { series } = parseTitle(c.appMetadata?.title);
+    const series = c.group?.name;
     if (series) bySeries.set(series, [...(bySeries.get(series) ?? []), c]);
   }
   const tiles = [];
   for (const c of library) {
-    const { series } = parseTitle(c.appMetadata?.title);
+    const series = c.group?.name;
     if (!series) tiles.push(videoTile(c));
     else if (bySeries.get(series)[0] === c) tiles.push(seriesTile(series, bySeries.get(series)));
   }
@@ -299,7 +303,7 @@ function render(s) {
     const hash = `#/series/${encodeURIComponent(s.route.series)}`;
     document.querySelector('[data-role="series-title"]').textContent = s.route.series;
     document.querySelector('[data-role="episode-grid"]').replaceChildren(
-      ...s.library.filter((c) => parseTitle(c.appMetadata?.title).series === s.route.series)
+      ...s.library.filter((c) => c.group?.name === s.route.series)
         .map((c) => episodeTile(c, hash)),
     );
   }
