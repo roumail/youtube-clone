@@ -1,14 +1,14 @@
-// App: routing + one state object + render(state).
-// Everything behind the parent unlocks with Face ID / Touch ID (unlock.js);
-// offline (service worker) and installability.
-import { installLocalScheme, pickedSource, CONTAINER_EXT } from './local-scheme.js';
+// App: routing + render(state) of every screen, the unlock flow (Face ID /
+// Touch ID, unlock.js), playing and streaming, and start-up. The state object
+// and what all parts share are in state.js; adding (adding.js), downloads
+// (downloads.js), the selection bar (selection.js) and the progress rows
+// (jobs.js) have their own modules.
+import { installLocalScheme, pickedSource } from './local-scheme.js';
 import {
-  initDrive, pickFromDrive, signedIn, signIn, signInEnds, driveSource, listFolder, FOLDER, whenSignedIn, goneFromDrive,
+  initDrive, pickFromDrive, signedIn, signInEnds, driveSource, whenSignedIn, goneFromDrive,
 } from './drive.js';
 import * as unlock from './unlock.js';
-import {
-  listVideos, importVideo, addStreamed, streamUri, removeVideo,
-} from './library.js';
+import { importVideo, streamUri } from './library.js';
 import { hideStreamed } from './streamed.js';
 import {
   playerState, initPlayer, openVideo, closeVideo, requestPlay, cancelPlay, allowPlay, pause,
@@ -17,39 +17,17 @@ import {
 import {
   FEATURES, flags, setFlag, loadEnabled, start as startFeature,
 } from './features.js';
-
-const $ = (testid, root = document) => root.querySelector(`[data-testid="${testid}"]`);
-
-const state = {
-  route: { name: 'library' },
-  setUp: false, // first run is done: Face ID is set up on this device
-  library: [], // the catalogue: stored and streamed videos (library.js listVideos)
-  settingsUnlocked: false,
-  search: '', // library search text (not saved); typing needs unlocking
-  searchUnlocked: false, // until the search field loses focus
-  // Unlock prompt: { purpose: 'setup' | 'import' | 'drive' | 'download' | 'settings' | 'play' | 'search',
-  //                 mode: 'unavailable' | 'setup' | 'unlock' | 'continue', asking, failures }
-  // ('unavailable': no Face ID, Touch ID or passcode; 'setup': first run;
-  //  'unlock': Face ID failed, was cancelled, or waits for a tap; 'continue':
-  //  Face ID passed, and an action that needs a tap waits for "Continue").
-  // While asking, Face ID is being asked and the prompt is out of sight.
-  prompt: null,
-  returnTo: '#/library', // where the player's Back goes (the library or a series list)
-  features: {}, // running optional features, by id (features.js)
-  jobs: [], // adds and downloads, one row each: { phase: 'storing' | 'done' | 'error' | 'cancelled', progress, message, cancel }
-  signingIn: null, // a Google sign-in started by the tap that opened a streamed video
-  online: navigator.onLine, // with no connection, streamed videos can't play
-  downloadedOnly: false, // the library's "Downloaded" filter (not saved)
-  downloading: new Set(), // the streamed videos being downloaded (their URIs)
-  // Videos ticked to play in a row (catalogue ids, in the order ticked); null
-  // while not selecting. Not saved.
-  selection: null,
-  // The playlist playing: { ids, index, advancing }; null for a video played alone.
-  playlist: null,
-  // A picked folder's videos, to choose from: { title, from, sourceOf,
-  // items: [{ doc, name, inLibrary, ticked }] }; null when not choosing.
-  choosing: null,
-};
+import {
+  state, $, go, update, setRender, refreshLibrary, streamsNow, playing, signInIfNeeded, onDevice,
+} from './state.js';
+import { renderJobs, startJob, endJob } from './jobs.js';
+import {
+  importItems, addFromDrive, renderChoosing, onChooseToggle, onChooseCancel, onChooseAdd,
+} from './adding.js';
+import { downloadControls, downloadRow, downloadVideo, toDownload } from './downloads.js';
+import {
+  selectable, playSelection, onEnded, removeSelection, renderSelectionBar,
+} from './selection.js';
 
 function parseRoute(hash) {
   const [, name = 'library', arg] = /^#\/([^/]*)\/?(.*)$/.exec(hash) ?? [];
@@ -58,8 +36,6 @@ function parseRoute(hash) {
   if (name === 'series') return { name, series: decodeURIComponent(arg) };
   return { name: 'library' };
 }
-
-const go = (hash) => { location.hash = hash; };
 
 // ---------- render ----------
 
@@ -93,16 +69,6 @@ function tile(testid, poster, ...texts) {
   return li;
 }
 
-// Opening a video remembers where Back should return to. A streamed video
-// renews the Google sign-in on this tap if needed, so it is ready by play.
-function openFrom(c, from) {
-  if (!state.online && streamsNow(c)) return; // dimmed: it can't play with no connection
-  state.returnTo = from;
-  state.signingIn = streamsNow(c) ? signInIfNeeded() : null;
-  state.signingIn?.catch(() => {}); // a failed sign-in is shown by the player
-  go(`#/player/${encodeURIComponent(c.offlineUri)}`);
-}
-
 function videoTile(c) {
   const li = tile('library-item', c.appMetadata.poster, c.appMetadata.title);
   li.dataset.videoId = c.offlineUri;
@@ -111,103 +77,6 @@ function videoTile(c) {
   selectable(li, c, '#/library');
   return li;
 }
-
-// ---------- selecting (a playlist) ----------
-
-// A tap opens a video; holding it starts selecting and ticks it. While
-// selecting, a tap ticks or unticks. Lifting the finger after a hold may still
-// send a click, which is not a tap.
-const HOLD_MS = 500;
-let holdTimer = null;
-let held = false;
-const clearHold = () => { clearTimeout(holdTimer); holdTimer = null; };
-
-function selectable(li, c, from) {
-  const id = c.offlineUri;
-  if (state.selection) {
-    const place = state.selection.indexOf(id);
-    li.setAttribute('role', 'checkbox');
-    li.setAttribute('aria-checked', String(place >= 0));
-    if (place >= 0) {
-      const number = document.createElement('span');
-      number.dataset.testid = 'selection-number';
-      number.textContent = String(place + 1);
-      li.append(number);
-    }
-  }
-  // A hold only starts selecting; while selecting, any press is a tap.
-  li.addEventListener('pointerdown', () => {
-    held = false;
-    clearHold();
-    if (state.selection) return;
-    holdTimer = setTimeout(() => {
-      holdTimer = null;
-      held = true;
-      state.selection = [id];
-      update();
-    }, HOLD_MS);
-  });
-  for (const type of ['pointerup', 'pointercancel', 'pointerleave']) li.addEventListener(type, clearHold);
-  li.addEventListener('contextmenu', (event) => event.preventDefault());
-  li.addEventListener('click', () => {
-    if (held) {
-      held = false;
-      return;
-    }
-    if (state.selection) toggleSelected(id);
-    else openFrom(c, from);
-  });
-}
-
-// Unticking the last ticked video stops selecting.
-function toggleSelected(id) {
-  const rest = state.selection.filter((x) => x !== id);
-  if (rest.length === state.selection.length) rest.push(id);
-  state.selection = rest.length ? rest : null;
-  update();
-}
-
-function playSelection() {
-  const ids = toPlay(state);
-  state.selection = null;
-  state.playlist = { ids, index: 0, advancing: false };
-  openFrom(state.library.find((c) => c.offlineUri === ids[0]), '#/library');
-}
-
-// At the end of a video in a playlist, the next one opens and plays by itself:
-// it was unlocked at the start. The last one stops, as any video does.
-// Replacing the history entry keeps Back (and the back gesture) going to the library.
-function onEnded() {
-  const list = state.playlist;
-  if (!list || list.index === list.ids.length - 1) return;
-  list.index += 1;
-  list.advancing = true;
-  location.replace(`#/player/${encodeURIComponent(list.ids[list.index])}`);
-}
-
-// A streamed video's tile says whether it is downloaded (a "Downloaded"
-// badge), and is dimmed with no connection unless it is. Stored videos are
-// always on the device. Downloading is from the selection bar.
-function downloadControls(li, c) {
-  if (c.playsFrom !== 'drive') return;
-  li.dataset.downloaded = c.download ? 'true' : (state.downloading.has(c.offlineUri) ? 'downloading' : 'false');
-  if (!state.online && streamsNow(c)) li.dataset.unavailable = 'true';
-  if (!c.download) return;
-  const badge = document.createElement('span');
-  badge.dataset.testid = 'downloaded-badge';
-  badge.textContent = 'Downloaded';
-  li.append(badge);
-}
-
-// Plays with no connection: stored, or streamed and downloaded.
-const onDevice = (c) => !streamsNow(c);
-// Ticked videos Play would play, in the order ticked: with no connection,
-// only those that play offline.
-const toPlay = (s) => s.selection.filter((id) => s.online || onDevice(s.library.find((c) => c.offlineUri === id)));
-// Ticked videos that Download would download: streamed, not downloaded or
-// downloading. None with no connection (it would only fail).
-const toDownload = (s) => (s.online ? s.library.filter((c) => s.selection.includes(c.offlineUri)
-  && c.playsFrom === 'drive' && !c.download && !s.downloading.has(c.offlineUri)) : []);
 
 // "3 episodes" when every video in it is numbered, else "3 videos".
 function seriesTile(name, episodes) {
@@ -220,7 +89,6 @@ function seriesTile(name, episodes) {
   li.addEventListener('click', () => go(`#/series/${encodeURIComponent(name)}`));
   return li;
 }
-
 
 function episodeTile(c, hash) {
   const g = c.group;
@@ -252,22 +120,6 @@ function libraryTiles(library) {
   return tiles;
 }
 
-// Settings lists the downloads: removing one frees the space, and the video
-// streams again. (Videos leave the library from the selection bar: Remove.)
-function downloadRow(c) {
-  const li = document.createElement('li');
-  li.dataset.testid = 'settings-download-item';
-  const title = document.createElement('span');
-  title.textContent = c.appMetadata.title;
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.dataset.testid = 'remove-download-button';
-  button.textContent = 'Remove download';
-  button.addEventListener('click', () => onRemoveDownload(c.download));
-  li.append(title, button);
-  return li;
-}
-
 function render(s) {
   const show = (testid, visible) => { $(testid).hidden = !visible; };
 
@@ -293,20 +145,7 @@ function render(s) {
   renderJobs(s.jobs);
   renderChoosing(s);
 
-  // Selecting: the bar, on the library and series screens
-  if (s.selection) $('screen-library').dataset.mode = 'select';
-  else delete $('screen-library').dataset.mode;
-  show('selection-bar', !!s.selection && ['library', 'series'].includes(s.route.name));
-  if (s.selection) {
-    $('selection-count').textContent = `${s.selection.length} selected`;
-    const plays = toPlay(s).length;
-    show('selection-play', plays > 0);
-    $('selection-play').textContent = `Play ${plays}`;
-    $('selection-remove').textContent = `Remove ${s.selection.length}`;
-    const downloads = toDownload(s).length;
-    show('selection-download', downloads > 0);
-    $('selection-download').textContent = `Download ${downloads}`;
-  }
+  renderSelectionBar(s);
 
   // Series: its episodes, in season/episode order
   show('screen-series', s.route.name === 'series');
@@ -360,13 +199,9 @@ function render(s) {
   }
 }
 
-const update = () => render(state);
+setRender(render);
 
 // ---------- actions ----------
-
-async function refreshLibrary() {
-  state.library = await listVideos();
-}
 
 // Something behind the parent: Face ID first. byTap: asked from a tap on the
 // page; from the device's media controls (no tap) Face ID can't start, so the
@@ -609,12 +444,6 @@ function initSeek() {
 
 // ---------- streamed videos ----------
 
-// A streamed video that isn't downloaded plays from Google Drive.
-const streamsNow = (c) => c.playsFrom === 'drive' && !c.download;
-const playing = () => state.library.find((c) => c.offlineUri === playerState.offlineUri);
-// Call within a tap: the sign-in in progress, or null if still signed in.
-const signInIfNeeded = () => (signedIn() ? null : signIn());
-
 // Within the tap that plays (or its "Continue"): a streamed video needs a valid Google sign-in.
 // Returns the sign-in in progress, or null when none is needed.
 function signInForPlay() {
@@ -670,103 +499,6 @@ async function hideGoneFromDrive() {
   update();
 }
 
-// Adds and downloads: a row each, kept (not rebuilt) while it runs, so its
-// Cancel stays under the finger. A finished row clears itself after a while;
-// one that failed stays longer, so it can be read.
-const CLEAR_AFTER_MS = { done: 10_000, cancelled: 10_000, error: 60_000 };
-const jobRows = new Map(); // job -> { li, text, bar, cancel }
-
-function renderJobs(jobs) {
-  for (const [job, row] of jobRows) {
-    if (!jobs.includes(job)) {
-      row.li.remove();
-      jobRows.delete(job);
-    }
-  }
-  for (const job of jobs) {
-    let row = jobRows.get(job);
-    if (!row) {
-      const li = document.createElement('li');
-      li.dataset.testid = 'import-status';
-      li.setAttribute('role', 'status');
-      const text = document.createElement('span');
-      const bar = document.createElement('progress');
-      bar.dataset.testid = 'import-progress';
-      bar.max = 1;
-      li.append(text, bar);
-      document.querySelector('[data-role="jobs"]').append(li);
-      row = { li, text, bar, cancel: null };
-      jobRows.set(job, row);
-    }
-    row.li.dataset.import = job.phase;
-    row.text.textContent = job.message;
-    row.bar.hidden = job.phase !== 'storing';
-    row.bar.value = job.progress;
-    if (job.cancel && !row.cancel) {
-      row.cancel = document.createElement('button');
-      row.cancel.type = 'button';
-      row.cancel.dataset.testid = 'cancel-download-button';
-      row.cancel.textContent = 'Cancel';
-      const { cancel } = job;
-      row.cancel.addEventListener('click', () => cancel.abort());
-      row.li.append(row.cancel);
-    } else if (!job.cancel && row.cancel) {
-      row.cancel.remove();
-      row.cancel = null;
-    }
-  }
-}
-
-function startJob(message, cancel = null) {
-  const job = { phase: 'storing', progress: 0, message, cancel };
-  state.jobs.push(job);
-  update();
-  return job;
-}
-
-function endJob(job, phase, message) {
-  Object.assign(job, { phase, message, cancel: null });
-  setTimeout(() => {
-    state.jobs = state.jobs.filter((j) => j !== job);
-    update();
-  }, CLEAR_AFTER_MS[phase]);
-  update();
-}
-
-const onJobProgress = (job) => (p) => {
-  job.progress = p;
-  update();
-};
-
-// Several files picked at once: added one after another; a bad file doesn't
-// stop the rest, and the summary names what failed.
-async function importSeveral(items, sourceOf, add) {
-  const total = items.length;
-  let added = 0;
-  const failed = [];
-  const job = startJob(`Adding ${total} videos…`);
-  for (const [i, item] of items.entries()) {
-    if (!item.name.toLowerCase().endsWith(CONTAINER_EXT)) {
-      failed.push(`${item.name} (not a ${CONTAINER_EXT} file)`);
-      continue;
-    }
-    const name = item.name.slice(0, -CONTAINER_EXT.length);
-    Object.assign(job, { progress: 0, message: `Adding ${i + 1} of ${total}: ${name}…` });
-    update();
-    try {
-      await add(sourceOf(item), onJobProgress(job));
-      added += 1;
-    } catch (e) {
-      failed.push(`${name} (${e.message})`);
-    }
-    await refreshLibrary();
-    update();
-  }
-  const summary = `Added ${added} of ${total} videos.`;
-  if (failed.length) endJob(job, 'error', `${summary} Couldn't add: ${failed.join('; ')}.`);
-  else endJob(job, 'done', summary);
-}
-
 // Play (button or OS command): unlocking comes first, every time.
 function onPlayRequested(byTap) {
   if (state.route.name !== 'player' || state.prompt) return;
@@ -784,171 +516,6 @@ function onUnlockCancel() {
   state.prompt = null;
   if (purpose === 'settings') go('#/library');
   if (purpose === 'play') cancelPlay();
-  update();
-}
-
-// Picked in Google Drive: files alone are added as streamed. With a folder,
-// every .kidsvideo in it and its subfolders (and any files picked with it) is
-// listed to choose from: new ones ticked, titles already there greyed out.
-async function addFromDrive(docs, sourceOf) {
-  const folders = docs.filter((d) => d.mimeType === FOLDER);
-  if (!folders.length) return importItems(docs, sourceOf, addStreamed);
-  const found = docs.filter((d) => d.mimeType !== FOLDER);
-  const job = startJob(`Looking in "${folders[0].name}"…`);
-  for (const folder of folders) {
-    job.message = `Looking in "${folder.name}"…`;
-    update();
-    try {
-      found.push(...await listFolder(folder));
-    } catch (e) {
-      return endJob(job, 'error', `Couldn't add the folder "${folder.name}": ${e.message}`);
-    }
-  }
-  if (!found.length) return endJob(job, 'error', `There are no .kidsvideo files in "${folders[0].name}".`);
-  state.jobs = state.jobs.filter((j) => j !== job); // the list takes over
-  const titles = new Set(state.library.map((c) => c.appMetadata.title));
-  const items = found.map((doc) => {
-    const name = doc.name.slice(0, -CONTAINER_EXT.length);
-    return { doc, name, inLibrary: titles.has(name), ticked: !titles.has(name) };
-  }).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  const one = docs.length === 1;
-  state.choosing = {
-    title: one ? `Add from "${folders[0].name}"` : 'Add from Google Drive',
-    from: one ? ` from "${folders[0].name}"` : '',
-    sourceOf,
-    items,
-  };
-  update();
-}
-
-// The list of a folder's videos: tick, untick, then add the ticked ones.
-function renderChoosing(s) {
-  $('drive-choose').hidden = !s.choosing;
-  if (!s.choosing) return;
-  const { title, items } = s.choosing;
-  const fresh = items.filter((i) => !i.inLibrary);
-  const ticked = fresh.filter((i) => i.ticked).length;
-  $('drive-choose').querySelector('[data-role="choose-title"]').textContent = title;
-  $('drive-choose').querySelector('[data-role="choose-list"]').replaceChildren(...items.map((item) => {
-    const li = document.createElement('li');
-    li.dataset.testid = 'drive-choose-item';
-    li.dataset.state = item.inLibrary ? 'in-library' : 'new';
-    const label = document.createElement('label');
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.dataset.testid = 'drive-choose-box';
-    box.checked = item.ticked;
-    box.disabled = item.inLibrary;
-    box.addEventListener('change', () => { item.ticked = box.checked; update(); });
-    const name = document.createElement('span');
-    name.textContent = item.inLibrary ? `${item.name} · in the library` : item.name;
-    label.append(box, name);
-    li.append(label);
-    return li;
-  }));
-  $('drive-choose-toggle').textContent = ticked === fresh.length ? 'Untick all' : 'Tick all';
-  $('drive-choose-add').textContent = `Add ${ticked}`;
-  $('drive-choose-add').disabled = ticked === 0;
-}
-
-function onChooseToggle() {
-  const fresh = state.choosing.items.filter((i) => !i.inLibrary);
-  const tick = !fresh.every((i) => i.ticked);
-  for (const item of fresh) item.ticked = tick;
-  update();
-}
-
-function onChooseCancel() {
-  state.choosing = null;
-  update();
-}
-
-// Add the ticked videos, one after another, in one row.
-async function onChooseAdd() {
-  const { items, sourceOf, from } = state.choosing;
-  state.choosing = null;
-  const chosen = items.filter((i) => i.ticked);
-  const skipped = items.filter((i) => i.inLibrary).length;
-  let added = 0;
-  const failed = [];
-  const job = startJob('Adding…');
-  for (const [i, { doc, name }] of chosen.entries()) {
-    Object.assign(job, { progress: i / chosen.length, message: `Adding ${i + 1} of ${chosen.length}: ${name}…` });
-    update();
-    try {
-      await addStreamed(sourceOf(doc));
-      added += 1;
-    } catch (e) {
-      failed.push(`${name} (${e.message})`); // also a title already there under another file name
-    }
-    await refreshLibrary();
-  }
-  const summary = `Added ${added} of ${chosen.length} videos${from}${skipped ? ` (${skipped} already in the library)` : ''}.`;
-  if (failed.length) endJob(job, 'error', `${summary} Couldn't add: ${failed.join('; ')}.`);
-  else endJob(job, 'done', summary);
-}
-
-// Picked files (stored: importVideo) or files in Google Drive (streamed:
-// addStreamed); sourceOf(item) gives its byte source.
-async function importItems(items, sourceOf, add) {
-  if (items.length > 1) return importSeveral(items, sourceOf, add);
-  const job = startJob('Adding video…');
-  try {
-    const stored = await add(sourceOf(items[0]), onJobProgress(job));
-    endJob(job, 'done', `Added "${stored.appMetadata.title}".`);
-  } catch (e) {
-    endJob(job, 'error', `Couldn't add the video: ${e.message}`);
-  }
-  await refreshLibrary();
-  update();
-}
-
-async function onRemoveDownload(offlineUri) {
-  await removeVideo(offlineUri);
-  await refreshLibrary();
-  update();
-}
-
-// Remove (selection bar, after Face ID): a stored video's copy is deleted; a
-// streamed one is hidden from this device (it stays in Google Drive and can be
-// added again), its download too, so nothing of it is left.
-async function removeSelection() {
-  const ids = state.selection;
-  state.selection = null;
-  for (const c of state.library.filter((v) => ids.includes(v.offlineUri))) {
-    if (c.playsFrom === 'drive') {
-      await hideStreamed(c.offlineUri);
-      if (c.download) await removeVideo(c.download);
-    } else {
-      await removeVideo(c.offlineUri);
-    }
-  }
-  await refreshLibrary();
-}
-
-// Download a streamed video: a stored copy for offline viewing, kept with it.
-// Cancel stops it at its next read of Google Drive; nothing of it is kept.
-async function downloadVideo(entry, signing) {
-  const { title } = entry.appMetadata;
-  const cancel = new AbortController();
-  state.downloading.add(entry.offlineUri);
-  const job = startJob(`Downloading "${title}"…`, cancel);
-  const source = driveSource(entry.file);
-  const read = source.read;
-  source.read = (start, end) => {
-    cancel.signal.throwIfAborted();
-    return read(start, end);
-  };
-  try {
-    await signing;
-    await importVideo(source, onJobProgress(job), entry.offlineUri);
-    endJob(job, 'done', `Downloaded "${title}".`);
-  } catch (e) {
-    if (cancel.signal.aborted) endJob(job, 'cancelled', `Download of "${title}" cancelled.`);
-    else endJob(job, 'error', `Couldn't download "${title}": ${e.message}`);
-  }
-  state.downloading.delete(entry.offlineUri);
-  await refreshLibrary();
   update();
 }
 
