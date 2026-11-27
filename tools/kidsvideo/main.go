@@ -70,6 +70,10 @@ func runWith(args []string, stdout, stderr io.Writer, tools toolset) int {
 	return 0
 }
 
+// maxTitle: the tar name field holds 100 bytes; "<Title>.mpd" and its closing
+// NUL must fit.
+const maxTitle = 95
+
 func pack(dir string) (string, error) {
 	dir = filepath.Clean(dir)
 	title := filepath.Base(dir)
@@ -79,8 +83,7 @@ func pack(dir string) (string, error) {
 			return "", fmt.Errorf("not a prepared video folder (missing %s): %s", name, dir)
 		}
 	}
-	// The tar name field holds 100 bytes: "<Title>.mpd" and its closing NUL must fit.
-	if len(title) > 95 {
+	if len(title) > maxTitle {
 		return "", fmt.Errorf("title too long for the container (max 95 bytes; an accented letter counts as 2): %s", title)
 	}
 	out := filepath.Join(filepath.Dir(dir), title+ext)

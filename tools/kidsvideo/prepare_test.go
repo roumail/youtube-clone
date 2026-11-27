@@ -153,6 +153,22 @@ func TestPrepareWritesOneFormat2FileNamedAfterTheTitle(t *testing.T) {
 	}
 }
 
+func TestPrepareTakesATitleWithACommaOrEquals(t *testing.T) {
+	s := newSetup(t, smallSource(), "in.mp4")
+	if code, _, stderr := s.prepare(t, "--title", "Song (A, B) x=y"); code != 0 {
+		t.Fatal(stderr)
+	}
+	// The packager is given plain paths: its stream descriptors are comma-separated.
+	for _, a := range s.fake.called("packager")[0] {
+		if strings.Contains(a, "Song") {
+			t.Fatalf("packager argument %q carries the title", a)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(s.dest, "Song (A, B) x=y"+ext)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPrepareTitleOptionNamesTheFile(t *testing.T) {
 	s := newSetup(t, smallSource(), "snowy.day.2016.1080p.mkv")
 	if code, _, stderr := s.prepare(t, "--title", "The Snowy Day"); code != 0 {

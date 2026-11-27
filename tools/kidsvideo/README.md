@@ -56,7 +56,10 @@ implementing until `go test` is green.
   them: the tool says so and stops. It must exist: a typo or a drive that
   isn't mounted is refused, not created.
 - **Titles:** the file name tidied ("Frozen.2.2019.1080p.BluRay.x264-GRP" →
-  "Frozen 2 2019"); `--title` sets it for a single input.
+  "Frozen 2 2019"; from yt-dlp, "Song｜ Artist [WzlO79d3S8c]" → "Song -
+  Artist"); `--title` sets it for a single input. A title from the file name
+  that is over 95 bytes is cut at a word to fit, and the tool says so; a
+  `--title` over 95 bytes is refused.
 - **Series:** with `--series NAME`, each file name must carry its season and
   episode (S01E03, s1e3, 1x03); the title becomes
   "NAME - S01E03 - Episode title" and the file goes in `DIR/NAME/`. A file

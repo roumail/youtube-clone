@@ -157,6 +157,8 @@ func TestPrepareTidiesTheTitleFromTheFileName(t *testing.T) {
 		"The.Snowy.Day.2016.WEB-DL": "The Snowy Day 2016",
 		"Show - S01E03":             "Show - S01E03",
 		"raw-vp9":                   "raw-vp9",
+		"Coke Studio Season 11｜ Piya Ghar Aaya｜ Fareed Ayaz [WzlO79d3S8c]": "Coke Studio Season 11 - Piya Ghar Aaya - Fareed Ayaz",
+		"Song [Live]": "Song [Live]",
 	} {
 		if got := tidy(name); got != want {
 			t.Errorf("tidy(%q) = %q, want %q", name, got, want)
@@ -169,6 +171,44 @@ func TestPrepareTidiesTheTitleFromTheFileName(t *testing.T) {
 	// A name that tidies to nothing keeps the file name.
 	if got := b.library(t); !slices.Equal(got, []string{"1080p.kidsvideo", "Frozen 2 2019.kidsvideo"}) {
 		t.Fatalf("library %v", got)
+	}
+}
+
+func TestPrepareShortensATitleFromTheFileNameToFit(t *testing.T) {
+	long := "Coke Studio Season 11｜ Piya Ghar Aaya｜ Fareed Ayaz｜ Abu Muhammad Qawwal and Brothers｜ A Very Long Upload Name [WzlO79d3S8c].webm"
+	b := newBatch(t, long)
+	code, stdout, stderr := b.run(t, "--dest", b.dest, b.in)
+	if code != 0 {
+		t.Fatal(stderr)
+	}
+	short := "Coke Studio Season 11 - Piya Ghar Aaya - Fareed Ayaz - Abu Muhammad Qawwal and Brothers - A"
+	if got := b.library(t); !slices.Equal(got, []string{short + ".kidsvideo"}) {
+		t.Fatalf("library %v", got)
+	}
+	if !strings.Contains(stdout, "== "+short+"\n   title shortened to fit (max 95 bytes): Coke Studio Season 11 - Piya Ghar Aaya - Fareed Ayaz - Abu Muhammad Qawwal and Brothers - A Very Long Upload Name\n") {
+		t.Fatalf("stdout %q", stdout)
+	}
+	// A title typed with --title is never cut.
+	typed := strings.Repeat("Word ", 20)
+	b = newBatch(t, "x.mp4")
+	code, _, stderr = b.run(t, "--title", typed, "--dest", b.dest, b.in)
+	if code != 1 || !strings.Contains(stderr, "title too long for the container") {
+		t.Fatalf("code %d, stderr %q", code, stderr)
+	}
+}
+
+func TestShortenCutsAtAWordElseALetterBoundary(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"Short", "Short"},
+		{strings.Repeat("a", 94) + " b", strings.Repeat("a", 94)},
+		{strings.Repeat("a", 95) + " b", strings.Repeat("a", 95)},
+		{strings.Repeat("a", 90) + " - Longword", strings.Repeat("a", 90)},
+		{strings.Repeat("é", 60), strings.Repeat("é", 47)},
+		{"(" + strings.Repeat("x", 100), "(" + strings.Repeat("x", 94)},
+	} {
+		if got := shorten(c.in); got != c.want {
+			t.Errorf("shorten(%q) = %q, want %q", c.in, got, c.want)
+		}
 	}
 }
 
