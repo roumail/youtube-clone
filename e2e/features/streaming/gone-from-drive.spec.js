@@ -12,7 +12,7 @@
 // Google is faked at the network boundary (fakeGoogle in e2e/support.js).
 // Not @ipad, for the same reason as add-from-drive.spec.js.
 import {
-  test, expect, goto, fixtureContainer, fakeGoogle, playerState, tapContinue, signInDue,
+  test, expect, goto, fixtureContainer, fakeGoogle, playerState, tapContinue, signInDue, downloadVideos,
 } from '../../support.js';
 
 const shared = () => ({
@@ -124,7 +124,7 @@ test.describe('Feature: Videos gone from Google Drive', () => {
     await test.step('Given "tiny" and "medium" are streamed and "medium" is downloaded, and an hour has passed', async () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'tiny.kidsvideo', 'medium.kidsvideo');
-      await item(page, 'medium').getByTestId('download-button').tap();
+      await downloadVideos(page, 'medium');
       await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'true');
       await page.clock.fastForward('01:00:00');
     });

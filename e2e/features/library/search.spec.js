@@ -1,7 +1,7 @@
 // Feature: Search the library — a parent narrows the library by title.
 // Search is flat: it also finds episodes inside a series (see below).
 // Typing needs Face ID; clearing is free.
-import { test, expect, goto, fakeGoogle, fixtureContainer, tapContinue } from '../../support.js';
+import { test, expect, goto, fakeGoogle, fixtureContainer, tapContinue, downloadVideos } from '../../support.js';
 
 const search = (page) => page.getByTestId('search-input');
 const items = (page) => page.getByTestId('library-item');
@@ -150,7 +150,7 @@ test.describe('Feature: Search the library', () => {
       await page.getByTestId('add-from-drive-button').click();
       await tapContinue(page); // the first Google sign-in
       const medium = items(page).filter({ hasText: 'medium' });
-      await medium.getByTestId('download-button').tap();
+      await downloadVideos(page, 'medium');
       await expect(medium).toHaveAttribute('data-downloaded', 'true');
     });
     await test.step('When I unlock search and type "medium"', async () => {

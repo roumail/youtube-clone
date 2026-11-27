@@ -55,9 +55,12 @@ Each video in a catalogue is either:
   Google Drive into Files. In the app: Add video → Face ID → Continue → pick it there. Then
   delete it from Downloads: the app keeps its own copy, so leaving it there
   stores the video twice.
-- **Downloading a streamed video** (for a trip, or a bad connection): its tile
-  in the library has **Download** (behind Face ID). A downloaded video plays and
-  seeks with no internet, like a stored one. A download is meant to be
+- **Downloading a streamed video** (for a trip, or a bad connection): hold a
+  video to start selecting, tick more, then **Download** (behind Face ID). A
+  downloaded video plays and seeks with no internet, like a stored one; its
+  tile says **Downloaded**, a series tile says how many of its episodes are,
+  and the **Downloaded** toggle next to search shows only what plays offline.
+  With no connection, streamed videos that aren't downloaded are dimmed. A download is meant to be
   short-lived: Settings → Downloads → **Remove download** frees the space, and if the
   browser clears it, the video simply streams again.
 - **Playing several in a row** (a playlist): hold a video in the library or a

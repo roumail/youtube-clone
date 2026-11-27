@@ -70,8 +70,9 @@ button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 0; back
 .grid li img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; display: block; }
 .grid li span { padding: 10px 12px; font-weight: 600; }
 .grid li .tile-note { padding-top: 0; font-weight: 400; color: var(--muted); }
-.grid li [data-testid="download-button"] { margin: 0 12px 10px; justify-self: start; }
-.grid li[data-downloaded="true"] > span:first-of-type::after { content: " · downloaded"; font-weight: 400; color: var(--muted); }
+.grid li [data-testid="downloaded-badge"] { margin: 0 12px 10px; justify-self: start; padding: 2px 10px; border-radius: 999px; background: #2e7d32; color: #fff; font-size: 0.85rem; font-weight: 600; }
+.grid li[data-unavailable="true"] { opacity: 0.4; }
+.search [data-testid="library-filter"][aria-pressed="true"] { background: var(--fg); color: #000; }
 .jobs { list-style: none; margin: 0; padding: 0; }
 [data-testid="import-status"] { color: var(--muted); margin: 8px 0; }
 progress[data-testid="import-progress"] { display: block; width: 100%; margin: 4px 0; }
