@@ -1043,6 +1043,7 @@ async function boot() {
   $('app').dataset.ready = 'true';
   showVersion();
   initDrive().then((ready) => { $('add-from-drive-button').hidden = !ready; });
+  whenSignedIn(hideGoneFromDrive);
 }
 
 boot();
