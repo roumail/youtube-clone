@@ -1,5 +1,6 @@
 // Feature: Download a streamed video — for a trip or a bad connection, a parent
-// downloads a streamed video onto this device: it then plays and seeks with no
+// ticks streamed videos and taps "Download N" in the selection bar, behind
+// Face ID, to download them onto this device: it then plays and seeks with no
 // connection, like a stored one. A download is short-lived and may be lost
 // (the browser can clear it, or the parent removes it); the video then simply
 // streams again. Only streamed videos offer Download: a stored video is
@@ -9,7 +10,7 @@
 // Not @ipad, for the same reason as add-from-drive.spec.js.
 import {
   test, expect, goto, openVideo, startPlaying, expectPlaying, fixtureContainer, fakeGoogle,
-  freeSpace, containerSize, playerState, tapContinue, signInDue, selectVideos,
+  freeSpace, containerSize, playerState, tapContinue, signInDue, selectVideos, downloadVideos,
 } from '../../support.js';
 
 const shared = () => ({
@@ -30,22 +31,43 @@ async function streamFromDrive(page, google, ...names) {
 const item = (page, title) => page.getByTestId('library-item').filter({ hasText: title });
 const row = (page, text) => page.getByTestId('import-status').filter({ hasText: text });
 
-// After Face ID; signed in already (by the add), so no "Continue".
-async function download(page, title) {
-  await item(page, title).getByTestId('download-button').tap();
-}
+// From the selection bar, after Face ID; signed in already (by the add), so no "Continue".
+const download = downloadVideos;
 
 test.describe('Feature: Download a streamed video', () => {
-  test('Scenario: a streamed video offers Download in the library; a stored one does not', async ({ page, setUp, seedLibrary }) => {
+  test('Scenario: Download counts only the ticked streamed videos not yet downloaded', async ({ page, setUp, seedLibrary }) => {
     const google = await fakeGoogle(page, shared());
-    await test.step('Given "tiny" is stored and "medium" is streamed', async () => {
+    await test.step('Given "Second" is stored, "tiny" and "medium" are streamed, and "medium" is downloaded', async () => {
       await goto(page, '#/library');
-      await seedLibrary('tiny');
+      await seedLibrary('Second');
+      await streamFromDrive(page, google, 'tiny.kidsvideo', 'medium.kidsvideo');
+      await download(page, 'medium');
+      await expect(item(page, 'medium')).toHaveAttribute('data-downloaded', 'true');
+    });
+    await test.step('When I tick "Second" alone', async () => {
+      await selectVideos(page, 'Second');
+    });
+    await test.step('Then the selection bar offers no Download', async () => {
+      await expect(page.getByTestId('selection-play')).toBeVisible();
+      await expect(page.getByTestId('selection-download')).toBeHidden();
+    });
+    await test.step('When I also tick "medium" and "tiny"', async () => {
+      await item(page, 'medium').tap();
+      await item(page, 'tiny').tap();
+    });
+    await test.step('Then it offers "Download 1"', async () => {
+      await expect(page.getByTestId('selection-download')).toHaveText('Download 1');
+    });
+  });
+
+  test('Scenario: the library tiles carry no Download button', async ({ page, setUp }) => {
+    const google = await fakeGoogle(page, shared());
+    await test.step('Given "medium" is streamed', async () => {
+      await goto(page, '#/library');
       await streamFromDrive(page, google, 'medium.kidsvideo');
     });
-    await test.step('Then only "medium" offers Download', async () => {
-      await expect(item(page, 'medium').getByTestId('download-button')).toBeVisible();
-      await expect(item(page, 'tiny').getByTestId('download-button')).toHaveCount(0);
+    await test.step('Then its tile has no button', async () => {
+      await expect(item(page, 'medium').getByRole('button')).toHaveCount(0);
     });
   });
 
@@ -55,9 +77,10 @@ test.describe('Feature: Download a streamed video', () => {
       await goto(page, '#/library');
       await streamFromDrive(page, google, 'medium.kidsvideo');
     });
-    await test.step('When I tap Download, Face ID fails, and I cancel', async () => {
+    await test.step('When I tick it, tap "Download 1", Face ID fails, and I cancel', async () => {
+      await selectVideos(page, 'medium');
       await faceId.willFail();
-      await item(page, 'medium').getByTestId('download-button').tap();
+      await page.getByTestId('selection-download').tap();
       await page.getByTestId('unlock-cancel').tap();
     });
     await test.step('Then nothing is downloaded', async () => {
@@ -250,11 +273,13 @@ test.describe('Feature: Download a streamed video', () => {
       await download(page, 'tiny');
       await download(page, 'medium');
     });
-    await test.step('Then both say they are downloading, and neither offers Download again', async () => {
+    await test.step('Then both say they are downloading, and ticking them offers no Download again', async () => {
       for (const title of ['tiny', 'medium']) {
         await expect(item(page, title)).toHaveAttribute('data-downloaded', 'downloading');
-        await expect(item(page, title).getByTestId('download-button')).toHaveCount(0);
       }
+      await selectVideos(page, 'tiny', 'medium');
+      await expect(page.getByTestId('selection-download')).toBeHidden();
+      await page.getByTestId('selection-cancel').tap();
     });
     await test.step('And when Google Drive answers, both are downloaded', async () => {
       releaseTiny();

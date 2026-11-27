@@ -38,7 +38,8 @@ const state = {
   features: {}, // running optional features, by id (features.js)
   jobs: [], // adds and downloads, one row each: { phase: 'storing' | 'done' | 'error' | 'cancelled', progress, message, cancel }
   signingIn: null, // a Google sign-in started by the tap that opened a streamed video
-  downloadTarget: null, // the streamed video whose Download asked for unlocking
+  online: navigator.onLine, // with no connection, streamed videos can't play
+  downloadedOnly: false, // the library's "Downloaded" filter (not saved)
   downloading: new Set(), // the streamed videos being downloaded (their URIs)
   // Videos ticked to play in a row (catalogue ids, in the order ticked); null
   // while not selecting. Not saved.
@@ -95,6 +96,7 @@ function tile(testid, poster, ...texts) {
 // Opening a video remembers where Back should return to. A streamed video
 // renews the Google sign-in on this tap if needed, so it is ready by play.
 function openFrom(c, from) {
+  if (!state.online && streamsNow(c)) return; // dimmed: it can't play with no connection
   state.returnTo = from;
   state.signingIn = streamsNow(c) ? signInIfNeeded() : null;
   state.signingIn?.catch(() => {}); // a failed sign-in is shown by the player
@@ -183,30 +185,34 @@ function onEnded() {
   location.replace(`#/player/${encodeURIComponent(list.ids[list.index])}`);
 }
 
-// A streamed video's tile says whether it is downloaded, and offers Download
-// (behind unlocking) while it isn't. Stored videos are already on the device.
+// A streamed video's tile says whether it is downloaded (a "Downloaded"
+// badge), and is dimmed with no connection unless it is. Stored videos are
+// always on the device. Downloading is from the selection bar.
 function downloadControls(li, c) {
   if (c.playsFrom !== 'drive') return;
   li.dataset.downloaded = c.download ? 'true' : (state.downloading.has(c.offlineUri) ? 'downloading' : 'false');
-  if (li.dataset.downloaded !== 'false') return;
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.dataset.testid = 'download-button';
-  button.textContent = 'Download';
-  button.addEventListener('click', (event) => {
-    event.stopPropagation(); // not opening the video
-    state.downloadTarget = c;
-    askUnlock('download');
-  });
-  li.append(button);
+  if (!state.online && streamsNow(c)) li.dataset.unavailable = 'true';
+  if (!c.download) return;
+  const badge = document.createElement('span');
+  badge.dataset.testid = 'downloaded-badge';
+  badge.textContent = 'Downloaded';
+  li.append(badge);
 }
+
+// Plays with no connection: stored, or streamed and downloaded.
+const onDevice = (c) => !streamsNow(c);
+// Ticked videos that Download would download: streamed, not downloaded or downloading.
+const toDownload = (s) => s.library.filter((c) => s.selection.includes(c.offlineUri)
+  && c.playsFrom === 'drive' && !c.download && !s.downloading.has(c.offlineUri));
 
 // "3 episodes" when every video in it is numbered, else "3 videos".
 function seriesTile(name, episodes) {
   const noun = episodes.every((c) => c.group.season !== undefined) ? 'episode' : 'video';
-  const count = `${episodes.length} ${noun}${episodes.length === 1 ? '' : 's'}`;
+  const downloaded = episodes.filter((c) => c.download).length;
+  const count = `${episodes.length} ${noun}${episodes.length === 1 ? '' : 's'}${downloaded ? ` · ${downloaded} downloaded` : ''}`;
   const li = tile('series-item', episodes[0].appMetadata?.poster, name, count);
   li.dataset.series = name;
+  if (!state.online && !episodes.some(onDevice)) li.dataset.unavailable = 'true';
   li.addEventListener('click', () => go(`#/series/${encodeURIComponent(name)}`));
   return li;
 }
@@ -265,16 +271,20 @@ function render(s) {
   show('screen-library', s.route.name === 'library');
   $('screen-library').dataset.state = s.library.length ? 'ready' : 'empty';
   const query = s.search.trim().toLowerCase();
+  // The "Downloaded" filter keeps what plays with no connection.
+  const visible = s.downloadedOnly ? s.library.filter(onDevice) : s.library;
   const shown = query
-    ? s.library.filter((c) => c.appMetadata.title.toLowerCase().includes(query))
-    : s.library;
+    ? visible.filter((c) => c.appMetadata.title.toLowerCase().includes(query))
+    : visible;
   // While searching, matching episodes are listed one by one.
   document.querySelector('[data-role="library-grid"]').replaceChildren(
-    ...(query ? shown.map(videoTile) : libraryTiles(s.library)),
+    ...(query ? shown.map(videoTile) : libraryTiles(visible)),
   );
   renderSearchField(s);
   show('search-clear', s.search !== '');
   show('search-empty', query !== '' && shown.length === 0);
+  $('library-filter').setAttribute('aria-pressed', String(s.downloadedOnly));
+  show('filter-empty', s.downloadedOnly && query === '' && visible.length === 0);
 
   renderJobs(s.jobs);
   renderChoosing(s);
@@ -287,6 +297,9 @@ function render(s) {
     $('selection-count').textContent = `${s.selection.length} selected`;
     $('selection-play').textContent = `Play ${s.selection.length}`;
     $('selection-remove').textContent = `Remove ${s.selection.length}`;
+    const downloads = toDownload(s).length;
+    show('selection-download', downloads > 0);
+    $('selection-download').textContent = `Download ${downloads}`;
   }
 
   // Series: its episodes, in season/episode order
@@ -295,7 +308,7 @@ function render(s) {
     const hash = `#/series/${encodeURIComponent(s.route.series)}`;
     document.querySelector('[data-role="series-title"]').textContent = s.route.series;
     document.querySelector('[data-role="episode-grid"]').replaceChildren(
-      ...s.library.filter((c) => c.group?.name === s.route.series)
+      ...visible.filter((c) => c.group?.name === s.route.series)
         .map((c) => episodeTile(c, hash)),
     );
   }
@@ -405,8 +418,10 @@ async function acceptPrompt(prompt) {
     // Within the tap on "Continue", so the browser allows opening the picker.
     $('import-input').click();
   } else if (purpose === 'download') {
-    // Within a tap too when a Google sign-in is due (needsTap).
-    downloadVideo(state.downloadTarget, signInIfNeeded());
+    // Within a tap too when a Google sign-in is due (needsTap). One sign-in for all.
+    const signing = signInIfNeeded();
+    for (const c of toDownload(state)) downloadVideo(c, signing);
+    state.selection = null;
   } else if (purpose === 'drive') {
     // Likewise: Google's sign-in opens a pop-up.
     pickFromDrive(addFromDrive);
@@ -1012,6 +1027,11 @@ async function boot() {
   $('selection-cancel').addEventListener('click', () => { state.selection = null; update(); });
   $('selection-play').addEventListener('click', playSelection);
   $('selection-remove').addEventListener('click', () => askUnlock('remove'));
+  $('selection-download').addEventListener('click', () => askUnlock('download'));
+  $('library-filter').addEventListener('click', () => { state.downloadedOnly = !state.downloadedOnly; update(); });
+  for (const event of ['online', 'offline']) {
+    window.addEventListener(event, () => { state.online = navigator.onLine; update(); });
+  }
   initSearch();
   window.addEventListener('hashchange', onRouteChange);
 

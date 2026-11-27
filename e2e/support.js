@@ -514,16 +514,26 @@ export async function fakeGoogle(page, files, folders = {}) {
   };
 }
 
-// Tick videos for the selection bar: hold the first library tile (the finger
-// stays down 600 ms; the app's hold is 500 ms; needs page.clock), tap the rest.
+// Tick videos for the selection bar (library or series screen): hold the first
+// tile until the app ticks it (its hold is 500 ms), then tap the rest.
 export async function selectVideos(page, first, ...rest) {
-  const tile = (title) => page.getByTestId('library-item').filter({ hasText: title });
+  const tile = (title) => page.locator('[data-testid="library-item"]:visible, [data-testid="episode-item"]:visible')
+    .filter({ hasText: title });
   const opts = { pointerType: 'touch', isPrimary: true, button: 0 };
   await tile(first).dispatchEvent('pointerdown', opts);
-  await page.clock.runFor(600);
+  await expect(tile(first)).toHaveAttribute('aria-checked', 'true');
   await tile(first).dispatchEvent('pointerup', opts);
   await tile(first).dispatchEvent('click');
   for (const title of rest) await tile(title).tap();
+}
+
+// Download from the selection bar: tick the videos, tap "Download N", pass Face ID
+// (and "Continue" when a Google sign-in is due).
+export async function downloadVideos(page, ...titles) {
+  const signingIn = await signInDue(page);
+  await selectVideos(page, ...titles);
+  await page.getByTestId('selection-download').tap();
+  if (signingIn) await tapContinue(page);
 }
 
 // Fire a Media Session action as the OS would (headphones, lock screen, media keys).

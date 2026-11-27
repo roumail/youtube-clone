@@ -8,7 +8,9 @@
 // or recently finished there is no row.
 // Google is faked at the network boundary. Not @ipad, for the same reason as
 // add-from-drive.spec.js.
-import { test, expect, goto, fixtureContainer, fakeGoogle, tapContinue, signInDue } from '../../support.js';
+import {
+  test, expect, goto, fixtureContainer, fakeGoogle, tapContinue, signInDue, downloadVideos,
+} from '../../support.js';
 
 const shelf = () => ({
   'Show - S01E01 - First.kidsvideo': fixtureContainer('Show - S01E01 - First'),
@@ -31,10 +33,8 @@ async function addFromDrive(page, google, ...names) {
   if (signingIn) await tapContinue(page);
 }
 
-// After Face ID; signed in already (by the add), so no "Continue".
-async function download(page, title) {
-  await item(page, title).getByTestId('download-button').tap();
-}
+// From the selection bar, after Face ID; signed in already (by the add), so no "Continue".
+const download = downloadVideos;
 
 test.describe('Feature: One row per add or download', () => {
   test('Scenario: with nothing added or downloaded, there is no row', async ({ page, setUp }) => {
