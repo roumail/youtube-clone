@@ -59,7 +59,8 @@ implementing until `go test` is green.
   "Frozen 2 2019"; from yt-dlp, "Song｜ Artist [WzlO79d3S8c]" → "Song -
   Artist"); `--title` sets it for a single input. A title from the file name
   that is over 95 bytes is cut at a word to fit, and the tool says so; a
-  `--title` over 95 bytes is refused.
+  `--title` over 95 bytes is refused. Any letters work (accents, other
+  scripts); in UTF-8 an accented letter takes 2 bytes or more.
 - **Series:** with `--series NAME`, a file name carrying its season and
   episode (S01E03, s1e3, 1x03) gets the title
   "NAME - S01E03 - Episode title"; any other gets "NAME - Title" (the tidied
