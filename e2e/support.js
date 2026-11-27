@@ -534,6 +534,8 @@ export async function downloadVideos(page, ...titles) {
   await selectVideos(page, ...titles);
   await page.getByTestId('selection-download').tap();
   if (signingIn) await tapContinue(page);
+  // Face ID passed and the downloads started: the selection is over.
+  await expect(page.getByTestId('selection-bar')).toBeHidden();
 }
 
 // Fire a Media Session action as the OS would (headphones, lock screen, media keys).

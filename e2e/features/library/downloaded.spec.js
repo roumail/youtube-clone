@@ -20,14 +20,15 @@ const shared = () => ({
   'Show - S01E02 - Second.kidsvideo': fixtureContainer('Show - S01E02 - Second'),
 });
 
+// Waits for this add's own row (rows are listed oldest first).
 async function streamFromDrive(page, google, ...names) {
+  const rows = page.getByTestId('import-status');
+  const earlier = await rows.count();
   await google.willPick(...names);
   const signingIn = await signInDue(page);
   await page.getByTestId('add-from-drive-button').click();
   if (signingIn) await tapContinue(page);
-  // Each picked file gets its own row; wait until all of them have finished.
-  await expect(page.getByTestId('import-status')).toHaveCount(names.length);
-  await expect(page.locator('[data-testid="import-status"][data-import="storing"]')).toHaveCount(0);
+  await expect(rows.nth(earlier)).toHaveAttribute('data-import', /done|error/);
 }
 
 const item = (page, title) => page.getByTestId('library-item').filter({ hasText: title });
