@@ -359,4 +359,59 @@ test.describe('Feature: Watch-time limit (optional)', () => {
       await expect.poll(() => faceId.uses()).toBe(before + 1);
     });
   });
+
+  // The clock next to the session times: a shortcut to a new time limit,
+  // without going back to Settings.
+  async function playWithTimeLeft(page, seedLibrary) {
+    await page.addInitScript(() => localStorage.setItem('watchTime.session', JSON.stringify({ budget: 1800, used: 1500 })));
+    await goto(page, '#/library');
+    await seedLibrary('medium');
+    await openVideo(page, 'medium');
+    await startPlaying(page);
+  }
+  const session = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('watchTime.session')));
+
+  test('Scenario: the clock sets a new time limit after Face ID, and the video goes on @ipad', async ({ page, setUp, seedLibrary, faceId }) => {
+    await enableWatchTime(page);
+    await test.step('Given "medium" is playing with 5 minutes of a 30-minute session left', async () => {
+      await playWithTimeLeft(page, seedLibrary);
+    });
+    await test.step('When I tap the clock and pass Face ID', async () => {
+      const before = await faceId.uses();
+      await page.getByTestId('timer-button').click();
+      await expect.poll(() => faceId.uses()).toBe(before + 1);
+    });
+    await test.step('Then the video is paused and the budget prompt asks how long they can watch', async () => {
+      await expect(page.getByTestId('budget-prompt')).toBeVisible();
+      await expectNotPlaying(page);
+    });
+    await test.step('When I choose 45 minutes', async () => {
+      await page.getByTestId('budget-option-45').click();
+    });
+    await test.step('Then the video goes on with a fresh 45 minutes', async () => {
+      await expectPlaying(page);
+      await expect(page.getByTestId('session-remaining')).toHaveText(/^4[45]:\d\d left$/);
+      expect((await session(page)).budget).toBe(45 * 60);
+    });
+  });
+
+  test('Scenario: cancelling after the clock keeps the time limit it had, paused', async ({ page, setUp, seedLibrary }) => {
+    await enableWatchTime(page);
+    await test.step('Given "medium" is playing with 5 minutes of a 30-minute session left', async () => {
+      await playWithTimeLeft(page, seedLibrary);
+    });
+    await test.step('When I tap the clock, pass Face ID and tap Cancel', async () => {
+      await page.getByTestId('timer-button').click();
+      await expect(page.getByTestId('budget-prompt')).toBeVisible();
+      await page.getByTestId('budget-cancel').click();
+    });
+    await test.step('Then the video is paused and the session is the one it had', async () => {
+      await expect(page.getByTestId('budget-prompt')).toBeHidden();
+      await expect(playerState(page)).toHaveAttribute('data-state', 'paused');
+      await expectNotPlaying(page);
+      const s = await session(page);
+      expect(s.budget).toBe(1800);
+      expect(s.used).toBeGreaterThanOrEqual(1500);
+    });
+  });
 });

@@ -1,7 +1,8 @@
 // Feature "watchTimeLimit": the parent sets a time budget at the
 // first play of a session; one budget for all videos; only actual playing time
 // counts; the session survives refreshes and relaunches and never ends by
-// itself — only a used-up budget or the parent (Settings → End session).
+// itself — only a used-up budget or the parent (Settings → End session). The
+// clock in the player asks the parent (Face ID) for a new budget at any time.
 // "Time is up" shows the parent's picture and plays a tune (time-up.js).
 import { initTimeUp } from './time-up.js';
 
@@ -104,10 +105,13 @@ export function init(ctx) {
 
   render();
   return {
-    /** Called after unlocking play. Returns true if it takes over (asks for a budget). */
-    beforePlay(proceed, cancel) {
+    /**
+     * Called after unlocking play. Returns true if it takes over (asks for a
+     * budget). newBudget: asked from the clock, so it asks even with time left.
+     */
+    beforePlay(proceed, cancel, newBudget) {
       const s = read();
-      if (s && s.used < s.budget) return false;
+      if (!newBudget && s && s.used < s.budget) return false;
       onChosen = proceed; onCancel = cancel;
       resetCustom();
       prompt.hidden = false;
