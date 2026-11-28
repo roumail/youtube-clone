@@ -76,6 +76,9 @@
       <audio data-testid="time-up-sound" data-sound="built-in" preload="auto"></audio>
       <!-- Optional feature "watchTimeLimit" (features/watch-time.js) -->
       <div class="session-bar" data-testid="session-bar" hidden>
+        <button type="button" class="timer-button" data-testid="timer-button" aria-label="Change the time limit">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </button>
         <span data-testid="session-time" data-seconds="0"></span>
         <span data-testid="session-remaining"></span>
         <span data-testid="clock"></span>

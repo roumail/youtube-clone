@@ -168,6 +168,7 @@ function render(s) {
     watchSignIn();
     show('play-button', ['paused', 'ended', 'pin-required', 'time-up'].includes(status));
     show('pause-button', status === 'playing');
+    $('timer-button').disabled = !['playing', 'paused', 'ended', 'time-up'].includes(status);
   }
 
   // Settings
@@ -282,7 +283,7 @@ async function acceptPrompt(prompt) {
     // they call proceed() from their own tap.
     const proceed = () => { allowPlay(signInForPlay()).then(update); update(); };
     const cancel = () => { cancelPlay(); update(); };
-    if (Object.values(state.features).some((f) => f.beforePlay?.(proceed, cancel))) return update();
+    if (Object.values(state.features).some((f) => f.beforePlay?.(proceed, cancel, prompt.newBudget))) return update();
     await allowPlay(signInForPlay()); // a refusal shows Play again (player.js)
   }
   update();
@@ -505,6 +506,16 @@ function onPlayRequested(byTap) {
   if (requestPlay()) askUnlock('play', byTap);
 }
 
+// The clock in the session bar: a new time limit, behind Face ID. The video
+// pauses meanwhile; choosing a time plays it, Cancel leaves it paused with the
+// time limit it had. Only offered while the video can play (render).
+function onTimerTapped() {
+  pause();
+  requestPlay();
+  askUnlock('play');
+  state.prompt.newBudget = true;
+}
+
 function onPause() {
   pause();
   if (state.prompt?.purpose === 'play') state.prompt = null;
@@ -594,6 +605,7 @@ async function boot() {
   $('add-from-drive-button').addEventListener('click', () => askUnlock('drive'));
   $('play-button').addEventListener('click', () => onPlayRequested(true));
   $('pause-button').addEventListener('click', onPause);
+  $('timer-button').addEventListener('click', onTimerTapped);
   $('drive-choose-toggle').addEventListener('click', onChooseToggle);
   $('drive-choose-cancel').addEventListener('click', onChooseCancel);
   $('drive-choose-add').addEventListener('click', onChooseAdd);

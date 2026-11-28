@@ -94,6 +94,8 @@ progress[data-testid="import-progress"] { display: block; width: 100%; margin: 4
   font-variant-numeric: tabular-nums; font-size: 0.95rem;
 }
 [data-testid="session-remaining"] { font-weight: 700; }
+/* The clock: a shortcut to a new time limit (behind Face ID). */
+[data-testid="screen-player"] .timer-button { display: grid; place-items: center; padding: 6px; margin: -6px 0 -6px -8px; background: none; backdrop-filter: none; min-width: 44px; min-height: 44px; }
 [data-testid="screen-player"][data-state="time-up"]::after {
   content: "Time is up"; position: absolute; z-index: 2; top: 40%; width: 100%; text-align: center;
   font-size: 2rem; font-weight: 700; color: var(--fg); text-shadow: 0 2px 12px #000;
