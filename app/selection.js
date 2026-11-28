@@ -20,11 +20,18 @@ function openFrom(c, from) {
 
 // A tap opens a video; holding it starts selecting and ticks it. While
 // selecting, a tap ticks or unticks. Lifting the finger after a hold may still
-// send a click, which is not a tap.
-const HOLD_MS = 500;
+// send a click, which is not a tap. The finger may wobble a little during the
+// hold; moving further (a scroll) is not a hold. The tile sinks while held.
+const HOLD_MS = 400;
+const WOBBLE_PX = 12;
 let holdTimer = null;
+let holding = null; // { li, x, y }: the tile being held and where the finger went down
 let held = false;
-const clearHold = () => { clearTimeout(holdTimer); holdTimer = null; };
+function clearHold() {
+  clearTimeout(holdTimer);
+  holding?.li.removeAttribute('data-holding');
+  holding = null;
+}
 
 export function selectable(li, c, from) {
   const id = c.offlineUri;
@@ -40,16 +47,21 @@ export function selectable(li, c, from) {
     }
   }
   // A hold only starts selecting; while selecting, any press is a tap.
-  li.addEventListener('pointerdown', () => {
+  li.addEventListener('pointerdown', (event) => {
     held = false;
     clearHold();
     if (state.selection) return;
+    holding = { li, x: event.clientX, y: event.clientY };
+    li.setAttribute('data-holding', '');
     holdTimer = setTimeout(() => {
-      holdTimer = null;
+      holding = null;
       held = true;
       state.selection = [id];
       update();
     }, HOLD_MS);
+  });
+  li.addEventListener('pointermove', (event) => {
+    if (holding && Math.hypot(event.clientX - holding.x, event.clientY - holding.y) > WOBBLE_PX) clearHold();
   });
   for (const type of ['pointerup', 'pointercancel', 'pointerleave']) li.addEventListener(type, clearHold);
   li.addEventListener('contextmenu', (event) => event.preventDefault());

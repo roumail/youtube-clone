@@ -515,7 +515,7 @@ export async function fakeGoogle(page, files, folders = {}) {
 }
 
 // Tick videos for the selection bar (library or series screen): hold the first
-// tile until the app ticks it (its hold is 500 ms), then tap the rest.
+// tile until the app ticks it (its hold is 400 ms), then tap the rest.
 export async function selectVideos(page, first, ...rest) {
   const tile = (title) => page.locator('[data-testid="library-item"]:visible, [data-testid="episode-item"]:visible')
     .filter({ hasText: title });
