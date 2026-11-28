@@ -142,7 +142,10 @@ progress[data-testid="import-progress"] { display: block; width: 100%; margin: 4
 .seek input[type="range"] { flex: 1; height: 32px; accent-color: var(--fg); }
 
 /* Playlist: holding a tile starts selecting; ticked tiles show their place. */
-.grid li { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; position: relative; }
+.grid li { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; position: relative; transition: transform 0.15s; }
+/* While held, the tile sinks until selecting starts; its picture can't be dragged away. */
+.grid li[data-holding] { transform: scale(0.94); transition: transform 0.4s ease-out; }
+.grid li img { pointer-events: none; -webkit-user-drag: none; }
 .grid li[aria-checked="true"] { outline: 3px solid var(--fg); outline-offset: -3px; }
 [data-testid="selection-number"] {
   position: absolute; top: 8px; left: 8px; min-width: 2em; padding: 4px 8px !important; text-align: center;

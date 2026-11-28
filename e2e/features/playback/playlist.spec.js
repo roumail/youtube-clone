@@ -19,7 +19,7 @@ import {
 
 const tile = (page, title) => page.getByTestId('library-item').filter({ hasText: title });
 
-// A held tap: the finger stays down for 600 ms (the app's hold is 500 ms).
+// A held tap: the finger stays down for 600 ms (the app's hold is 400 ms).
 // Lifting it may still send a click (Chrome does), which must not count as a tap.
 async function hold(page, locator) {
   await locator.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true, button: 0 });
@@ -57,6 +57,43 @@ test.describe('Feature: Play several (a playlist)', () => {
       await expect(tile(page, 'tiny').getByTestId('selection-number')).toHaveText('1');
       await expect(page.getByTestId('unlock-prompt')).toBeHidden();
       await expect(page.getByTestId('screen-player')).toBeHidden();
+    });
+  });
+
+  test('Scenario: a finger that wobbles a little still holds, and the tile shows it is held @ipad', async ({ page }) => {
+    const touch = (x, y) => ({ pointerType: 'touch', isPrimary: true, button: 0, clientX: x, clientY: y });
+    await test.step('When I put a finger on "tiny"', async () => {
+      await tile(page, 'tiny').dispatchEvent('pointerdown', touch(100, 100));
+    });
+    await test.step('Then the tile shows it is being held', async () => {
+      await expect(tile(page, 'tiny')).toHaveAttribute('data-holding', '');
+    });
+    await test.step('When the finger wobbles a few points while it stays down, and lifts', async () => {
+      await tile(page, 'tiny').dispatchEvent('pointermove', touch(106, 104));
+      await page.clock.runFor(600);
+      await tile(page, 'tiny').dispatchEvent('pointermove', touch(108, 98));
+      await tile(page, 'tiny').dispatchEvent('pointerup', touch(108, 98));
+      await tile(page, 'tiny').dispatchEvent('click');
+    });
+    await test.step('Then the library is selecting with "tiny" ticked, and nothing opened', async () => {
+      await expect(page.getByTestId('screen-library')).toHaveAttribute('data-mode', 'select');
+      await expect(tile(page, 'tiny')).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByTestId('screen-player')).toBeHidden();
+    });
+  });
+
+  test('Scenario: a finger that moves away during the hold is a scroll, not a hold', async ({ page }) => {
+    const touch = (x, y) => ({ pointerType: 'touch', isPrimary: true, button: 0, clientX: x, clientY: y });
+    await test.step('When I put a finger on "tiny" and move it away before the hold, then lift it', async () => {
+      await tile(page, 'tiny').dispatchEvent('pointerdown', touch(100, 100));
+      await tile(page, 'tiny').dispatchEvent('pointermove', touch(100, 140));
+      await page.clock.runFor(600);
+      await tile(page, 'tiny').dispatchEvent('pointerup', touch(100, 140));
+    });
+    await test.step('Then nothing is ticked and the tile is no longer shown as held', async () => {
+      await expect(page.getByTestId('screen-library')).not.toHaveAttribute('data-mode', 'select');
+      await expect(tile(page, 'tiny')).not.toHaveAttribute('aria-checked');
+      await expect(tile(page, 'tiny')).not.toHaveAttribute('data-holding');
     });
   });
 
